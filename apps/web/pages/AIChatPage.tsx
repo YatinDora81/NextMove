@@ -1,6 +1,7 @@
 "use client"
-import React, { useState, useEffect, useRef, useMemo } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { Copy, Check, RotateCcw, Plus, MessageSquare, Menu, X } from "lucide-react"
+import { useToast, ToastContainer } from "@/lib/toast"
 import {
   Card,
   CardContent,
@@ -18,51 +19,88 @@ type Message = {
   options?: string[]
 }
 
-type ChatSession = {
+type ChatRoom = {
   id: string
   title: string
-  messages: Message[]
+  description?: string
+  roomId?: string
   createdAt: Date
   lastMessage?: string
 }
 
+type UserChoices = {
+  messageFormat: string
+  action: string
+}
+
+
+// All conversation flow messages in order
+const CONVERSATION_MESSAGES: Message[] = [
+  {
+    id: 1,
+    role: "ai",
+    content: "Welcome! Let's start by choosing your message format:",
+    type: "options",
+    options: ["Simple Message", "Email Format"]
+  },
+  {
+    id: 2,
+    role: "ai",
+    content: "Great! Now choose what you'd like to do:",
+    type: "options",
+    options: ["Generate", "Follow Up"]
+  }
+]
+
+
+// Typing indicator component
+const TypingIndicator = () => (
+  <div className="flex justify-start">
+    <div className="max-w-[80%] bg-muted/60 rounded-2xl p-4 shadow-sm border">
+      <div className="flex justify-between items-start mb-2">
+        <p className="text-sm font-medium text-muted-foreground">AI Assistant</p>
+      </div>
+      <div className="flex items-center space-x-1">
+        <span className="text-base">AI is typing</span>
+        <div className="flex space-x-1 ml-2">
+          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+)
+
+
 export default function AiChatPage() {
-  const [chatSessions, setChatSessions] = useState<ChatSession[]>([
-    {
-      id: "chat-1",
-      title: "New Chat",
-      messages: [
-        {
-          id: 1,
-          role: "ai",
-          content: "Welcome! Let's start by choosing your message format:",
-          type: "options",
-          options: ["Simple Message", "Email Format"]
-        }
-      ],
-      createdAt: new Date(),
-      lastMessage: "Welcome! Let's start by choosing your message format:"
-    }
-  ])
-  const [currentChatId, setCurrentChatId] = useState<string>("chat-1")
+  // Clean state management
+  const [rooms, setRooms] = useState<ChatRoom[]>([{
+    id: "chat-1",
+    title: "New Chat", 
+    createdAt: new Date(),
+    lastMessage: CONVERSATION_MESSAGES[0]?.content || ""
+  }])
+  const [currentChat, setCurrentChat] = useState<Message[]>([CONVERSATION_MESSAGES[0]!])
+  const [currentRoomId, setCurrentRoomId] = useState<string>("chat-1")
+  const [currentMessageNum, setCurrentMessageNum] = useState<number>(0)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [input, setInput] = useState("")
-  const [selectedFormat, setSelectedFormat] = useState("")
-  const [selectedAction, setSelectedAction] = useState("")
-  const [showInput, setShowInput] = useState(false)
+  const [userChoices, setUserChoices] = useState<UserChoices>({ messageFormat: "", action: "" })
   const [copiedMessageId, setCopiedMessageId] = useState<number | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const currentChat = chatSessions.find(chat => chat.id === currentChatId)
-  const messages = useMemo(() => currentChat?.messages || [], [currentChat?.messages])
+  // Toast management
+  const { toasts, showWaitToast, showSuccessToast, showErrorToast, showCreateRoomToast } = useToast()
 
+  // Computed values
+  const showInput = currentMessageNum >= CONVERSATION_MESSAGES.length
+
+  // Helper functions
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
-
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages])
 
   const copyToClipboard = async (text: string, messageId: number) => {
     try {
@@ -74,140 +112,196 @@ export default function AiChatPage() {
     }
   }
 
-  const updateCurrentChatMessages = (newMessages: Message[]) => {
-    setChatSessions(prev => prev.map(chat =>
-      chat.id === currentChatId
-        ? {
-          ...chat,
-          messages: newMessages,
-          lastMessage: newMessages[newMessages.length - 1]?.content || ""
-        }
-        : chat
+
+  // Auto-scroll when messages change
+  useEffect(() => {
+    scrollToBottom()
+  }, [currentChat])
+
+  // Simple helper functions  
+  const updateCurrentRoom = (updates: Partial<ChatRoom>) => {
+    setRooms(prev => prev.map(room =>
+      room.id === currentRoomId ? { ...room, ...updates } : room
     ))
   }
 
   const createNewChat = () => {
-    const newChatId = `chat-${Date.now()}`
-    const newChat: ChatSession = {
-      id: newChatId,
-      title: "New Chat",
-      messages: [
-        {
-          id: 1,
-          role: "ai",
-          content: "Welcome! Let's start by choosing your message format:",
-          type: "options",
-          options: ["Simple Message", "Email Format"]
-        }
-      ],
-      createdAt: new Date(),
-      lastMessage: "Welcome! Let's start by choosing your message format:"
-    }
+    const hasUserMessages = currentChat.some(msg => msg.role === "user")
+    
+    if (!hasUserMessages) {
+      // Reset current chat
+      setCurrentChat([CONVERSATION_MESSAGES[0]!])
+      setCurrentMessageNum(0)
+      setUserChoices({ messageFormat: "", action: "" })
+      setCopiedMessageId(null)
+      setIsLoading(false)
+      updateCurrentRoom({ 
+        title: "New Chat", 
+        description: undefined,
+        roomId: undefined,
+        lastMessage: CONVERSATION_MESSAGES[0]?.content || ""
+      })
+    } else {
+      // Create new room
+      const newRoomId = `chat-${Date.now()}`
+      const newRoom: ChatRoom = {
+        id: newRoomId,
+        title: "New Chat",
+        createdAt: new Date(),
+        lastMessage: CONVERSATION_MESSAGES[0]?.content || ""
+      }
 
-    setChatSessions(prev => [...prev, newChat])
-    setCurrentChatId(newChatId)
-    setSelectedFormat("")
-    setSelectedAction("")
-    setShowInput(false)
-    setCopiedMessageId(null)
-  }
-
-  const switchToChat = (chatId: string) => {
-    setCurrentChatId(chatId)
-    const chat = chatSessions.find(c => c.id === chatId)
-    if (chat) {
-      // Reset UI state based on current chat
-      const hasSelectedFormat = chat.messages.some(m => m.role === "user" && ["Simple Message", "Email Format"].includes(m.content))
-      const hasSelectedAction = chat.messages.some(m => m.role === "user" && ["Generate", "Follow Up"].includes(m.content))
-
-      setSelectedFormat(hasSelectedFormat ? chat.messages.find(m => m.role === "user" && ["Simple Message", "Email Format"].includes(m.content))?.content || "" : "")
-      setSelectedAction(hasSelectedAction ? chat.messages.find(m => m.role === "user" && ["Generate", "Follow Up"].includes(m.content))?.content || "" : "")
-      setShowInput(hasSelectedFormat && hasSelectedAction)
+      setRooms(prev => [...prev, newRoom])
+      setCurrentRoomId(newRoomId)
+      setCurrentChat([CONVERSATION_MESSAGES[0]!])
+      setCurrentMessageNum(0)
+      setUserChoices({ messageFormat: "", action: "" })
+      setCopiedMessageId(null)
+      setIsLoading(false)
     }
     setSidebarOpen(false)
   }
 
-  const restartChat = () => {
-    const initialMessages: Message[] = [
-      {
-        id: 1,
-        role: "ai" as const,
-        content: "Welcome! Let's start by choosing your message format:",
-        type: "options",
-        options: ["Simple Message", "Email Format"]
-      }
-    ]
-    updateCurrentChatMessages(initialMessages)
-    setSelectedFormat("")
-    setSelectedAction("")
-    setShowInput(false)
+  const resetCurrentChat = () => {
+    setCurrentChat([CONVERSATION_MESSAGES[0]!])
+    setCurrentMessageNum(0)
+    setUserChoices({ messageFormat: "", action: "" })
     setCopiedMessageId(null)
+    setIsLoading(false)
+    updateCurrentRoom({ 
+      title: "New Chat", 
+      description: undefined,
+      roomId: undefined,
+      lastMessage: CONVERSATION_MESSAGES[0]?.content || ""
+    })
   }
 
+  // Message handling functions
   const handleOptionSelect = (messageId: number, option: string) => {
-    // Find the message that triggered this selection
-    const triggerMessage = messages.find(msg => msg.id === messageId)
+    // Add user response
+    const userMessage: Message = {
+      id: Date.now(),
+      role: "user" as const,
+      content: option,
+      type: "text"
+    }
+    
+    const newMessages: Message[] = [...currentChat, userMessage]
+    setCurrentChat(newMessages)
+    updateCurrentRoom({ lastMessage: option })
 
-    // Add user response first
-    const newMessages: Message[] = [
-      ...messages,
-      { id: Date.now(), role: "user" as const, content: option, type: "text" }
-    ]
-    updateCurrentChatMessages(newMessages)
+    // Store user choice
+    if (currentMessageNum === 0) {
+      setUserChoices(prev => ({ ...prev, messageFormat: option }))
+    } else if (currentMessageNum === 1) {
+      setUserChoices(prev => ({ ...prev, action: option }))
+    }
 
-    // Check if this is the first question (message format)
-    if (triggerMessage?.content.includes("message format")) {
-      setSelectedFormat(option)
-      // Add second AI message after user selects first option
+    // Move to next message or enable input
+    const nextMessageNum = currentMessageNum + 1
+    setCurrentMessageNum(nextMessageNum)
+
+    // Add next conversation message if available
+    if (nextMessageNum < CONVERSATION_MESSAGES.length) {
       setTimeout(() => {
-        const updatedMessages: Message[] = [
-          ...newMessages,
-          {
-            id: Date.now() + 1,
-            role: "ai" as const,
-            content: "Great! Now choose what you'd like to do:",
-            type: "options",
-            options: ["Generate", "Follow Up"]
-          }
-        ]
-        updateCurrentChatMessages(updatedMessages)
+        const nextMessage: Message = { ...CONVERSATION_MESSAGES[nextMessageNum]!, id: Date.now() + 1 }
+        setCurrentChat(prev => [...prev, nextMessage])
       }, 500)
     }
-    // Check if this is the second question (action)
-    else if (triggerMessage?.content.includes("what you'd like to do")) {
-      setSelectedAction(option)
-      setShowInput(true)
-    }
   }
 
-  const handleSend = () => {
+  const handleSendAttempt = () => {
+    if (isLoading) {
+      showWaitToast()
+      return
+    }
+    handleSend()
+  }
+
+  const handleSend = async () => {
     if (!input.trim()) return
 
-    const newMessage: Message = {
+    const userMessage: Message = {
       id: Date.now(),
       role: "user" as const,
       content: input,
       type: "text"
     }
 
-    const updatedMessages: Message[] = [
-      ...messages,
-      newMessage,
-      {
+    const messagesWithUser: Message[] = [...currentChat, userMessage]
+    setCurrentChat(messagesWithUser)
+    const inputText = input
+    setInput("")
+    setIsLoading(true)
+
+    try {
+      const isFirstChatMessage = currentMessageNum === CONVERSATION_MESSAGES.length
+      
+      if (isFirstChatMessage) {
+        showCreateRoomToast()
+      }
+
+      const delay = Math.random() * 2000 + 2000
+      await new Promise(resolve => setTimeout(resolve, delay))
+
+      let aiResponse: Message
+
+      if (isFirstChatMessage) {
+        const roomId = `room_${Date.now()}`
+        
+        aiResponse = {
+          id: Date.now() + 1,
+          role: "ai" as const,
+          content: `Great! I've created a room for our conversation. ${generateResponse(inputText, userChoices)}`,
+          type: "text"
+        }
+
+        updateCurrentRoom({
+          title: `Chat about ${inputText.slice(0, 30)}${inputText.length > 30 ? '...' : ''}`,
+          roomId,
+          lastMessage: aiResponse.content
+        })
+
+        showSuccessToast(`Room created successfully!`)
+      } else {
+        aiResponse = {
+          id: Date.now() + 1,
+          role: "ai" as const,
+          content: generateResponse(inputText, userChoices),
+          type: "text"
+        }
+
+        updateCurrentRoom({ lastMessage: aiResponse.content })
+      }
+
+      setCurrentChat([...messagesWithUser, aiResponse])
+
+    } catch (error) {
+      console.error('Error sending message:', error)
+      showErrorToast('Failed to send message. Please try again.')
+      
+      const errorMessage: Message = {
         id: Date.now() + 1,
         role: "ai" as const,
-        content: "Processing your request... AI response coming soon!",
+        content: "Sorry, I encountered an error. Please try again.",
         type: "text"
       }
-    ]
-    updateCurrentChatMessages(updatedMessages)
-    setInput("")
+      setCurrentChat([...messagesWithUser, errorMessage])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const generateResponse = (userInput: string, choices: UserChoices): string => {
+    return `I received your message: "${userInput}". Here's my response based on your chosen format (${choices.messageFormat}) and action (${choices.action}). This is a simulated AI response that would normally come from your API.`
   }
 
   return (
     <div className="w-full flex flex-row mt-16 h-[calc(100vh-4rem)] bg-background">
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} />
       {/* Sidebar */}
-      <div className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} w-80 h-full bg-card border-r flex flex-col flex-shrink-0 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static`}>
+      <div className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} w-80 h-full bg-card border-r flex flex-col transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:flex-shrink-0 fixed lg:relative z-30`}>
         <div className="flex flex-col h-full">
           {/* Sidebar Header */}
           <div className="flex items-center justify-between p-4 py-[27px] border-b bg-card">
@@ -235,23 +329,33 @@ export default function AiChatPage() {
           </div>
 
           {/* Chat List */}
-          <div className="flex-1 overflow-y-auto p-2 scrollbar-sleek">
-            {chatSessions.map((chat) => (
+          <div className="flex-1 w-full overflow-y-auto p-2 scrollbar-sleek">
+            {rooms.map((room) => (
               <div
-                key={chat.id}
-                onClick={() => switchToChat(chat.id)}
-                className={`p-3 rounded-lg mb-2 cursor-pointer transition-colors hover:bg-muted/60 ${currentChatId === chat.id ? 'bg-muted border border-border' : ''
+                key={room.id}
+                onClick={() => setCurrentRoomId(room.id)}
+                className={`p-3 rounded-lg mb-2 cursor-pointer transition-colors hover:bg-muted/60 ${currentRoomId === room.id ? 'bg-muted border border-border' : ''
                   }`}
               >
                 <div className="flex items-start gap-3">
                   <MessageSquare className="h-4 w-4 mt-1 text-muted-foreground" />
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-sm truncate">{chat.title}</h3>
+                    <h3 className="font-medium text-sm truncate">{room.title}</h3>
+                    {room.description && (
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-1 italic">
+                        {room.description}
+                      </p>
+                    )}
+                    {room.roomId && (
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 font-mono">
+                        Room ID: {room.roomId}
+                      </p>
+                    )}
                     <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                      {chat.lastMessage}
+                      {room.lastMessage}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {chat.createdAt.toLocaleDateString()}
+                      Created: {room.createdAt.toLocaleDateString()}
                     </p>
                   </div>
                 </div>
@@ -290,7 +394,7 @@ export default function AiChatPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={restartChat}
+                onClick={resetCurrentChat}
                 className="flex items-center gap-2 hover:bg-muted transition-colors"
                 title="Restart conversation"
               >
@@ -303,8 +407,8 @@ export default function AiChatPage() {
         <CardContent className="flex-1 flex flex-col min-h-0 overflow-hidden p-0">
           {/* Chat Messages */}
           <div className="flex-1 overflow-y-auto p-6 scrollbar-sleek">
-              <div className="min-h-full flex flex-col justify-end space-y-6">
-                {messages.map((msg) => (
+              <div className="min-h-full flex flex-col justify-start lg:justify-end space-y-6">
+                {currentChat.map((msg) => (
                   <div key={msg.id} className="space-y-3">
                     {/* AI Message */}
                     {msg.role === "ai" && (
@@ -339,8 +443,8 @@ export default function AiChatPage() {
                                   className="mr-2 mb-2 hover:bg-primary hover:text-primary-foreground transition-colors"
                                   onClick={() => handleOptionSelect(msg.id, option)}
                                   disabled={
-                                    (msg.content.includes("message format") && selectedFormat !== "") ||
-                                    (msg.content.includes("what you'd like to do") && selectedAction !== "")
+                                    (msg.content.includes("message format") && userChoices.messageFormat !== "") ||
+                                    (msg.content.includes("what you'd like to do") && userChoices.action !== "")
                                   }
                                 >
                                   {option}
@@ -376,6 +480,12 @@ export default function AiChatPage() {
                     )}
                   </div>
                 ))}
+                {/* Typing indicator */}
+                {isLoading && (
+                  <div className="space-y-3">
+                    <TypingIndicator />
+                  </div>
+                )}
                 <div ref={messagesEndRef} />
               </div>
             </div>
@@ -386,8 +496,8 @@ export default function AiChatPage() {
                 <div className="space-y-4">
                   {/* Display selected options */}
                   <div className="flex gap-4 text-sm text-muted-foreground">
-                    <span>Format: <strong>{selectedFormat}</strong></span>
-                    <span>Action: <strong>{selectedAction}</strong></span>
+                    <span>Format: <strong>{userChoices.messageFormat}</strong></span>
+                    <span>Action: <strong>{userChoices.action}</strong></span>
                   </div>
 
                   {/* Input area */}
@@ -397,12 +507,12 @@ export default function AiChatPage() {
                         placeholder="Type your message here..."
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                        onKeyDown={(e) => e.key === "Enter" && handleSendAttempt()}
                         className="h-12 text-base"
                       />
                     </div>
                     <Button
-                      onClick={handleSend}
+                      onClick={handleSendAttempt}
                       className="h-12 px-6 font-medium"
                       disabled={!input.trim()}
                     >
@@ -418,3 +528,4 @@ export default function AiChatPage() {
     </div>
   )
 }
+
