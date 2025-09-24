@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+  // output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Users {
+  id         String   @id
+  name       String
+  email      String   @unique
+  profilePic String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  isPaid     Boolean  @default(false)
+
+  // relations
+  resumes  Resumes[] @relation("UserResume")
+  company  Company[] @relation("CreatedByRelation")
+  messages Message[] @relation("User_Message")
+  Room     Room[]    @relation("Room_User")
+
+  @@index([id, email])
+}
+
+model Resumes {
+  id        String   @id @default(uuid())
+  name      String
+  link      String
+  userId    String
+  user      Users    @relation("UserResume", fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Role {
+  id   String  @id @default(uuid())
+  name String
+  desc String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  company   Company[] @relation("RolesRelation")
+}
+
+model Templates {
+  id          String      @id @default(uuid())
+  name        String
+  description String?
+  type        MessageType @default(MESSAGE)
+  content     String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  rules TemplateRules[] @relation("TemplateRules")
+}
+
+model TemplateRules {
+  id         String   @id @default(uuid())
+  rule       String
+  templateId String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  templateRelation Templates @relation("TemplateRules", fields: [templateId], references: [id])
+}
+
+model Company {
+  id        String   @id @default(uuid())
+  name      String
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  roles     Role[]   @relation("RolesRelation")
+
+  createdByRelation Users @relation("CreatedByRelation", fields: [createdBy], references: [id])
+}
+
+model Message {
+  id      String    @id @default(uuid())
+  message String
+  by      MessageBy
+  userId  String
+  roomId  String
+  // relations
+  user    Users     @relation("User_Message", fields: [userId], references: [id])
+  room    Room      @relation("Room_Messages", fields: [roomId], references: [id])
+}
+
+model Room {
+  id                 String    @id @default(uuid())
+  name               String
+  description        String
+  predefinedMessages String[]
+  userId             String
+  messages           Message[] @relation("Room_Messages")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  user Users @relation("Room_User", fields: [userId], references: [id])
+}
+
+enum MessageBy {
+  AI
+  SELF
+}
+
+enum MessageType {
+  EMAIL
+  MESSAGE
+}
