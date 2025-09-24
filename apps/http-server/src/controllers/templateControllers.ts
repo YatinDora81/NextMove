@@ -12,7 +12,7 @@ class Templates {
                 })
             }
 
-            const allTemplates = await 
+            // const allTemplates = await 
 
         } catch (error) {
             return res.status(500).json({
