@@ -104,11 +104,10 @@ function GeneratePromt() {
 
                     </div>
 
-                    <div className="w-full flex flex-col gap-2 mt-3">
+                    {/* <div className="w-full flex flex-col gap-2 mt-3">
                         <Label htmlFor="roles">Resume</Label>
                         <Select>
                             <SelectTrigger className="w-full py-4 px-3 rounded-md border">
-                                {/* 👇 this will just show the selected option's text */}
                                 <SelectValue placeholder="Select Resume" />
                             </SelectTrigger>
 
@@ -129,7 +128,7 @@ function GeneratePromt() {
                                 </SelectItem>
                             </SelectContent>
                         </Select>
-                    </div>
+                    </div> */}
                 </CardContent>
                 <CardFooter className=' mt-2'>
                     <Button className=' w-full'>Generate Message</Button>

@@ -18,12 +18,34 @@ model Users {
   isPaid     Boolean  @default(false)
 
   // relations
-  resumes  Resumes[] @relation("UserResume")
-  company  Company[] @relation("CreatedByRelation")
-  messages Message[] @relation("User_Message")
-  Room     Room[]    @relation("Room_User")
+  resumes           Resumes[]           @relation("UserResume")
+  company           Company[]           @relation("CreatedByRelation")
+  messages          Message[]           @relation("User_Message")
+  Room              Room[]              @relation("Room_User")
+  generatedMessages GeneratedMessages[] @relation("User_gen_rel")
 
   @@index([id, email])
+}
+
+model GeneratedMessages {
+  id            String      @id @default(uuid())
+  recruiterName String?
+  role          String
+  template      String
+  company       String
+  message       String
+  gender        String?
+  messageType   MessageType
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  user          String
+
+  userGen         Users     @relation("User_gen_rel", fields: [user], references: [id])
+  roleRel         Role      @relation("Role_GeneratedMessages", fields: [role], references: [id])
+  templateRel     Templates @relation("Template_GeneratedMessages", fields: [template], references: [id])
+  company_gen_rel Company   @relation("Company_GeneratedMessages", fields: [company], references: [id])
+
+  @@index([id])
 }
 
 model Resumes {
@@ -43,21 +65,25 @@ model Role {
   name String
   desc String?
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  company   Company[] @relation("RolesRelation")
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  company           Company[]           @relation("RolesRelation")
+  templates         Templates[]         @relation("RolesRelation")
+  GeneratedMessages GeneratedMessages[] @relation("Role_GeneratedMessages")
 }
 
 model Templates {
-  id          String      @id @default(uuid())
-  name        String
-  description String?
-  type        MessageType @default(MESSAGE)
-  content     String
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-
-  rules TemplateRules[] @relation("TemplateRules")
+  id                String              @id @default(uuid())
+  name              String
+  description       String?
+  type              MessageType         @default(MESSAGE)
+  content           String
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  role              String
+  roleRelation      Role                @relation("RolesRelation", fields: [role], references: [id])
+  rules             TemplateRules[]     @relation("TemplateRules")
+  GeneratedMessages GeneratedMessages[] @relation("Template_GeneratedMessages")
 }
 
 model TemplateRules {
@@ -78,7 +104,8 @@ model Company {
   updatedAt DateTime @updatedAt
   roles     Role[]   @relation("RolesRelation")
 
-  createdByRelation Users @relation("CreatedByRelation", fields: [createdBy], references: [id])
+  GeneratedMessages GeneratedMessages[] @relation("Company_GeneratedMessages")
+  createdByRelation Users               @relation("CreatedByRelation", fields: [createdBy], references: [id])
 }
 
 model Message {

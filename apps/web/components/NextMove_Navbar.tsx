@@ -16,7 +16,7 @@ function NextMove_Navbar() {
         { name: 'Templates', link: '/templates' },
         { name: 'Resumes', link: '/resumes' },
         { name: 'Companies', link: '/companies' },
-        { name: 'History', link: '/history' }
+        { name: 'Applied', link: '/applied' }
     ]
 
     return (
