@@ -16,6 +16,7 @@ model Users {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   isPaid     Boolean  @default(false)
+  
 
   // relations
   resumes           Resumes[]           @relation("UserResume")
@@ -23,6 +24,7 @@ model Users {
   messages          Message[]           @relation("User_Message")
   Room              Room[]              @relation("Room_User")
   generatedMessages GeneratedMessages[] @relation("User_gen_rel")
+  templates         Templates[]         @relation("User_Templates")
 
   @@index([id, email])
 }
@@ -81,7 +83,10 @@ model Templates {
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   role              String
+  user              String
+  isDeleted         Boolean             @default(false)
   roleRelation      Role                @relation("RolesRelation", fields: [role], references: [id])
+  userRelation      Users               @relation("User_Templates", fields: [user], references: [id])
   rules             TemplateRules[]     @relation("TemplateRules")
   GeneratedMessages GeneratedMessages[] @relation("Template_GeneratedMessages")
 }

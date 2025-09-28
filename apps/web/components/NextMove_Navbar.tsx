@@ -1,7 +1,7 @@
 "use client"
-import { SignedIn, SignedOut, SignInButton,  SignUpButton, UserButton, useUser } from '@clerk/nextjs'
+import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton, useUser } from '@clerk/nextjs'
 import React, { useState } from 'react'
-import { Navbar, NavItems, NavbarLogo, NavBody, MobileNav, MobileNavToggle, MobileNavHeader, MobileNavMenu,} from './ui/resizable-navbar'
+import { Navbar, NavItems, NavbarLogo, NavBody, MobileNav, MobileNavToggle, MobileNavHeader, MobileNavMenu, } from './ui/resizable-navbar'
 import { Button } from './ui/button'
 import { ModeToggle } from './ui/modeToggle'
 
@@ -11,7 +11,7 @@ function NextMove_Navbar() {
     const { isSignedIn, user } = useUser()
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const navbarItems: { name: string; link: string }[] = [
-        { name: 'Generate' , link: '/' },
+        { name: 'Generate', link: '/' },
         { name: 'AI Chat', link: '/ai-chat' },
         { name: 'Templates', link: '/templates' },
         { name: 'Resumes', link: '/resumes' },
@@ -45,7 +45,7 @@ function NextMove_Navbar() {
                                     <Button variant="outline">Login</Button>
                                 </SignInButton>
 
-                                <SignUpButton mode="modal">
+                                <SignUpButton forceRedirectUrl={"/?isu=1"} mode="modal">
                                     <Button variant="default">Sign Up</Button>
                                 </SignUpButton>
                             </SignedOut>

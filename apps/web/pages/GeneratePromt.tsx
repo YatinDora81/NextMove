@@ -1,5 +1,5 @@
 "use client"
-import React from 'react'
+import React, { useEffect } from 'react'
 import {
     Card,
     CardContent,
@@ -18,8 +18,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@radix-ui/react-label'
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Button } from '@/components/ui/button'
+import { useAuth } from '@clerk/nextjs'
 
 function GeneratePromt() {
+    
+    
     return (
         <div className=' w-full h-screen flex justify-center items-center'>
             <Card className=' min-w-[90%]  md:min-w-[70%] lg:min-w-[40%] h-fit '>
