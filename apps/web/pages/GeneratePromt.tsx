@@ -100,12 +100,16 @@ Yatin Dora`,
             return
         }
 
-        const promt = currRole.promt.replace("[Recruiter Name]", compDet.rName.toUpperCase()).replace("[Company Name]", compDet.cName.toUpperCase()).replace("[Role]", currRole.role?.toUpperCase())
+        const promt = currRole.promt.replace("[Recruiter Name]", capitalizeWords(compDet.rName)).replace("[Company Name]", capitalizeWords(compDet.cName)).replace("[Role]", capitalizeWords(currRole.role))
         navigator.clipboard.writeText(promt)
         toast.success("Copied", toastOpt)
 
-        
 
+
+    }
+
+    function capitalizeWords(str: string) {
+        return str.replace(/\b\w/g, char => char.toUpperCase());
     }
 
 
