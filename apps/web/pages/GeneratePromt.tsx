@@ -86,7 +86,7 @@ I have experience as a full-stack development intern, building both frontend and
 
 I’m proficient in the MERN stack and experienced with backend tools like Prisma, Drizzle ORM, Docker, and Express.js. My recent projects include a collaborative drawing platform and a real-time chat app built with Next.js, Node.js, and WebSocket, showcasing both frontend and backend development skills, as well as modern development practices using Git, Turborepo, and CI/CD workflows.
 
-I’m actively looking for [Role] internship/full-time opportunities at [Company Name] and would truly appreciate a referral if there are any suitable openings. I’ve attached my resume for your reference. Please let me know if you'd need any additional information.
+I’m actively looking for [Role] opportunities at [Company Name] and would truly appreciate a referral if there are any suitable openings. I’ve attached my resume for your reference. Please let me know if you'd need any additional information.
 
 Best regards,
 Yatin Dora`,
@@ -100,7 +100,7 @@ Yatin Dora`,
             return
         }
 
-        const promt = currRole.promt.replace("[Recruiter Name]", compDet.rName).replace("[Company Name]", compDet.cName).replace("[Role]", currRole.role)
+        const promt = currRole.promt.replace("[Recruiter Name]", compDet.rName.toUpperCase()).replace("[Company Name]", compDet.cName.toUpperCase()).replace("[Role]", currRole.role?.toUpperCase())
         navigator.clipboard.writeText(promt)
         toast.success("Copied", toastOpt)
 
