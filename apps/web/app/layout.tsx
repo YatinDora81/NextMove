@@ -6,6 +6,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import NextMove_Navbar from '@/components/NextMove_Navbar'
+import { Toaster } from 'react-hot-toast'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -37,6 +38,8 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+            <Toaster position="bottom-right"
+              reverseOrder={false} />
             {/* <header className="flex justify-end items-center p-4 gap-4 h-16">
               <SignedOut>
                 <SignInButton />

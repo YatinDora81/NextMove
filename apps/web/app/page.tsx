@@ -1,8 +1,14 @@
 import GeneratePromt from "@/pages/GeneratePromt";
+import { Metadata } from "next";
 
-export default function LandingPage(){
+export const metadata: Metadata = {
+  title: 'Generate Promt',
+  description: 'Generate Promt',
+}
+
+export default function LandingPage() {
   return (
-    <div className=" "> 
+    <div className=" ">
       <GeneratePromt />
     </div>
   )
