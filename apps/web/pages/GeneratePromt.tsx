@@ -1,5 +1,5 @@
 "use client"
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
     Card,
     CardContent,
@@ -19,12 +19,17 @@ import { Label } from '@radix-ui/react-label'
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@clerk/nextjs'
+import ModalContainer from '@/components/ModalContainer'
 
 function GeneratePromt() {
-    
-    
+
+    const [openSearch, setOpenSearch] = useState<boolean>(true)
+
     return (
-        <div className=' w-full h-screen flex justify-center items-center'>
+        <div className='  w-full h-screen flex justify-center items-center'>
+
+            {openSearch && <ModalContainer open={openSearch} setOpen={setOpenSearch} />}
+
             <Card className=' min-w-[90%]  md:min-w-[70%] lg:min-w-[40%] h-fit '>
                 <CardHeader>
                     <CardTitle className=' text-2xl font-semibold'>Generate Message</CardTitle>
