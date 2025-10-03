@@ -1,5 +1,5 @@
 import express, { Request, Response, Router } from 'express'
-import Templates from '@/src/controllers/templateControllers.js'
+import Templates from '../controllers/templateControllers.js'
 const router: Router = express.Router()
 
 router.get('/get-templates', Templates.getTemplates)
