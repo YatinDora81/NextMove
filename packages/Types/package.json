@@ -10,7 +10,8 @@
     "@repo/typescript-config": "workspace:*"
   },
   "exports": {
-    "./ZodTypes": "./src/zodTypes.ts"
+    "./ZodTypes": "./src/zodTypes.ts",
+    "./Types": "./src/types.ts"
   },
   "keywords": [],
   "author": "",

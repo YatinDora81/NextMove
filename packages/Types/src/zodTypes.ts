@@ -50,3 +50,37 @@ export const updateTemplateSchema = z.object({
     rules: z.array(z.string()),
 })
 export type updateTemplateSchemaType = z.infer<typeof updateTemplateSchema>;
+
+export const updateUserDetailsSchema = z.object({
+    full_name: z.string(),
+    image_url: z.string().nullable(),
+    userId: z.string(),
+})
+export type updateUserDetailsSchemaType = z.infer<typeof updateUserDetailsSchema>;
+
+export const createRoleSchema = z.array(z.string());
+export type createRoleSchemaType = z.infer<typeof createRoleSchema>;
+
+export const deleteRoleSchema = z.array(z.string());
+export type deleteRoleSchemaType = z.infer<typeof deleteRoleSchema>;
+
+export const generateMessageSchema = z.object({
+    recruiterName: z.string(),
+    role: z.string(),
+    template: z.string(),
+    company: z.string(),
+    message: z.string(),
+    gender: z.string(),
+    messageType: z.enum(['MESSAGE', 'EMAIL']),
+    isNewCompany: z.boolean().optional().default(false),
+    newCompanyName: z.string().optional().default(""),
+    isNewRecruiter: z.boolean().optional().default(false),
+
+})
+export type generateMessageSchemaType = z.infer<typeof generateMessageSchema>;
+
+export const getGeneratedMessagesSchema = z.object({
+    page: z.number(),
+    limit: z.number()
+})
+export type getGeneratedMessagesSchemaType = z.infer<typeof getGeneratedMessagesSchema>;
