@@ -54,7 +54,7 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null }: { ch
 
                         <div className="my-4 flex flex-col items-start gap-2 overflow-auto">
                             <Label htmlFor="tempp">Template Description</Label>
-                            <Textarea id="tempp" placeholder="Hi [Recruiter Name] i want to join your [Company]" rows={3} className='h-[12vh]  overflow-y-auto' />
+                            <Textarea  id="tempp" placeholder="Hi [Recruiter Name] i want to join your [Company]"  className=' resize-none h-[25vh]  overflow-y-auto' />
                         </div>
 
                         <div className=' w-full flex items-center justify-between'>

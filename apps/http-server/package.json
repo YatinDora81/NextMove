@@ -6,11 +6,12 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node ./dist/index.js",
-    "build": "tsc -b",
+    "build": "tsc -b && pnpm exec tsc-alias -p tsconfig.json",
     "dev": "pnpm run build && pnpm run start"
   },
   "dependencies": {
     "@clerk/backend": "^2.15.0",
+    "@google/genai": "^1.22.0",
     "@repo/db": "workspace:*",
     "@repo/types": "workspace:*",
     "@repo/typescript-config": "workspace:*",
@@ -28,5 +29,8 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "module"
+  "type": "module",
+  "devDependencies": {
+    "tsc-alias": "^1.8.16"
+  }
 }

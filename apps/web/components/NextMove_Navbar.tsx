@@ -14,8 +14,8 @@ function NextMove_Navbar() {
         { name: 'Generate', link: '/' },
         { name: 'AI Chat', link: '/ai-chat' },
         { name: 'Templates', link: '/templates' },
-        { name: 'Resumes', link: '/resumes' },
-        { name: 'Companies', link: '/companies' },
+        // { name: 'Resumes', link: '/resumes' },
+        // { name: 'Companies', link: '/companies' },
         { name: 'Applied', link: '/applied' }
     ]
 
