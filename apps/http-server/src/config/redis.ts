@@ -1,8 +1,12 @@
 import redis, { RedisClientType } from 'redis'
+import {config} from 'dotenv'
+
+config()
+
 const client: RedisClientType = redis.createClient({
     socket: {
-        host: "localhost",
-        port: 6379,
+        host: process.env.REDIS_HOST,
+        port: parseInt(process.env.REDIS_PORT!),
         reconnectStrategy(retries) {
             const delay = Math.min(retries * 100, 5000);
             console.log(`Redis reconnect attempt #${retries}, next in ${delay}ms`);
