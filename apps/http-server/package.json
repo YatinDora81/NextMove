@@ -7,7 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node ./dist/index.js",
     "build": "tsc -b && pnpm exec tsc-alias -p tsconfig.json",
-    "dev": "pnpm run build && pnpm run start"
+    "dev": "pnpm run build && pnpm run start",
+    "prisma:generate": "cd ../../packages/db && pnpm run generate && cd ../../http-server"
   },
   "dependencies": {
     "@clerk/backend": "^2.15.0",
