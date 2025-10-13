@@ -11,7 +11,7 @@
   },
   "exports": {
     "./ZodTypes": "./src/zodTypes.ts",
-    "./Types": "./src/types.ts"
+    "./Types": "./src/Types.ts"
   },
   "keywords": [],
   "author": "",
