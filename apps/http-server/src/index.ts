@@ -1,9 +1,11 @@
 import express from 'express'
 import { config } from "dotenv"
-import { authenticateUser } from './middleware/authenticateUser.js'
 import userRoutes from './routes/users.js'
 import templatesRoutes from './routes/templates.js'
-import { generateMessage } from './config/gemini.js'
+import rolesRoutes from './routes/roles.js'
+import chatRoutes from './routes/chat.js'
+import generateRoutes from './routes/generatedMessage.js'
+import webhookRoutes from './routes/webhook.js'
 const app = express()
 config()
 
@@ -12,18 +14,11 @@ const PORT = process.env.PORT
 
 app.use('/api/users', userRoutes)
 app.use('/api/templates', templatesRoutes)
+app.use('/api/roles', rolesRoutes)
+app.use('/api/chat', chatRoutes)
+app.use('/api/generate', generateRoutes)
+app.use('/api/webhooks', webhookRoutes)
 
-app.get('/g', async (req, res) => {
-    try {
-        const message = await generateMessage('i am yatin ad i am a system')
-        res.status(200).json({ message })
-    } catch (error) {
-        console.log(error);
-        res.status(500).json({error})
-    }
-})
-
-// app.use(authenticateUser)
 
 app.listen(PORT, () => {
     console.log(`App is running on ${PORT} PORT`)

@@ -84,3 +84,18 @@ export const getGeneratedMessagesSchema = z.object({
     limit: z.number()
 })
 export type getGeneratedMessagesSchemaType = z.infer<typeof getGeneratedMessagesSchema>;
+
+export const updatePremiumSchema = z.array(z.email());
+export type updatePremiumSchemaType = z.infer<typeof updatePremiumSchema>;
+
+const createChatSchema1 = z.object({
+    isNewRoom: z.boolean(),
+    predefinedMessages: z.array(z.string())
+})
+const createChatSchema2 = z.object({
+    roomId: z.string(),
+    message: z.string(),
+    roomAllMessages: z.array(z.string())
+})
+export const createChatSchema = z.union([createChatSchema1, createChatSchema2]);
+export type createChatSchemaType = z.infer<typeof createChatSchema>;

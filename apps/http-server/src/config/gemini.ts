@@ -9,17 +9,9 @@ export async function generateMessage(message: string) {
         const chat = await ai.chats.create({
             model: "gemini-2.5-flash",
             history: [
-                {
-                    role: "user",
-                    parts: [{ text: "Hello" }],
-                },
-                {
-                    role: "model",
-                    parts: [{ text: "" }],
-                },
             ],
             config: {
-                systemInstruction: "Send me in json format only"
+                systemInstruction: "Send me in json format only using language english"
             }
         });
         const response1 = await chat.sendMessage({

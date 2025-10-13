@@ -11,7 +11,7 @@ export const isAdmin = (req: Request, res: Response, next: NextFunction) => {
             })
         }
 
-        const admins = process.env.ADMINS || [] as string[];
+        const admins = process.env.ADMIN_EMAILS || [] as string[];
         if (!admins.includes(user.email)) {
             return res.status(401).json({
                 success: false,

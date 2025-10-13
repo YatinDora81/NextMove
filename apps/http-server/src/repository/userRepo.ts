@@ -1,7 +1,7 @@
 import logger from "@/config/logger.js"
 import { clearRedis } from "@/utils/redisCommon.js"
 import { prismaClient } from "@repo/db/db"
-import { updateUserDetailsSchemaType } from "@repo/types/ZodTypes"
+import { updatePremiumSchemaType, updateUserDetailsSchemaType } from "@repo/types/ZodTypes"
 
 class UserRepo {
     async updateUserDetails(data: updateUserDetailsSchemaType) {
@@ -22,6 +22,37 @@ class UserRepo {
             return res;
         } catch (error) {
             throw new Error(`Failed to update user details in DB , ${error}`)
+        }
+    }
+    async getPremium(userId: string) {
+        try {
+            const res = await prismaClient.users.findUnique({
+                where: { id: userId }
+            })
+            return { isPaid: res?.isPaid || false }
+        } catch (error) {
+            throw new Error(`Failed to get premium in DB , ${error}`)
+        }
+    }
+    async updatePremium(data: updatePremiumSchemaType) {
+        try {
+            const res = await prismaClient.users.updateMany({
+                where: { email: { in: data } },
+                data: { isPaid: true }
+            })
+            return res
+        }
+        catch(error){
+            throw new Error(`Failed to update premium in DB , ${error}`)
+        }
+    }
+    async getUsers() {
+        try {
+            const res = await prismaClient.users.findMany()
+            return res
+        }
+        catch (error) {
+            throw new Error(`Failed to get users in DB , ${error}`)
         }
     }
 }

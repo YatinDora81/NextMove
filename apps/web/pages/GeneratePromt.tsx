@@ -18,12 +18,21 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@radix-ui/react-label'
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Button } from '@/components/ui/button'
-// import { useAuth } from '@clerk/nextjs'
+import { useAuth } from '@clerk/nextjs'
 import ModalContainer from '@/components/ModalContainer'
 
 function GeneratePromt() {
-
+    
     const [openSearch, setOpenSearch] = useState<boolean>(false)
+    const { getToken } = useAuth()
+    
+    useEffect(() => {
+        const fetchUsers = async () => {
+            const token = await getToken({ template: 'frontend_token' })
+            console.log(token)
+        }
+        fetchUsers()
+    }, [getToken])
 
     return (
         <div className='  w-full h-screen flex justify-center items-center'>
