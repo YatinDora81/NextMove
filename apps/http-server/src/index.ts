@@ -9,6 +9,9 @@ import webhookRoutes from './routes/webhook.js'
 const app = express()
 config()
 
+app.use('/api/webhooks', webhookRoutes)
+
+
 app.use(express.json())
 const PORT = process.env.PORT
 
@@ -17,7 +20,6 @@ app.use('/api/templates', templatesRoutes)
 app.use('/api/roles', rolesRoutes)
 app.use('/api/chat', chatRoutes)
 app.use('/api/generate', generateRoutes)
-app.use('/api/webhooks', webhookRoutes)
 
 
 app.listen(PORT, () => {

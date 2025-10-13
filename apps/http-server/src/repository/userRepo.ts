@@ -55,6 +55,7 @@ class UserRepo {
             throw new Error(`Failed to get users in DB , ${error}`)
         }
     }
+    
 }
 
 export default new UserRepo()
