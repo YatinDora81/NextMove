@@ -9,6 +9,7 @@ router.post(
     // express.raw({ type: "application/json" }),
     (req, res) => {
         try {
+            console.log(req)
             const signature = req.headers["clerk-signature"];
             const rawBody = req.body; // now Buffer (not parsed JSON)
             const CLERK_WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
