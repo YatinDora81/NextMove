@@ -11,7 +11,8 @@
       "@middleware/*": ["./src/middleware/*"],
       "@routes/*": ["./src/routes/*"],
       "@repository/*": ["./src/repository/*"],
-      "@utils/*": ["./src/utils/*"]
+      "@utils/*": ["./src/utils/*"],
+      "@services/*": ["./src/services/*"]
     }
   }
 }

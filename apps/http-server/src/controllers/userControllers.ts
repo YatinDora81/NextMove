@@ -6,6 +6,7 @@ import { clearRedis, getRedis, setRedis } from '../utils/redisCommon.js'
 import logger from '../config/logger.js'
 import { updateUserDeatilsClerk } from '@/utils/updateUserDetails.js'
 import userRepo from '@/repository/userRepo.js'
+import userService from '@/services/user.service.js'
 
 class UserControllers {
     async createUser(req: Request, res: Response) {
@@ -20,47 +21,12 @@ class UserControllers {
                 return
             }
 
-            const cachedUser = await getRedis(`user:${parsedData.data.id}`)
-            if (cachedUser) {
-                res.status(200).json({
-                    success: true,
-                    data: JSON.parse(cachedUser),
-                    message: "User Already Exists"
-                })
-                return
-            }
-
-            const { id, name, email, profilePic } = parsedData.data
-            let user;
-
-            try {
-                user = await prismaClient.users.create({
-                    data: {
-                        id, name, email, profilePic
-                    }
-                })
-            }
-            catch (error: any) {
-                if (error.code === 'P2002') {
-                    res.status(200).json({
-                        success: true,
-                        data: user,
-                        message: "User Already Exists"
-                    })
-                    return
-                } else throw error
-            }
-
-            try {
-                await redisClient.set(`user:${id}`, JSON.stringify(user), { expiration: { type: 'EX', value: 86400 } })
-            } catch (redisError) {
-                logger.error(`${Date.now()} redisError`)
-            }
+            const { user, message } = await userService.createUser(parsedData.data) as { user: any, message: string }
 
             res.status(200).json({
                 success: true,
                 data: user,
-                message: "User Created Successfully"
+                message: message
             })
         } catch (error) {
             res.status(500).json({
@@ -81,115 +47,117 @@ class UserControllers {
                 })
                 return
             }
-            const { full_name, image_url, userId } = parsedData.data
-            const clerkResponse = await updateUserDeatilsClerk(userId, { full_name, image_url })
-            const dbresponse = await userRepo.updateUserDetails(parsedData.data)
+            const { firstName, lastName, image_url, userId } = parsedData.data
+            logger.info("Body parsed successfully")
+            const clerkResponse = await updateUserDeatilsClerk(userId, { firstName, lastName: lastName!== null ? lastName : '', image_url })
+        logger.info("Clerk response successfully")
+        const dbresponse = await userRepo.updateUserDetails(parsedData.data)
+        logger.info("DB response successfully")
+        res.status(200).json({
+            success: true,
+            data: {
+                clerkResponse,
+                dbresponse
+            },
+            message: "User Details Updated Successfully"
+        })
 
-            res.status(200).json({
-                success: true,
-                data: {
-                    clerkResponse,
-                    dbresponse
-                },
-                message: "User Details Updated Successfully"
-            })
-
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                data: error,
-                message: "Internal Server Error"
-            })
-        }
+    } catch(error) {
+        res.status(500).json({
+            success: false,
+            data: error,
+            message: "Internal Server Error"
+        })
     }
+}
     async isPremium(req: Request, res: Response) {
-        try {
-            if (!req.user) {
-                res.status(401).json({
-                    success: false,
-                    data: null,
-                    message: "Unauthorized"
-                })
-                return
-            }
-            const getCache = await getRedis(`premium:${req.user.email}`)
-            if (getCache) {
-                res.status(200).json({
-                    success: true,
-                    data: JSON.parse(getCache),
-                    message: "User is Premium"
-                })
-                return
-            }
-            const isPremium = await userRepo.getPremium(req.user.user_id)
-            await setRedis(`premium:${req.user.email}`, JSON.stringify(isPremium), 86400)
+    try {
+        if (!req.user) {
+            res.status(401).json({
+                success: false,
+                data: null,
+                message: "Unauthorized"
+            })
+            return
+        }
+        const getCache = await getRedis(`premium:${req.user.user_id}`)
+        if (getCache) {
             res.status(200).json({
                 success: true,
-                data: isPremium,
+                data: JSON.parse(getCache),
                 message: "User is Premium"
             })
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                data: error,
-                message: "Internal Server Error"
-            })
+            return
         }
+        const isPremium = await userRepo.getPremium(req.user.user_id)
+        await setRedis(`premium:${req.user.user_id}`, JSON.stringify(isPremium), 86400)
+        res.status(200).json({
+            success: true,
+            data: isPremium,
+            message: "User is Premium"
+        })
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            data: error,
+            message: "Internal Server Error"
+        })
     }
+}
     async updatePremium(req: Request, res: Response) {
-        try {
-            if (!req.user) {
-                res.status(401).json({
-                    success: false,
-                    data: null,
-                    message: "Unauthorized"
-                })
-                return
-            }
-            const parsedData = updatePremiumSchema.safeParse(req.body)
-            if (!parsedData.success) {
-                res.status(400).json({
-                    success: false,
-                    data: parsedData.error,
-                    message: "Invalid Data"
-                })
-                return
-            }
+    try {
+        if (!req.user) {
+            res.status(401).json({
+                success: false,
+                data: null,
+                message: "Unauthorized"
+            })
+            return
+        }
+        const parsedData = updatePremiumSchema.safeParse(req.body)
+        if (!parsedData.success) {
+            res.status(400).json({
+                success: false,
+                data: parsedData.error,
+                message: "Invalid Data"
+            })
+            return
+        }
 
-            const user = await userRepo.updatePremium(parsedData.data)
-            parsedData.data.forEach(async (email) => {
-                await clearRedis(`premium:${email}`)
-            })
-            res.status(200).json({
-                success: true,
-                data: user,
-                message: "Premium Updated Successfully"
-            })
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                data: error,
-                message: "Internal Server Error"
-            })
-        }
+        const user = await userRepo.updatePremium(parsedData.data)
+        user.forEach(async (user) => {
+            await clearRedis(`premium:${user.id}`)
+        })
+        res.status(200).json({
+            success: true,
+            data: user,
+            message: "Premium Updated Successfully"
+        })
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            data: error,
+            message: "Internal Server Error"
+        })
     }
+}
     async getUsers(req: Request, res: Response) {
-        try {
-            const users = await userRepo.getUsers()
-            res.status(200).json({
-                success: true,
-                data: users,
-                message: "Users Fetched Successfully"
-            })
-        }
-        catch (error) {
-            res.status(500).json({
-                success: false,
-                data: error,
-                message: "Internal Server Error"
-            })
-        }
+    try {
+        const users = await userRepo.getUsers()
+        res.status(200).json({
+            success: true,
+            data: users,
+            message: "Users Fetched Successfully"
+        })
     }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            data: error,
+            message: "Internal Server Error"
+        })
+    }
+}
 }
 
 export default new UserControllers()

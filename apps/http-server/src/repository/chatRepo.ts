@@ -1,5 +1,6 @@
 import logger from "@/config/logger.js"
 import { prismaClient } from "@repo/db/db"
+import { createChatSchemaType } from "@repo/types/ZodTypes"
 
 class ChatRepo {
     async getAllChats(userId: string) {
@@ -29,11 +30,54 @@ class ChatRepo {
                     }
                 }
             })
-return chats
+            return chats
         } catch (error) {
-    logger.error("Error in getAllChats repo", error)
-    throw error
-}
+            logger.error("Error in getAllChats repo", error)
+            throw error
+        }
+    }
+    async createNewRoom(userId: string, predefinedMessages: string[], name: string = "",
+        description: string = "") {
+        try {
+            const room = await prismaClient.room.create({
+                data: {
+                    userId: userId,
+                    predefinedMessages: predefinedMessages,
+                    name: name,
+                    description: description
+                }
+            })
+            return room
+        } catch (error) {
+            logger.error("Error in createNewRoom repo", error)
+            throw error
+        }
+    }
+    async createNewChat(userId: string, message: string, roomId: string, parsedData: createChatSchemaType) {
+        try {
+            const chat = await prismaClient.message.createManyAndReturn({
+                data: [{
+                    userId: userId,
+                    message: parsedData.message,
+                    roomId: roomId,
+                    by: "SELF"
+                },
+                {
+                    userId: userId,
+                    message: message,
+                    roomId: roomId,
+                    by: "AI"
+                },
+                ],
+                include: {
+                    room: true,
+                }
+            })
+            return chat
+        } catch (error) {
+            logger.error("Error in createNewChat repo", error)
+            throw error
+        }
     }
 }
 

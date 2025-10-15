@@ -6,13 +6,14 @@ import { updatePremiumSchemaType, updateUserDetailsSchemaType } from "@repo/type
 class UserRepo {
     async updateUserDetails(data: updateUserDetailsSchemaType) {
         try {
-            const { full_name, image_url, userId } = data
+            const { firstName, lastName, image_url, userId } = data
             const res = await prismaClient.users.update({
                 where: {
                     id: userId
                 },
                 data: {
-                    name: full_name,
+                    firstName,
+                    lastName: lastName!==null ? lastName : '',
                     profilePic: image_url
                 }
             })
@@ -36,7 +37,7 @@ class UserRepo {
     }
     async updatePremium(data: updatePremiumSchemaType) {
         try {
-            const res = await prismaClient.users.updateMany({
+            const res = await prismaClient.users.updateManyAndReturn({
                 where: { email: { in: data } },
                 data: { isPaid: true }
             })

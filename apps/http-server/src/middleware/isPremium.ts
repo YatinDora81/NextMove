@@ -11,32 +11,40 @@ export const isPremium = async (req: Request, res: Response, next: NextFunction)
                 data: null,
                 message: "Unauthorized"
             })
+            return 
         }
 
-        const cached = await getRedis(`premium:${req.user?.email}`)
+        const cached = await getRedis(`premium:${req.user?.user_id}`)
+
+        console.log("----------------------------------------Cached LOG----------------------------------------", cached);
+        
+
         if (cached) {
             const obj = JSON.parse(cached)
-            if (obj.isPremium) {
+            if (obj.isPaid) {
                 next()
+                return
             } else {
                 res.status(401).json({
                     success: false,
                     data: null,
                     message: "Not A Premium User"
                 })
+                return 
             }
         }
-
         const isPremium = await userRepo.getPremium(req.user!.user_id)
-        await setRedis(`premium:${req.user?.email}`, JSON.stringify(isPremium), 86400)
-        if (isPremium) {
+        await setRedis(`premium:${req.user?.user_id}`, JSON.stringify(isPremium), 86400)
+        if (isPremium.isPaid) {
             next()
+            return
         } else {
             res.status(401).json({
                 success: false,
                 data: null,
                 message: "Not A Premium User"
             })
+            return
         }
 
     } catch (error) {
@@ -46,5 +54,6 @@ export const isPremium = async (req: Request, res: Response, next: NextFunction)
             data: error,
             message: "Internal Server Error"
         })
+        return
     }
 }

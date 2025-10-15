@@ -10,13 +10,13 @@ datasource db {
 
 model Users {
   id         String   @id
-  name       String
+  firstName  String   @default("")
+  lastName   String?  @default("")
   email      String   @unique
   profilePic String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   isPaid     Boolean  @default(false)
-  
 
   // relations
   resumes           Resumes[]           @relation("UserResume")
@@ -114,16 +114,16 @@ model Company {
 }
 
 model Message {
-  id      String    @id @default(uuid())
-  message String
-  by      MessageBy
-  userId  String
-  roomId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String    @id @default(uuid())
+  message   String
+  by        MessageBy
+  userId    String
+  roomId    String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   // relations
-  user    Users     @relation("User_Message", fields: [userId], references: [id])
-  room    Room      @relation("Room_Messages", fields: [roomId], references: [id])
+  user      Users     @relation("User_Message", fields: [userId], references: [id])
+  room      Room      @relation("Room_Messages", fields: [roomId], references: [id])
 }
 
 model Room {

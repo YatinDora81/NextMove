@@ -19,10 +19,13 @@ export type authTokenSchemaType = z.infer<typeof authTokenSchema>;
 
 export const createUserSchema = z.object({
     id: z.string(),
-    name: z.string(),
+    firstName: z.string(),
+    lastName: z.string().nullable(),
     email: z.email(),
     profilePic: z.string().nullable(),
 })
+
+export type createUserSchemaType = z.infer<typeof createUserSchema>;
 
 export const createTemplateSchema = z.object({
     name: z.string(),
@@ -52,11 +55,17 @@ export const updateTemplateSchema = z.object({
 export type updateTemplateSchemaType = z.infer<typeof updateTemplateSchema>;
 
 export const updateUserDetailsSchema = z.object({
-    full_name: z.string(),
+    firstName: z.string(),
+    lastName: z.string().nullable().default(""),
     image_url: z.string().nullable(),
     userId: z.string(),
 })
 export type updateUserDetailsSchemaType = z.infer<typeof updateUserDetailsSchema>;
+
+export const deleteUserSchema = z.object({
+    userId: z.string(),
+})
+export type deleteUserSchemaType = z.infer<typeof deleteUserSchema>;
 
 export const createRoleSchema = z.array(z.string());
 export type createRoleSchemaType = z.infer<typeof createRoleSchema>;
@@ -88,14 +97,11 @@ export type getGeneratedMessagesSchemaType = z.infer<typeof getGeneratedMessages
 export const updatePremiumSchema = z.array(z.email());
 export type updatePremiumSchemaType = z.infer<typeof updatePremiumSchema>;
 
-const createChatSchema1 = z.object({
-    isNewRoom: z.boolean(),
-    predefinedMessages: z.array(z.string())
-})
-const createChatSchema2 = z.object({
-    roomId: z.string(),
+export const createChatSchema = z.object({
+    isNewRoom: z.boolean().optional().default(false),
+    predefinedMessages: z.array(z.string()),
     message: z.string(),
-    roomAllMessages: z.array(z.string())
-})
-export const createChatSchema = z.union([createChatSchema1, createChatSchema2]);
+    roomId: z.string().nullable(),
+    roomAllMessages: z.array(z.string()).optional().default([])
+});
 export type createChatSchemaType = z.infer<typeof createChatSchema>;

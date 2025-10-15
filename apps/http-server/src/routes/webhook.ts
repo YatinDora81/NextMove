@@ -1,3 +1,6 @@
+import logger from '@/config/logger.js';
+import userService from '@/services/user.service.js';
+import { createUserSchemaType, deleteUserSchemaType, updateUserDetailsSchemaType } from '@repo/types/ZodTypes';
 import express, { Request, Response, Router } from 'express';
 const router: Router = express.Router();
 // import bodyParser from 'body-parser';
@@ -32,14 +35,32 @@ router.post('/clerk', express.raw({ type: 'application/json' }), async (req: Req
         switch (event.type) {
             case 'user.created':
                 console.log('New user created:', event?.data);
-
+                const data: createUserSchemaType = {
+                    email: event.data.email_addresses[0].email_address,
+                    id: event.data.id,
+                    firstName: event.data.first_name,
+                    lastName: event.data.last_name!==null ? event.data.last_name : '',
+                    profilePic: event.data.image_url,
+                }
+                await userService.createUser(data);
                 break;
             case 'user.updated':
                 console.log('User updated:', event.data);
                 // Example: Update user data in your database
+                const data2: updateUserDetailsSchemaType = {
+                    firstName: event.data.first_name,
+                    lastName: event.data.last_name!==null ? event.data.last_name : '',
+                    image_url: event.data.image_url,
+                    userId: event.data.id,
+                }
+                await userService.updateUserByClerk(data2);
                 break;
             case 'user.deleted':
                 console.log('User deleted:', event.data);
+                const data3: deleteUserSchemaType = {
+                    userId: event.data.id,
+                }
+                await userService.deleteUserByClerk(data3);
                 // Example: Remove user data from your database
                 break;
             default:
@@ -48,7 +69,7 @@ router.post('/clerk', express.raw({ type: 'application/json' }), async (req: Req
 
         res.status(200).send('Webhook received and processed');
     } catch (err) {
-        console.error('[ CLERK WEBHOOK ] Something Went Wrong In Clerk Webhook', err);
+        logger.error('[ CLERK WEBHOOK ] Something Went Wrong In Clerk Webhook', err);
         return res.status(400).send(`Something Went Wrong In Clerk Webhook ${err}`);
     }
 });
