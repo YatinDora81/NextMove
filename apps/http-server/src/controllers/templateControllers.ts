@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { prismaClient } from '@repo/db/db'
 import templateRepo from "../repository/templateRepo.js";
 import { createTemplateSchema, deleteTemplateSchema, updateTemplateSchema } from "@repo/types/ZodTypes";
+import logger from "@/config/logger.js";
 
 class Templates {
     async getTemplates(req: Request, res: Response) {
@@ -17,6 +18,7 @@ class Templates {
             const allTemplates = await templateRepo.getAllTemplates(req.user.user_id)
 
         } catch (error) {
+            logger.error(`[CONTROLLER: getTemplates] Error fetching templates for user: ${req.user?.user_id}`, error)
             return res.status(500).json({
                 success: false,
                 data: `${error}`,
@@ -49,6 +51,7 @@ class Templates {
             })
         }
         catch (error) {
+            logger.error(`[CONTROLLER: createTemplate] Error creating template for user: ${req.user?.user_id}`, error)
             return res.status(500).json({
                 success: false,
                 data: `${error}`,
@@ -81,6 +84,7 @@ class Templates {
             })
         }
         catch (error) {
+            logger.error(`[CONTROLLER: deleteTemplate] Error deleting template for user: ${req.user?.user_id}`, error)
             return res.status(500).json({
                 success: false,
                 data: `${error}`,
@@ -113,6 +117,7 @@ class Templates {
             })
         }
         catch (error) {
+            logger.error(`[CONTROLLER: updateTemplate] Error updating template for user: ${req.user?.user_id}`, error)
             return res.status(500).json({
                 success: false,
                 data: `${error}`,

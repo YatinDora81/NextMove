@@ -29,6 +29,7 @@ class UserControllers {
                 message: message
             })
         } catch (error) {
+            logger.error(`[CONTROLLER: createUser] Error creating user`, error)
             res.status(500).json({
                 success: false,
                 data: error,
@@ -63,6 +64,7 @@ class UserControllers {
         })
 
     } catch(error) {
+        logger.error(`[CONTROLLER: updateUserDetails] Error updating user details`, error)
         res.status(500).json({
             success: false,
             data: error,
@@ -97,6 +99,7 @@ class UserControllers {
             message: "User is Premium"
         })
     } catch (error) {
+        logger.error(`[CONTROLLER: isPremium] Error checking premium status for user: ${req.user?.user_id}`, error)
         res.status(500).json({
             success: false,
             data: error,
@@ -134,6 +137,7 @@ class UserControllers {
             message: "Premium Updated Successfully"
         })
     } catch (error) {
+        logger.error(`[CONTROLLER: updatePremium] Error updating premium status`, error)
         res.status(500).json({
             success: false,
             data: error,
@@ -151,6 +155,7 @@ class UserControllers {
         })
     }
     catch (error) {
+        logger.error(`[CONTROLLER: getUsers] Error fetching users`, error)
         res.status(500).json({
             success: false,
             data: error,

@@ -1,5 +1,6 @@
 import { prismaClient } from "@repo/db/db"
 import { createRoleSchemaType, deleteRoleSchemaType } from "@repo/types/ZodTypes"
+import logger from "@/config/logger.js"
 
 class RoleRepo {
     async getAllRoles() {
@@ -14,6 +15,7 @@ class RoleRepo {
             })
             return data
         } catch (error) {
+            logger.error(`[REPO: getAllRoles] Error fetching all roles`, error)
             throw new Error(`Error at getting all roles ${error}`)
         }
     }
@@ -26,6 +28,7 @@ class RoleRepo {
             })
             return data
         } catch (error) {
+            logger.error(`[REPO: createRole] Error creating roles`, error)
             throw new Error(`Error at creating role ${error}`)
         }
     }
@@ -40,6 +43,7 @@ class RoleRepo {
             })
             return data
         } catch (error) {
+            logger.error(`[REPO: deleteRole] Error deleting roles`, error)
             throw new Error(`Error at deleting role ${error}`)
         }
     }

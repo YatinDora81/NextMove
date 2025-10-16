@@ -83,7 +83,7 @@ You must ALWAYS respond with ONLY a JSON string in this exact format (NO markdow
 - CRITICAL: Use \\n (escaped) not actual line breaks in JSON strings
 
 ### ROOM NAMING (when isNewRoom is true)
-- **name**: Create a concise, descriptive name based on the conversation context
+- **name**: Create SHORT, concise names (max 3-4 words) following this priority order: 1) If recruiter first name is present, use "FirstName Company MessageType" format (e.g., "Ram Google Follow-up", "Sarah Google Application", "John Microsoft Referral"), 2) If no recruiter name, use "Company MessageType" format (e.g., "Signzy Follow-up", "Google Application", "Microsoft Referral")
   - Examples: "Frontend Developer Application", "Google Follow-up", "Data Science Inquiry"
 - **description**: Provide a brief description of the conversation purpose
   - Examples: "Application for Frontend Developer position at TechCorp", "Follow-up on interview feedback"

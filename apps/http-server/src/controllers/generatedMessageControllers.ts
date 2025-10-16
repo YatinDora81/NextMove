@@ -2,6 +2,7 @@ import generateMessageRepo from "@/repository/generateMessageRepo.js";
 import { clearRedis, getRedis } from "@/utils/redisCommon.js";
 import { generateMessageSchema } from "@repo/types/ZodTypes";
 import { Request, Response } from "express";
+import logger from "@/config/logger.js";
 
 class GeneratedMessageControllers {
     async generateMessage(req: Request, res: Response) {
@@ -31,6 +32,7 @@ class GeneratedMessageControllers {
             })
         }
         catch (error) {
+            logger.error(`[CONTROLLER: generateMessage] Error generating message for user: ${req.user?.user_id}`, error)
             return res.status(500).json({
                 success: false,
                 data: error,
@@ -63,6 +65,7 @@ class GeneratedMessageControllers {
             })
         }
         catch (error) {
+            logger.error(`[CONTROLLER: getGeneratedMessages] Error fetching generated messages for user: ${req.user?.user_id}`, error)
             return res.status(500).json({
                 success: false,
                 data: error,

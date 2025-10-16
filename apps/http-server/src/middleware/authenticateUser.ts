@@ -15,10 +15,11 @@ export const authenticateUser = (req: Request, res: Response, next: NextFunction
         // Check for token in Authorization header
         const authHeader = req.headers.authorization;
         if (!authHeader || !authHeader.startsWith("Bearer ")) {
-            return res.status(401).json({
+            res.status(401).json({
                 success: false,
                 message: "User Not Authenticated! No token provided."
             });
+            return 
         }
 
         const token = authHeader.split(" ")[1];
@@ -36,31 +37,35 @@ export const authenticateUser = (req: Request, res: Response, next: NextFunction
             console.error("JWT Error:", error);
 
             if (error.name === "TokenExpiredError") {
-                return res.status(401).json({
+                res.status(401).json({
                     success: false,
                     error: "Token expired",
                     message: "Your session has expired. Please login again."
                 });
+                return 
             } else if (error.name === "JsonWebTokenError") {
-                return res.status(401).json({
+                res.status(401).json({
                     success: false,
                     error: "Invalid token",
                     message: "The provided token is invalid."
                 });
+                return 
             } else {
-                return res.status(500).json({
+                res.status(500).json({
                     success: false,
                     error: "Internal server error",
                     message: "Something went wrong while verifying the token."
                 });
+                return 
             }
         }
 
     } catch (error) {
         console.error("Authentication middleware error:", error);
-        return res.status(500).json({
+        res.status(500).json({
             success: false,
             message: "User Not Authenticated!"
         });
+        return 
     }
 };

@@ -42,6 +42,7 @@ class UserService {
             }
             return { user, message: "User Created Successfully" }
         } catch (error) {
+            logger.error(`[SERVICE: createUser] Error creating user`, error)
             throw new Error("Something Went Wrong In User Service " + error);
         }
     }
@@ -54,6 +55,7 @@ class UserService {
             })
             return { user, message: "User Updated Successfully" }
         } catch (error) {
+            logger.error(`[SERVICE: updateUserByClerk] Error updating user`, error)
             throw new Error("Something Went Wrong In User Service " + error);
         }
     }
@@ -68,6 +70,7 @@ class UserService {
             if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
                 return { user: null, message: "User not found, skipping deletion" }
             }
+            logger.error(`[SERVICE: deleteUserByClerk] Error deleting user`, error)
             throw new Error("Something Went Wrong In User Service " + error);
         }
     }

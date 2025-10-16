@@ -1,5 +1,6 @@
 import { prismaClient } from "@repo/db/db";
 import { generateMessageSchemaType } from "@repo/types/ZodTypes";
+import logger from "@/config/logger.js";
 
 class GenerateMessageRepo {
     async generateMessage(userId: string, parsedData: generateMessageSchemaType) {
@@ -30,6 +31,7 @@ class GenerateMessageRepo {
             })
         }
         catch (error) {
+            logger.error(`[REPO: generateMessage] Error generating message for user: ${userId}`, error)
             throw new Error(`Error at generating message ${error}`)
         }
     }
@@ -44,6 +46,7 @@ class GenerateMessageRepo {
             return data
         }
         catch (error) {
+            logger.error(`[REPO: getGeneratedMessages] Error fetching generated messages for user: ${userId}`, error)
             throw new Error(`Error at getting generated messages ${error}`)
         }
     }

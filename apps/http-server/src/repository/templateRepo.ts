@@ -1,5 +1,6 @@
 import { prismaClient } from "@repo/db/db"
 import { createTemplateSchemaType, deleteTemplateSchemaType, updateTemplateSchemaType } from "@repo/types/ZodTypes"
+import logger from "@/config/logger.js"
 import { clearRedis, getRedis, setRedis } from "../utils/redisCommon.js"
 
 class TemplateRepo {
@@ -48,6 +49,7 @@ class TemplateRepo {
 
             return data
         } catch (error) {
+            logger.error(`[REPO: getAllTemplates] Error fetching templates for user: ${userId}`, error)
             throw new Error(`Error at getting all templates ${error}`)
         }
     }
@@ -79,6 +81,7 @@ class TemplateRepo {
 
         }
         catch (error) {
+            logger.error(`[REPO: createTemplate] Error creating template for user: ${userId}`, error)
             throw new Error(`Error at creating template ${error}`)
         }
     }
@@ -96,6 +99,7 @@ class TemplateRepo {
             await clearRedis(`templates:${userId}`)
             return res
         } catch (error) {
+            logger.error(`[REPO: deleteTemplate] Error deleting template for user: ${userId}`, error)
             throw new Error(`Error at deleting template ${error}`)
         }
     }
@@ -134,6 +138,7 @@ class TemplateRepo {
             return res
         }
         catch (error) {
+            logger.error(`[REPO: updateTemplate] Error updating template for user: ${userId}`, error)
             throw new Error(`Error at updating template ${error}`)
         }
     }

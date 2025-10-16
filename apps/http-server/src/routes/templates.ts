@@ -4,28 +4,10 @@ const router: Router = express.Router()
 
 router.get('/get-templates', Templates.getTemplates)
 
-router.post('/add-template', (req: Request, res: Response) => {
-    try {
+router.post('/add-template', Templates.createTemplate)
 
-    } catch (error) {
+router.put('/update-template', Templates.updateTemplate)
 
-    }
-})
-
-router.put('/update-template', (req: Request, res: Response) => {
-    try {
-
-    } catch (error) {
-
-    }
-})
-
-router.delete('/delete-template', (req: Request, res: Response) => {
-    try {
-
-    } catch (error) {
-
-    }
-})
+router.delete('/delete-template', Templates.deleteTemplate)
 
 export default router;

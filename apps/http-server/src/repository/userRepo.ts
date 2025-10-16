@@ -22,6 +22,7 @@ class UserRepo {
             logger.info(`User details updated successfully in DB , ${res}`)
             return res;
         } catch (error) {
+            logger.error(`[REPO: updateUserDetails] Error updating user details for user: ${data.userId}`, error)
             throw new Error(`Failed to update user details in DB , ${error}`)
         }
     }
@@ -32,6 +33,7 @@ class UserRepo {
             })
             return { isPaid: res?.isPaid || false }
         } catch (error) {
+            logger.error(`[REPO: getPremium] Error fetching premium status for user: ${userId}`, error)
             throw new Error(`Failed to get premium in DB , ${error}`)
         }
     }
@@ -44,6 +46,7 @@ class UserRepo {
             return res
         }
         catch(error){
+            logger.error(`[REPO: updatePremium] Error updating premium status`, error)
             throw new Error(`Failed to update premium in DB , ${error}`)
         }
     }
@@ -53,6 +56,7 @@ class UserRepo {
             return res
         }
         catch (error) {
+            logger.error(`[REPO: getUsers] Error fetching all users`, error)
             throw new Error(`Failed to get users in DB , ${error}`)
         }
     }

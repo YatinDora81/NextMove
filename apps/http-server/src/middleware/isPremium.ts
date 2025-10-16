@@ -16,9 +16,6 @@ export const isPremium = async (req: Request, res: Response, next: NextFunction)
 
         const cached = await getRedis(`premium:${req.user?.user_id}`)
 
-        console.log("----------------------------------------Cached LOG----------------------------------------", cached);
-        
-
         if (cached) {
             const obj = JSON.parse(cached)
             if (obj.isPaid) {

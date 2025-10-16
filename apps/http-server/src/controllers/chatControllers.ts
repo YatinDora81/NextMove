@@ -25,7 +25,7 @@ class ChatControllers {
             })
 
         } catch (error) {
-            logger.error("Error in getAllChats controller", error)
+            logger.error(`[CONTROLLER: getAllChats] Error fetching chats for user: ${req.user?.user_id}`, error)
             res.status(500).json({
                 success: false,
                 data: error,
@@ -44,8 +44,6 @@ class ChatControllers {
                 return
             }
 
-            // logger.info("------------------------------------------STFU--------------------------------------------------------------")
-
             const parsedData = createChatSchema.safeParse(req.body)
             if (!parsedData.success) {
                 res.status(400).json({
@@ -56,34 +54,22 @@ class ChatControllers {
                 return
             }
 
-            logger.info(`----------------------------------------Parsed Data---------------------------------------- ${parsedData.data}`)
-
             const gptSTr: string = await gemini.generateMessage({
                 isNewRoom: parsedData.data.isNewRoom,
                 message: parsedData.data.message,
                 previousMessages: parsedData.data.roomAllMessages,
                 predefinedMessages: parsedData.data.predefinedMessages
-            }) as string
-
-
-            logger.info(`Gpt response ${gptSTr}`)
-            
+            }) as string            
             
             const gptResponse: gptResponseType = JSON.parse(gptSTr)
 
-            logger.info(`Gpt response parsed ${gptResponse} ress`)
-
             let roomDetails
 
-            logger.info(`--------------------- Creating new room ----------------------------------------`)
-
-            if (parsedData.data.isNewRoom) roomDetails = await chatRepo.createNewRoom(req.user.user_id, parsedData.data.predefinedMessages)
-
-            logger.info(`--------------------- Room details ---------------------------------------- ${JSON.stringify(roomDetails)}`)
+            if (parsedData.data.isNewRoom) {
+                roomDetails = await chatRepo.createNewRoom(req.user.user_id, parsedData.data.predefinedMessages, gptResponse.name, gptResponse.description)
+            }
 
             const newChat = await chatRepo.createNewChat(req.user.user_id, gptResponse.new_message, parsedData.data.isNewRoom ? roomDetails!.id : parsedData.data.roomId!, parsedData.data)
-
-            logger.info(`--------------------- New chat ---------------------------------------- ${JSON.stringify(newChat)}`)
 
             res.status(200).json({
                 success: true,
@@ -91,7 +77,7 @@ class ChatControllers {
                 message: "Chat created successfully"
             })
         } catch (error) {
-            logger.error("Error in createChat controller", error)
+            logger.error(`[CONTROLLER: createChat] Error creating chat for user: ${req.user?.user_id}`, error)
             res.status(500).json({
                 success: false,
                 data: error,

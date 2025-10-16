@@ -3,16 +3,15 @@ import { GoogleGenAI } from "@google/genai";
 import { config } from "dotenv";
 import logger from "./logger.js";
 config();
-// The client gets the API key from the environment variable `GEMINI_API_KEY`.
 
 class Gemini {
 
-    private secretKey = ["GEMINI_API_KEY_Y81"];
+    private secretKeyNames = JSON.parse(process.env.GEMINI_API_KEY_NAMES!) as string[];
     private currentClientNumber: number;
     private ai: GoogleGenAI[];
 
     constructor() {
-            this.ai = this.secretKey.map(key => new GoogleGenAI({ apiKey: process.env[key] }));
+            this.ai = this.secretKeyNames.map(key => new GoogleGenAI({ apiKey: process.env[key] }));
             this.currentClientNumber = 0;
     }
 
@@ -22,17 +21,25 @@ class Gemini {
         previousMessages: string[],
         predefinedMessages: string[]
     }) {
-        const client = this.ai[this.currentClientNumber]!;
-        const response = await client.models.generateContent({
-                model: "gemini-2.5-flash",
-                contents: JSON.stringify(messageObj),
-                config:{
-                    // responseJsonSchema: true,
-                    systemInstruction: GPT_INSTRUCTION
-                }
-    
-            });
-        return response.text || null;
+        try {
+            const client = this.ai[this.currentClientNumber]!;
+            const response = await client.models.generateContent({
+                    model: "gemini-2.5-flash",
+                    contents: JSON.stringify(messageObj),
+                    config:{
+                        // responseJsonSchema: true,
+                        systemInstruction: GPT_INSTRUCTION
+                    }
+        
+                });
+                
+            this.currentClientNumber = (this.currentClientNumber + 1) % this.ai.length;
+            
+            return response.text || null;
+        } catch (error) {
+            logger.error(`[CONFIG: generateMessage] Error generating AI message`, error)
+            throw error;
+        }
     }
 }
 

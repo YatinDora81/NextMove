@@ -28,11 +28,14 @@ class ChatRepo {
                             updatedAt: true,
                         }
                     }
+                },
+                orderBy:{
+                    updatedAt: "desc"
                 }
             })
             return chats
         } catch (error) {
-            logger.error("Error in getAllChats repo", error)
+            logger.error(`[REPO: getAllChats] Error fetching chats from database for user: ${userId}`, error)
             throw error
         }
     }
@@ -49,33 +52,46 @@ class ChatRepo {
             })
             return room
         } catch (error) {
-            logger.error("Error in createNewRoom repo", error)
+            logger.error(`[REPO: createNewRoom] Error creating new room for user: ${userId}`, error)
             throw error
         }
     }
     async createNewChat(userId: string, message: string, roomId: string, parsedData: createChatSchemaType) {
         try {
-            const chat = await prismaClient.message.createManyAndReturn({
-                data: [{
-                    userId: userId,
-                    message: parsedData.message,
-                    roomId: roomId,
-                    by: "SELF"
-                },
-                {
-                    userId: userId,
-                    message: message,
-                    roomId: roomId,
-                    by: "AI"
-                },
-                ],
-                include: {
-                    room: true,
-                }
+            const chat = await prismaClient.$transaction(async tx =>{
+                const newChatMessages = await tx.message.createManyAndReturn({
+                    data: [{
+                        userId: userId,
+                        message: parsedData.message,
+                        roomId: roomId,
+                        by: "SELF"
+                    },
+                    {
+                        userId: userId,
+                        message: message,
+                        roomId: roomId,
+                        by: "AI"
+                    },
+                    ],
+                    include: {
+                        room: true,
+                    }
+                })
+
+                await tx.room.update({
+                    where: {
+                        id: roomId
+                    },
+                    data: {
+                        updatedAt: new Date()
+                    }
+                })
+
+                return newChatMessages;
             })
             return chat
         } catch (error) {
-            logger.error("Error in createNewChat repo", error)
+            logger.error(`[REPO: createNewChat] Error creating new chat for user: ${userId}`, error)
             throw error
         }
     }

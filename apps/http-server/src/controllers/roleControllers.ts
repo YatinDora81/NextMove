@@ -2,6 +2,7 @@ import roleRepo from "@/repository/roleRepo.js";
 import { clearRedis, getRedis, setRedis } from "@/utils/redisCommon.js";
 import { createRoleSchema, deleteRoleSchema } from "@repo/types/ZodTypes";
 import { Request, Response } from "express";
+import logger from "@/config/logger.js";
 
 class RoleControllers {
     async getRoles(req: Request, res: Response) {
@@ -19,6 +20,7 @@ class RoleControllers {
             await setRedis('roles', JSON.stringify(roles), 86400);
 
         } catch (error) {
+            logger.error(`[CONTROLLER: getRoles] Error fetching roles`, error)
             return res.status(500).json({
                 success: false,
                 data: error,
@@ -47,6 +49,7 @@ class RoleControllers {
                 message: "Role Created Successfully"
             })
         } catch (error) {
+            logger.error(`[CONTROLLER: createRole] Error creating role`, error)
             return res.status(500).json({
                 success: false,
                 data: error,
@@ -74,6 +77,7 @@ class RoleControllers {
                 message: "Role Deleted Successfully"
             })
         } catch (error) {
+            logger.error(`[CONTROLLER: deleteRole] Error deleting role`, error)
             return res.status(500).json({
                 success: false,
                 data: error,
