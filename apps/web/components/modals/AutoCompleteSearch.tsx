@@ -36,11 +36,14 @@ function AutoCompleteSearch({ setOpen, searchFor = "String" }: { setOpen?: (v: b
                 </CardHeader>
 
                 {/* FIX: put results/empty state inside CardContent instead of CardHeader */}
-                <CardContent className='flex-1 flex-col -my-10 md:-my-5 flex justify-center items-center '>
-                    {/* {[...dummyData.slice(0, 10)].map((item, index) => (
+                <CardContent className='flex-1 flex-col -my-5 flex justify-evenly items-center overflow-y-auto max-h-[54vh] '>
+                    {[...dummyData.slice(0, 10)].map((item, index) => (
                         <div key={index} className=' w-full h-8 flex justify-start items-center border-b hover:bg-zinc-100 rounded-md hover:text-black text-lg py-5 transition-colors duration-75 px-3 '>{item}</div>
-                    ))} */}
-                    <div
+                    ))}
+                    {[...dummyData.slice(0, 10)].map((item, index) => (
+                        <div key={index} className=' w-full h-8 flex justify-start items-center border-b hover:bg-zinc-100 rounded-md hover:text-black text-lg py-5 transition-colors duration-75 px-3 '>{item}</div>
+                    ))}
+                    {/* <div
                         className="w-full h-full flex flex-col justify-center items-center
                                   text-base italic
                                    borde border-gray-300 dark:border-gray-600
@@ -49,7 +52,7 @@ function AutoCompleteSearch({ setOpen, searchFor = "String" }: { setOpen?: (v: b
                     >
                         <CiSearch className="mb-3 h-8 w-8 text-gray-400" />
                         <span>No search results</span>
-                    </div>
+                    </div> */}
                 </CardContent>
             </Card>
         </div>

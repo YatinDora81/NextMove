@@ -19,6 +19,12 @@ class RoleControllers {
             const roles = await roleRepo.getAllRoles();
             await setRedis('roles', JSON.stringify(roles), 86400);
 
+            return res.status(200).json({
+                success: true,
+                data: roles,
+                message: "Roles Retrieved Successfully"
+            })
+
         } catch (error) {
             logger.error(`[CONTROLLER: getRoles] Error fetching roles`, error)
             return res.status(500).json({

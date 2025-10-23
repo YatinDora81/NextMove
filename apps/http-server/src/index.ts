@@ -6,11 +6,13 @@ import rolesRoutes from './routes/roles.js'
 import chatRoutes from './routes/chat.js'
 import generateRoutes from './routes/generatedMessage.js'
 import webhookRoutes from './routes/webhook.js'
+import cors from 'cors'
+
 const app = express()
 config()
 
 app.use('/api/webhooks', webhookRoutes)
-
+app.use(cors())
 
 app.use(express.json())
 const PORT = process.env.PORT

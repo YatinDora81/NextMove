@@ -1,5 +1,5 @@
 "use client"
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import {
     Card,
     CardContent,
@@ -18,26 +18,23 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@radix-ui/react-label'
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Button } from '@/components/ui/button'
-import { useAuth } from '@clerk/nextjs'
 import ModalContainer from '@/components/ModalContainer'
+import { Role } from '@/utils/api_types'
+import { Roles_AutoComplete } from '@/components/Roles_AutoComplete'
 
 function GeneratePromt() {
+
+    const [openSearch, setOpenSearch] = useState<boolean>(true)
+    const [selectedRole, setSelectedRole] = useState<Role | null>(null)
     
-    const [openSearch, setOpenSearch] = useState<boolean>(false)
-    const { getToken } = useAuth()
+    console.log(selectedRole);
     
-    useEffect(() => {
-        const fetchUsers = async () => {
-            const token = await getToken({ template: 'frontend_token' })
-            console.log(token)
-        }
-        fetchUsers()
-    }, [getToken])
+
 
     return (
         <div className='  w-full h-screen flex justify-center items-center'>
 
-            {openSearch && <ModalContainer open={openSearch} setOpen={setOpenSearch} />}
+            {openSearch && <ModalContainer setOpen={setOpenSearch} />}
 
             <Card className=' min-w-[90%]  md:min-w-[70%] lg:min-w-[40%] h-fit '>
                 <CardHeader>
@@ -52,25 +49,15 @@ function GeneratePromt() {
                     </div>
 
 
-                    <div className="mb-4 flex  justify-between gap-2">
-                        <div className=' w-[47%]'>
-                            <Label htmlFor="roles">Role</Label>
-                            <Select>
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Roles" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="light">Frontend</SelectItem>
-                                    <SelectItem value="dark">Backend</SelectItem>
-                                    <SelectItem value="system">Full Stack</SelectItem>
-                                </SelectContent>
-                            </Select>
+                    <div className="mb-4 flex items-center justify-between gap-2">
+                        <div className=' w-[47%] self-end'>
+                            <Roles_AutoComplete selectedRole={selectedRole} setSelectedRole={setSelectedRole} />
                         </div>
                         <div className=' w-[47%]'>
                             <Label htmlFor="roles">Template</Label>
-                            <Select>
+                            <Select disabled={!selectedRole}>
                                 <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Select Template" />
+                                    <SelectValue placeholder={selectedRole ? "Select Template" : "Select Role First"} />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="light">Template 1</SelectItem>
