@@ -22,22 +22,69 @@ import { Button } from '@/components/ui/button'
 import { Role, TemplateType } from '@/utils/api_types'
 import { Roles_AutoComplete } from '@/components/Roles_AutoComplete'
 import { useTemplates } from '@/hooks/useTemplates'
+import toast from 'react-hot-toast'
+import { useUser } from '@clerk/nextjs'
+import { capitalizeWords } from '@/utils/strings'
 
 function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
 
     // const [openSearch, setOpenSearch] = useState<boolean>(true)
     const [selectedRole, setSelectedRole] = useState<Role | null>(null)
     const [roleWithTemplate, setRoleWithTemplate] = useState<TemplateType[]>([])
+    const [selectedTemplate, setSelectedTemplate] = useState<TemplateType | null>(null)
+    const { user } = useUser()
+    const [formDetails, setFormDetails] = useState<{
+        recruiterName: string
+        company: string
+        isMale: boolean
+    }>({
+        recruiterName: "",
+        company: "",
+        isMale: false,
+    })
 
     const { templates } = useTemplates()
 
     useEffect(() => {
         if (selectedRole) {
             setRoleWithTemplate(templates.filter((template) => template.role === selectedRole?.id))
+        } else {
+            setRoleWithTemplate([])
         }
+        setSelectedTemplate(null) // Reset template when role changes
     }, [templates, selectedRole])
 
-    console.log(roleWithTemplate)
+    const submitHandler = () => {
+        try {
+            if (formDetails.company.trim().length === 0 || formDetails.recruiterName.trim().length === 0) {
+                toast.error("Company and Recruiter Name are required")
+                return
+            }
+            if (!selectedTemplate) {
+                toast.error("Template is required")
+                return
+            }
+            let myName = user?.firstName || ""
+            if (user?.lastName) {
+                myName = myName + " " + user?.lastName
+            }
+
+            let newMessage = selectedTemplate.content
+            // Use global replace (/g flag) to replace ALL occurrences
+            newMessage = newMessage.replace(/\[Recruiter Name\]/g, capitalizeWords(formDetails.recruiterName))
+            newMessage = newMessage.replace(/\[Company Name\]/g, capitalizeWords(formDetails.company))
+            newMessage = newMessage.replace(/\[Role\]/g, capitalizeWords(selectedTemplate.roleRelation.name))
+            newMessage = newMessage.replace(/\[MY NAME\]/g, capitalizeWords(myName))
+
+            console.log("Generated message:", newMessage)
+
+            navigator.clipboard.writeText(newMessage)
+            toast.success("Message copied.")
+        } catch (error) {
+            toast.error("Something went wrong")
+            console.log(error)
+        }
+    }
 
     return (
         <div className='  w-full h-screen flex justify-center items-center'>
@@ -53,7 +100,7 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
                 <CardContent>
                     <div className="mb-4 flex flex-col gap-2">
                         <Label htmlFor="email">Recruiter Name</Label>
-                        <Input id="email" placeholder="Jhon Doe...." type="text" />
+                        <Input value={formDetails.recruiterName} onChange={(e) => setFormDetails({ ...formDetails, recruiterName: e.target.value })} id="email" placeholder="Jhon Doe...." type="text" />
                     </div>
 
 
@@ -63,7 +110,17 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
                         </div>
                         <div className=' w-[47%]'>
                             <Label htmlFor="roles">Template</Label>
-                            <Select disabled={!selectedRole}>
+                            <Select
+                                disabled={!selectedRole}
+                                value={selectedTemplate?.id || ""}
+                                onValueChange={(value) => {
+                                    const template = roleWithTemplate.find(t => t.id === value)
+                                    if (template) {
+                                        setSelectedTemplate(template)
+                                        console.log("Selected template:", template)
+                                    }
+                                }}
+                            >
                                 <SelectTrigger className="w-full">
                                     <SelectValue placeholder={selectedRole ? "Select Template" : "Select Role First"} />
                                 </SelectTrigger>
@@ -79,30 +136,29 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
 
                     <div className="mb-4 flex flex-col gap-2">
                         <Label htmlFor="email">Company Name</Label>
-                        <Input id="email" placeholder="Company Name...." type="text" />
+                        <Input value={formDetails.company} onChange={(e) => setFormDetails({ ...formDetails, company: e.target.value })} id="email" placeholder="Company Name...." type="text" />
                     </div>
 
 
                     <div className="flex flex-col gap-2">
 
                         <div className=' w-[47%]  gap-2'>
-                            <RadioGroup className=' flex ' defaultValue="male">
+                            {selectedTemplate && selectedTemplate.rules.find(rule => rule.rule === "[GENDER]") && <RadioGroup className=' flex ' defaultValue="male">
                                 {/* preselect male */}
                                 <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="male" id="male" />
+                                    <RadioGroupItem value="male" id="male" onChange={() => setFormDetails({ ...formDetails, isMale: true })} />
                                     <Label htmlFor="option-one">Male</Label>
                                 </div>
                                 <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="female" id="female" />
+                                    <RadioGroupItem value="female" id="female" onChange={() => setFormDetails({ ...formDetails, isMale: false })} />
                                     <Label htmlFor="option-two">Female</Label>
                                 </div>
-                            </RadioGroup>
+                            </RadioGroup>}
                         </div>
 
 
-                        <div>
+                        {/* <div>
                             <RadioGroup defaultValue="message" className=' flex'>
-                                {/* preselect message */}
                                 <div className="flex items-center space-x-2">
                                     <RadioGroupItem value="message" id="message" />
                                     <Label htmlFor="message">Simple Message</Label>
@@ -112,7 +168,7 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
                                     <Label htmlFor="email">Email Format</Label>
                                 </div>
                             </RadioGroup>
-                        </div>
+                        </div> */}
 
                     </div>
 
@@ -143,7 +199,7 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
                     </div> */}
                 </CardContent>
                 <CardFooter className=' mt-2'>
-                    <Button className=' w-full'>Generate Message</Button>
+                    <Button onClick={submitHandler} className=' w-full'>Generate Message</Button>
                 </CardFooter>
             </Card>
         </div>
