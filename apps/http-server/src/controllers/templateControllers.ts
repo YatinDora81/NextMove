@@ -16,6 +16,11 @@ class Templates {
             }
 
             const allTemplates = await templateRepo.getAllTemplates(req.user.user_id)
+            return res.status(200).json({
+                success: true,
+                data: allTemplates,
+                message: "Templates Fetched Successfully!!!"
+            })
 
         } catch (error) {
             logger.error(`[CONTROLLER: getTemplates] Error fetching templates for user: ${req.user?.user_id}`, error)

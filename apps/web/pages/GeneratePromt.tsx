@@ -1,5 +1,5 @@
 "use client"
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
     Card,
     CardContent,
@@ -18,23 +18,31 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@radix-ui/react-label'
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Button } from '@/components/ui/button'
-import ModalContainer from '@/components/ModalContainer'
-import { Role } from '@/utils/api_types'
+// import ModalContainer from '@/components/ModalContainer'
+import { Role, TemplateType } from '@/utils/api_types'
 import { Roles_AutoComplete } from '@/components/Roles_AutoComplete'
+import { useTemplates } from '@/hooks/useTemplates'
 
-function GeneratePromt() {
+function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
 
-    const [openSearch, setOpenSearch] = useState<boolean>(true)
+    // const [openSearch, setOpenSearch] = useState<boolean>(true)
     const [selectedRole, setSelectedRole] = useState<Role | null>(null)
-    
-    console.log(selectedRole);
-    
+    const [roleWithTemplate, setRoleWithTemplate] = useState<TemplateType[]>([])
 
+    const { templates } = useTemplates()
+
+    useEffect(() => {
+        if (selectedRole) {
+            setRoleWithTemplate(templates.filter((template) => template.role === selectedRole?.id))
+        }
+    }, [templates, selectedRole])
+
+    console.log(roleWithTemplate)
 
     return (
         <div className='  w-full h-screen flex justify-center items-center'>
 
-            {openSearch && <ModalContainer setOpen={setOpenSearch} />}
+            {/* {openSearch && <ModalContainer setOpen={setOpenSearch} />} */}
 
             <Card className=' min-w-[90%]  md:min-w-[70%] lg:min-w-[40%] h-fit '>
                 <CardHeader>
@@ -51,7 +59,7 @@ function GeneratePromt() {
 
                     <div className="mb-4 flex items-center justify-between gap-2">
                         <div className=' w-[47%] self-end'>
-                            <Roles_AutoComplete selectedRole={selectedRole} setSelectedRole={setSelectedRole} />
+                            <Roles_AutoComplete selectedRole={selectedRole} setSelectedRole={setSelectedRole} allRoles={allRoles} />
                         </div>
                         <div className=' w-[47%]'>
                             <Label htmlFor="roles">Template</Label>
@@ -60,9 +68,9 @@ function GeneratePromt() {
                                     <SelectValue placeholder={selectedRole ? "Select Template" : "Select Role First"} />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="light">Template 1</SelectItem>
-                                    <SelectItem value="dark">Template 2</SelectItem>
-                                    <SelectItem value="system">Template 3</SelectItem>
+                                    {roleWithTemplate.map((template) => (
+                                        <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>
