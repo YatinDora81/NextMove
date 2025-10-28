@@ -23,8 +23,9 @@ import { Role, TemplateType } from '@/utils/api_types'
 import { Roles_AutoComplete } from '@/components/Roles_AutoComplete'
 import { useTemplates } from '@/hooks/useTemplates'
 import toast from 'react-hot-toast'
-import { useUser } from '@clerk/nextjs'
+import { useAuth, useUser } from '@clerk/nextjs'
 import { capitalizeWords } from '@/utils/strings'
+import { GENERATE_MESSAGE } from '@/utils/url'
 
 function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
 
@@ -33,6 +34,8 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
     const [roleWithTemplate, setRoleWithTemplate] = useState<TemplateType[]>([])
     const [selectedTemplate, setSelectedTemplate] = useState<TemplateType | null>(null)
     const { user } = useUser()
+    const { getToken } = useAuth()
+
     const [formDetails, setFormDetails] = useState<{
         recruiterName: string
         company: string
@@ -80,9 +83,60 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
 
             navigator.clipboard.writeText(newMessage)
             toast.success("Message copied.")
+            generateMessage(newMessage)
         } catch (error) {
             toast.error("Something went wrong")
             console.log(error)
+        }
+    }
+
+    const generateMessage = async (message: string = "") => {
+        try {
+            const token = await getToken({ template: "frontend_token" })
+            if (!token) {
+                throw new Error("Token not found")
+            }
+            const bodyShouldBe: {
+                "recruiterName": string,
+                "role": string,
+                "template": string,
+                "company": string,
+                "message": string,
+                "gender": string,
+                "messageType": "MESSAGE" | "EMAIL",
+                "isNewCompany": boolean,
+                "newCompanyName": string,
+                "isNewRecruiter": boolean
+            } = {
+                recruiterName: capitalizeWords(formDetails.recruiterName),
+                role: selectedRole?.id || "",
+                template: selectedTemplate?.id || "",
+                company: capitalizeWords(formDetails.company),
+                message,
+                gender: "",
+                messageType: "MESSAGE",
+                isNewCompany: true,
+                isNewRecruiter: true,
+                newCompanyName: capitalizeWords(formDetails.company),
+            }
+            const res = await fetch(GENERATE_MESSAGE, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify(bodyShouldBe)
+            })
+            const data = await res.json()
+
+            console.log(data)
+            if (data.success) {
+                console.log("Message generated successfully")
+            } else {
+                console.log(data.message)
+            }
+        } catch (error) {
+            console.log("Error at sending request to generate message", error)
         }
     }
 

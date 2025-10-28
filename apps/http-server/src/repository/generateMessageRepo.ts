@@ -41,6 +41,16 @@ class GenerateMessageRepo {
                 where: { user: userId },
                 orderBy: {
                     createdAt: 'desc'
+                },
+                include : {
+                    roleRel: true,
+                    templateRel: true,
+                    company_gen_rel: {
+                        include: {
+                            createdByRelation: true,
+                        }
+                    },
+                    userGen: true,
                 }
             })
             return data

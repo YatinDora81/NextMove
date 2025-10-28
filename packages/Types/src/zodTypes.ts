@@ -79,12 +79,11 @@ export const generateMessageSchema = z.object({
     template: z.string(),
     company: z.string(),
     message: z.string(),
-    gender: z.string(),
+    gender: z.string().optional().default(""),
     messageType: z.enum(['MESSAGE', 'EMAIL']),
     isNewCompany: z.boolean().optional().default(false),
     newCompanyName: z.string().optional().default(""),
     isNewRecruiter: z.boolean().optional().default(false),
-
 })
 export type generateMessageSchemaType = z.infer<typeof generateMessageSchema>;
 
