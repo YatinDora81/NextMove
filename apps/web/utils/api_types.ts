@@ -101,3 +101,27 @@ export const GeneratedMessageSchema = z.object({
 
 export type GeneratedMessageType = z.infer<typeof GeneratedMessageSchema>;
 export type GeneratedMessage = GeneratedMessageType; // Alias for backward compatibility
+
+export const MessageSchema = z.object({
+  id: z.string(),
+  message: z.string(),
+  by: z.enum(["SELF", "AI"]),
+  userId: z.string(),
+  roomId: z.string(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
+export const RoomWithAIChateSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  predefinedMessages: z.array(z.string()),
+  userId: z.string(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  messages: z.array(MessageSchema),
+});
+
+export type MessageType = z.infer<typeof MessageSchema>;
+export type RoomWithAIChatType = z.infer<typeof RoomWithAIChateSchema>;

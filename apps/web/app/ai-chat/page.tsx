@@ -1,7 +1,10 @@
+import { AIProvider } from "@/hooks/useAI";
 import AiChatPage from "@/pages/AIChatPage";
 
 export default function AIChat() {
     return (
-        <AiChatPage />
+        <AIProvider>
+            <AiChatPage />
+        </AIProvider>
     )
 }
