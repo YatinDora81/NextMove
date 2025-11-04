@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useAI } from "@/hooks/useAI"
 import { MessageType, RoomWithAIChatType } from "@/utils/api_types"
+import toast from "react-hot-toast"
 
 
 // Typing indicator component
@@ -38,10 +39,17 @@ export default function AiChatPage() {
   // Clean state management
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
-  const [input, setInput] = useState<string>("")
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set())
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const { rooms, setCurrSelectedRoom, isNewRoom, setIsNewRoom, setNewRoomDetails, isAIChatLoading, newRoomDetails, currSelectedRoom, isNewRoomFocused, setIsNewRoomFocused } = useAI()
+  const { rooms, setCurrSelectedRoom, isNewRoom, setIsNewRoom, setNewRoomDetails, isAIChatLoading, newRoomDetails, currSelectedRoom, isNewRoomFocused, setIsNewRoomFocused, addNewMessage, input, setInput, messageResponseLoading } = useAI()
+
+  // Scroll to bottom when messages or newRoomDetails change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
+    }
+  }, [currSelectedRoom?.messages, newRoomDetails])
 
 
   const handleSelectRoom = (room: RoomWithAIChatType) => {
@@ -97,6 +105,21 @@ export default function AiChatPage() {
     )
   }
 
+  const handleMessageSent = () => {
+    if (isNewRoom && newRoomDetails && newRoomDetails.length > 0) {
+      addNewMessage(input, null, true, newRoomDetails, [])
+    }
+    else if(currSelectedRoom && currSelectedRoom.predefinedMessages && currSelectedRoom.predefinedMessages.length > 0 ) addNewMessage(input, currSelectedRoom?.id, false, currSelectedRoom?.predefinedMessages, currSelectedRoom?.messages.map((msg: MessageType) => msg.message))
+    else {
+      toast.error("Please select a room or create a new room")
+    }
+
+
+
+  }
+
+  console.log(currSelectedRoom)
+
   return (
     <div className="w-full flex flex-row mt-16 h-[calc(100vh-4rem)] bg-background">
       {/* Toast Notifications */}
@@ -135,7 +158,7 @@ export default function AiChatPage() {
           <div className="flex-1 w-full overflow-y-auto p-2 scrollbar-sleek">
 
             {
-              ((isNewRoom && !newRoomDetails) || (rooms.length === 0 && isAIChatLoading))
+              ((isNewRoom) || (rooms.length === 0 && isAIChatLoading))
               &&
               <div
                 onClick={() => {
@@ -331,6 +354,107 @@ export default function AiChatPage() {
                   </div>
                 )}
 
+                {/* for new room preselected messages */}
+                {
+                  isNewRoom && (
+                    <div className="flex flex-col w-full gap-5 justify-start">
+                      {/* 1 Message by ai */}
+                      <div className="max-w-fit bg-muted/60 rounded-2xl p-4 shadow-sm border relative group">
+                        <div className="flex justify-between flex-col gap-3 items-start mb-2">
+                          <p className="text-sm font-medium text-muted-foreground">
+                            AI Assistant
+                          </p>
+                          <p>
+                            Welcome! Let's start by choosing your message format:
+                          </p>
+
+                          <div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="mr-2 mb-2 hover:bg-primary hover:text-primary-foreground 
+                              transition-colors"
+                              onClick={() => {
+                                setNewRoomDetails([...(newRoomDetails || []), "Simple message"])
+                              }}
+                              disabled={(newRoomDetails?.length || 0) > 0}
+                            >
+                              Simple Message
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="mr-2 mb-2 hover:bg-primary hover:text-primary-foreground transition-colors"
+                              disabled={(newRoomDetails?.length || 0) > 0}
+                              onClick={() => {
+                                setNewRoomDetails([...(newRoomDetails || []), "Email Format"])
+                              }}
+                            >
+                              Email Format
+                            </Button>
+                          </div>
+
+                        </div>
+                      </div>
+
+                      {/* 2 Message by me */}
+                      {newRoomDetails && newRoomDetails.length >= 1 && <div className="flex justify-end">
+                        <div className="max-w-[80%] bg-primary text-primary-foreground rounded-2xl p-4 shadow-sm relative group">
+                          <p className="text-sm font-medium opacity-90">You</p>
+                          <p className="text-base capitalize">{newRoomDetails?.[0]}</p>
+                        </div>
+                      </div>}
+
+                      {/* 3 Message by ai */}
+                      {newRoomDetails && newRoomDetails.length >= 1 && <div className="max-w-fit bg-muted/60 rounded-2xl p-4 shadow-sm border relative group">
+                        <div className="flex justify-between flex-col gap-3 items-start mb-2">
+                          <p className="text-sm font-medium text-muted-foreground">
+                            AI Assistant
+                          </p>
+                          <p>
+                            Great! Now choose what you'd like to do:
+                          </p>
+
+                          <div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="mr-2 mb-2 hover:bg-primary hover:text-primary-foreground 
+                              transition-colors"
+                              onClick={() => {
+                                setNewRoomDetails([...(newRoomDetails || []), "Generate"])
+                              }}
+                              disabled={(newRoomDetails?.length || 0) > 1}
+                            >
+                              Generate
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="mr-2 mb-2 hover:bg-primary hover:text-primary-foreground transition-colors"
+                              onClick={() => {
+                                setNewRoomDetails([...(newRoomDetails || []), "Follow Up"])
+                              }}
+                              disabled={(newRoomDetails?.length || 0) > 1}
+                            >
+                              Follow Up
+                            </Button>
+                          </div>
+
+                        </div>
+                      </div>}
+
+                      {/* 4 Message by me */}
+                      {newRoomDetails && newRoomDetails.length >= 2 && <div className="flex justify-end">
+                        <div className="max-w-[80%] bg-primary text-primary-foreground rounded-2xl p-4 shadow-sm relative group">
+                          <p className="text-sm font-medium opacity-90">You</p>
+                          <p className="text-base capitalize">{newRoomDetails?.[1]}</p>
+                        </div>
+                      </div>}
+                    </div>
+                  )
+                }
+
                 {currSelectedRoom?.messages.map((msg: MessageType) => (
                   <div key={msg.id} className="space-y-3">
 
@@ -386,19 +510,19 @@ export default function AiChatPage() {
                     )}
                   </div>
                 ))}
-                {/* Typing indicator
-                // {isLoading && (
-                //   <div className="space-y-3">
-                //     <TypingIndicator />
-                //   </div>
-                // )} */}
-                {/* <div ref={messagesEndRef} /> */}
+                {/* Typing indicator */}
+                {messageResponseLoading && (
+                  <div className="space-y-3">
+                    <TypingIndicator />
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
               </div>
             </div>
 
             {/* Input Section */}
             {/* 1 more condition here to check two predefined message are there */}
-            {(!isNewRoom || (isNewRoom && newRoomDetails !== null)) && (
+            {(currSelectedRoom || (isNewRoom && newRoomDetails && newRoomDetails.length >= 2)) && (
               <div className="border-t bg-card p-6 flex-shrink-0">
                 <div className="space-y-4">
                   {/* Display selected options */}
@@ -414,16 +538,16 @@ export default function AiChatPage() {
                         placeholder="Type your message here..."
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        // onKeyDown={(e) => e.key === "Enter" && handleSendAttempt()}
+                        onKeyDown={(e) => e.key === "Enter" && handleMessageSent()}
                         className="h-12 text-base"
                       />
                     </div>
                     <Button
-                      // onClick={handleSendAttempt}
+                      onClick={handleMessageSent}
                       className="h-12 px-6 font-medium"
-                      disabled={!input.trim()}
+                      disabled={!input.trim() || messageResponseLoading}
                     >
-                      Send
+                      {messageResponseLoading ? "Sending..." : "Send"}
                     </Button>
                   </div>
                 </div>

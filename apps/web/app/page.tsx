@@ -19,7 +19,7 @@ export default async function LandingPage() {
   return (
     <div className=" ">
       <TemplateProvider>
-        <GeneratePromt allRoles={data.data as Role[]} />
+        <GeneratePromt allRoles={ data.data as Role[]} />
       </TemplateProvider>
     </div>
   )
