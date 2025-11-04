@@ -5,3 +5,4 @@ export const GENERATE_MESSAGE = `${BASE_API}/api/generate/generate-message`;
 export const GET_GENERATED_MESSAGES = `${BASE_API}/api/generate/get-generated-messages`;
 export const GET_ALL_ROOMS = `${BASE_API}/api/chat/get-all-chats`;
 export const ADD_NEW_MESSAGE = `${BASE_API}/api/chat/create-chat`;
+export const UPDATE_USER_DETAILS = `${BASE_API}/api/users/update-user-details`

@@ -1,5 +1,5 @@
 "use client"
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
     Card,
     CardContent,
@@ -26,6 +26,8 @@ import toast from 'react-hot-toast'
 import { useAuth, useUser } from '@clerk/nextjs'
 import { capitalizeWords } from '@/utils/strings'
 import { GENERATE_MESSAGE } from '@/utils/url'
+import { EditIcon, RefreshCcwIcon } from 'lucide-react'
+import EditName from '@/components/modals/EditName'
 
 function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
 
@@ -34,7 +36,15 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
     const [roleWithTemplate, setRoleWithTemplate] = useState<TemplateType[]>([])
     const [selectedTemplate, setSelectedTemplate] = useState<TemplateType | null>(null)
     const { user } = useUser()
+    const [firstName, setFirstName] = useState('')
+    const [lastName, setLastName] = useState('')
     const { getToken } = useAuth()
+    const editBtnRef = useRef<HTMLButtonElement>(null)
+
+    useEffect(() => {
+        setFirstName(capitalizeWords(user?.firstName || ''))
+        setLastName(capitalizeWords(user?.lastName || ''))
+    }, [user])
 
     const [formDetails, setFormDetails] = useState<{
         recruiterName: string
@@ -67,9 +77,9 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
                 toast.error("Template is required")
                 return
             }
-            let myName = user?.firstName || ""
-            if (user?.lastName) {
-                myName = myName + " " + user?.lastName
+            let myName = firstName 
+            if (lastName) {
+                myName = myName + " " + lastName
             }
 
             let newMessage = selectedTemplate.content
@@ -188,10 +198,12 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
                     </div>
 
 
-                    <div className="mb-4 flex flex-col gap-2">
+                    <div className="mb-2 flex flex-col gap-2">
                         <Label htmlFor="email">Company Name</Label>
                         <Input value={formDetails.company} onChange={(e) => setFormDetails({ ...formDetails, company: e.target.value })} id="email" placeholder="Company Name...." type="text" />
                     </div>
+
+
 
 
                     <div className="flex flex-col gap-2">
@@ -210,6 +222,20 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
                             </RadioGroup>}
                         </div>
 
+
+
+                        {/* Your Name */}
+
+                        <div className="mb-4 flex flex-col gap-2">
+                            <Label htmlFor="yourName">Your Name</Label>
+                            <div className='flex gap-1'>
+                                <Input className=' ' value={firstName + " " + lastName} disabled id="yourName" placeholder="Your Name...." type="text" />
+                                {/* <Button ref={editBtnRef} variant={"secondary"} onClick={() => { }} className=' ' size="icon"><RefreshCcwIcon className="w-4 h-4" /></Button> */}
+                                <EditName><Button variant={"secondary"} className=' ' size="icon">
+                                    <EditIcon className="w-4 h-4" />
+                                </Button></EditName>
+                            </div>
+                        </div>
 
                         {/* <div>
                             <RadioGroup defaultValue="message" className=' flex'>

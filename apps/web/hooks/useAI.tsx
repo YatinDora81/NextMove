@@ -133,6 +133,7 @@ export const AIProvider = ({ children }: { children: React.ReactNode }) => {
                     } as RoomWithAIChatType)
                     setIsNewRoomFocused(false)
                     setInput("")
+                    setMessageResponseLoading(false)
                 }
                 toast.success(data.message || "Message added successfully")
             }
@@ -144,7 +145,6 @@ export const AIProvider = ({ children }: { children: React.ReactNode }) => {
             setMessageResponseLoading(false);
         }
     }
-
 
     const fetchRooms = async () => {
         setIsAIChatLoading(true);
@@ -171,7 +171,6 @@ export const AIProvider = ({ children }: { children: React.ReactNode }) => {
             setIsAIChatLoading(false)
         }
     }
-
 
     useEffect(() => {
         fetchRooms()
@@ -207,10 +206,6 @@ export const AIProvider = ({ children }: { children: React.ReactNode }) => {
             setNewRoomDetails(null);
         }
     }, [currSelectedRoom])
-
-
-
-    console.log("Curr Selected Room", currSelectedRoom)
 
     return (
         <AIContext.Provider value={{ rooms, setRooms, isAIChatLoading, setIsAIChatLoading, fetchRooms, currSelectedRoom, setCurrSelectedRoom, isNewRoom, setIsNewRoom, newRoomDetails, setNewRoomDetails, isNewRoomFocused, setIsNewRoomFocused, addNewMessage, messageResponseLoading, setMessageResponseLoading, input, setInput }}>
