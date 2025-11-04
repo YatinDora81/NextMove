@@ -133,7 +133,6 @@ export const AIProvider = ({ children }: { children: React.ReactNode }) => {
                     } as RoomWithAIChatType)
                     setIsNewRoomFocused(false)
                     setInput("")
-                    setMessageResponseLoading(false)
                 }
                 toast.success(data.message || "Message added successfully")
             }

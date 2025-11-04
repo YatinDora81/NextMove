@@ -42,14 +42,14 @@ export default function AiChatPage() {
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set())
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const { rooms, setCurrSelectedRoom, isNewRoom, setIsNewRoom, setNewRoomDetails, isAIChatLoading, newRoomDetails, currSelectedRoom, isNewRoomFocused, setIsNewRoomFocused, addNewMessage, input, setInput, messageResponseLoading } = useAI()
+  const { rooms, setCurrSelectedRoom, isNewRoom, setIsNewRoom, setNewRoomDetails, isAIChatLoading, newRoomDetails, currSelectedRoom, isNewRoomFocused, setIsNewRoomFocused, addNewMessage, input, setInput, messageResponseLoading, setMessageResponseLoading } = useAI()
 
-  // Scroll to bottom when messages or newRoomDetails change
+  // Scroll to bottom when messages, newRoomDetails, or loading state changes
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
     }
-  }, [currSelectedRoom?.messages, newRoomDetails])
+  }, [currSelectedRoom?.messages, newRoomDetails, messageResponseLoading])
 
 
   const handleSelectRoom = (room: RoomWithAIChatType) => {
@@ -109,7 +109,7 @@ export default function AiChatPage() {
     if (isNewRoom && newRoomDetails && newRoomDetails.length > 0) {
       addNewMessage(input, null, true, newRoomDetails, [])
     }
-    else if(currSelectedRoom && currSelectedRoom.predefinedMessages && currSelectedRoom.predefinedMessages.length > 0 ) addNewMessage(input, currSelectedRoom?.id, false, currSelectedRoom?.predefinedMessages, currSelectedRoom?.messages.map((msg: MessageType) => msg.message))
+    else if (currSelectedRoom && currSelectedRoom.predefinedMessages && currSelectedRoom.predefinedMessages.length > 0) addNewMessage(input, currSelectedRoom?.id, false, currSelectedRoom?.predefinedMessages, currSelectedRoom?.messages.map((msg: MessageType) => msg.message))
     else {
       toast.error("Please select a room or create a new room")
     }
@@ -118,7 +118,6 @@ export default function AiChatPage() {
 
   }
 
-  console.log(currSelectedRoom)
 
   return (
     <div className="w-full flex flex-row mt-16 h-[calc(100vh-4rem)] bg-background">
@@ -133,7 +132,14 @@ export default function AiChatPage() {
               <Button
                 variant="outline"
                 size="sm"
-                // onClick={createNewChat}
+                onClick={() => {
+                  setIsNewRoomFocused(true)
+                  setIsNewRoom(true)
+                  setCurrSelectedRoom(null)
+                  setNewRoomDetails(null)
+                  setInput("")
+                  setMessageResponseLoading(false)
+                }}
                 className="flex items-center gap-2"
                 title="New Chat"
               >
@@ -249,16 +255,31 @@ export default function AiChatPage() {
                   AI Chat Assistant
                 </CardTitle>
               </div>
-              <Button
+              { !currSelectedRoom ? <Button
                 variant="outline"
                 size="sm"
-                // onClick={resetCurrentChat}
+                onClick={() => {
+                  setIsNewRoomFocused(true)
+                  setIsNewRoom(true)
+                  setCurrSelectedRoom(null)
+                  setNewRoomDetails(null)
+                  setInput("")
+                  setMessageResponseLoading(false)
+                }}
                 className="flex items-center gap-2 hover:bg-muted transition-colors"
                 title="Restart conversation"
               >
                 <RotateCcw className="h-4 w-4" />
                 <span className="hidden sm:inline">Restart</span>
-              </Button>
+              </Button> :
+                <div>
+                  <div className="text-sm text-muted-foreground">
+                    {currSelectedRoom?.name}
+                  </div>
+                  <div className="text-sm text-muted-foreground text-right">
+                    {new Date(currSelectedRoom?.createdAt || new Date()).toLocaleDateString()}
+                  </div>
+                </div>}
             </div>
           </CardHeader>
 
@@ -538,8 +559,9 @@ export default function AiChatPage() {
                         placeholder="Type your message here..."
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleMessageSent()}
+                        onKeyDown={(e) => e.key === "Enter" && !messageResponseLoading && handleMessageSent()}
                         className="h-12 text-base"
+                        disabled={messageResponseLoading}
                       />
                     </div>
                     <Button
