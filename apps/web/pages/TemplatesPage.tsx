@@ -11,10 +11,14 @@ import {
 } from "@/components/ui/accordion"
 import TemplateOpeartion from '@/components/modals/TemplateOpeartion'
 import AlertModal from '@/components/modals/AlertModal'
+import { useTemplates } from '@/hooks/useTemplates'
+import { Role, TemplateType } from '@/utils/api_types'
+import { toTitleCase } from '@/utils/strings'
+import toast from 'react-hot-toast'
 
 
 
-function TemplatesPage() {
+function TemplatesPage({ allRoles }: { allRoles: Role[] }) {
 
     const filters = [
         {
@@ -29,12 +33,14 @@ function TemplatesPage() {
     ]
 
     const [filter, setFilter] = useState('All')
-    const [orignalTemplates, setOriginalTemplates] = useState<any>([]);
-    const [renderTemplates, setRenderTemplates] = useState<any>([]);
+    const { templates: orignalTemplates, deleteTemplate } = useTemplates()
+    const [renderTemplates, setRenderTemplates] = useState<TemplateType[]>([]);
 
     useEffect(() => {
         setRenderTemplates(orignalTemplates)
     }, [orignalTemplates])
+
+    console.log('renderTemplates', renderTemplates)
 
 
     return (
@@ -56,7 +62,7 @@ function TemplatesPage() {
 
                     <div>
 
-                        <TemplateOpeartion isUpdate={false} currData={null}>
+                        <TemplateOpeartion allRoles={allRoles} isUpdate={false} currData={null}>
                             <Button variant={"default"} className=' flex justify-center items-center gap-2 ' >
                                 <Plus />New
                             </Button>
@@ -67,72 +73,37 @@ function TemplatesPage() {
 
                 <Accordion type="single" collapsible className=' w-full'>
 
-                    <AccordionItem value="item-1" className=' w-full bzinc-100 dark:bzinc-900/40 rounded-xl  px-5 md:px-10 '>
-                        <AccordionTrigger>
+                    {
+                        renderTemplates.map((template) => (<AccordionItem key={template?.id} value={template?.id} className=' w-full bzinc-100 dark:bzinc-900/40 rounded-xl  px-5 md:px-10 '>
+                            <AccordionTrigger>
 
-                            <div className=' flex flex-col gap-2 pb-2 '>
-                                <div className=' flex'>
-                                    <div className=' bgray-700/10 dark:bzinc-950 w-[82px] border flex justify-center items-center  py-2 rounded-2xl'>Message</div>
-                                    <div className=' bgray-700/10 dark:bzinc-950 w-[82px] border flex justify-center items-center  py-2 rounded-2xl'>Full Stack</div>
+                                <div className=' flex flex-col gap-3 pb-2 '>
+                                    <div className=' flex gap-2'>
+                                        <div className=' bgray-700/10 dark:bzinc-950 px-3 border flex justify-center items-center  py-2 rounded-2xl'>{toTitleCase(template.type)}</div>
+                                        <div className=' bgray-700/10 dark:bzinc-950  px-3 border flex justify-center items-center  py-2 rounded-2xl'>{template.roleRelation ? toTitleCase(template.roleRelation.name) : 'N/A'}</div>
+                                    </div>
+                                    {/* <div className=' px-3'>For Mutuals</div> */}
+                                    <div className=' text-lg  pl-2'>{template.name}</div>
                                 </div>
-                                {/* <div className=' px-3'>For Mutuals</div> */}
-                                <div className=' text-lg  pl-2'>A special thanks for </div>
-                            </div>
 
-                        </AccordionTrigger>
-                        <AccordionContent className=' w-full flex justify-between items-start gap-2'>
-                            <div className='pl-2 w-full text-black dark:text-zinc-300'>
-                                {"okayyy cyt vuvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvhhhhhhhhhhhhhhhhhhhhhhhh hhhhhhhhhhhhhhhhhhhhh h hhhhhhhhhhhhhhhhhhhb ctfvy guh fctvgbhj fc vghbj cfvgbh cyvg hu vbhu vguhvub vyguh gvyuh ivugbh".split("\n").map((line, idx) => (
-                                    <p key={idx}>{line}</p>
-                                ))}
-                            </div>
-                            <div className=' flex gap-1 '>
-                                <Button variant={"outline"} className=' flex justify-center items-center gap-2 ' size={'sm'} > <Copy /></Button>
-                                <Button variant={"outline"} className=' flex justify-center items-center gap-2 ' size={"sm"} > <Edit /></Button>
-                                <AlertModal alertMode={1} >
-                                    <Button variant={"outline"} className=' flex justify-center items-center gap-2 hover:text-red-500 ' size={"sm"} > <Trash /></Button>
-                                </AlertModal>
-                            </div>
-
-                        </AccordionContent>
-                    </AccordionItem>
-
-
-
-
-
-                    <AccordionItem value="item-2" className=' w-full bzinc-900/40 rounded-xl  px-5 md:px-10 '>
-                        <AccordionTrigger>
-
-                            <div className=' flex flex-col gap-2 pb-2 '>
-                                <div className=' flex'>
-                                    <div className=' bzinc-950 w-[82px] border flex justify-center items-center  py-2 rounded-2xl'>Email</div>
-                                    <div className=' bzinc-950 w-[82px] border flex justify-center items-center  py-2 rounded-2xl'>FrontEnd</div>
+                            </AccordionTrigger>
+                            <AccordionContent className=' w-full flex justify-between items-start gap-2'>
+                                <div className='pl-2 w-full text-black dark:text-zinc-300 whitespace-pre-line'>
+                                    {template.content}
                                 </div>
-                                {/* <div className=' px-3'>For Mutuals</div> */}
-                                <div className=' text-lg  pl-2'>A special thanks for </div>
-                            </div>
+                                <div className=' flex gap-1 '>
+                                    <Button variant={"outline"} className=' flex justify-center items-center gap-2 ' size={'sm'} onClick={() => { navigator.clipboard.writeText(template.content); toast.success('Copied to clipboard') }} > <Copy /></Button>
+                                    <TemplateOpeartion allRoles={allRoles} isUpdate={true} currData={template}>
+                                        <Button variant={"outline"} className=' flex justify-center items-center gap-2 ' size={"sm"} > <Edit /></Button>
+                                    </ TemplateOpeartion>
+                                    <AlertModal alertMode={1} onConfirm={() => deleteTemplate(template.id)}>
+                                        <Button variant={"outline"} className=' flex justify-center items-center gap-2 hover:text-red-500 ' size={"sm"} > <Trash /></Button>
+                                    </AlertModal>
+                                </div>
 
-                        </AccordionTrigger>
-                        <AccordionContent className=' w-full flex justify-between items-start gap-2'>
-                            <div className='pl-2 w-full text-zinc-300'>
-                                {"okayyy cyt vuvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvhhhhhhhhhhhhhhhhhhhhhhhh hhhhhhhhhhhhhhhhhhhhh h hhhhhhhhhhhhhhhhhhhb ctfvy guh fctvgbhj fc vghbj cfvgbh cyvg hu vbhu vguhvub vyguh gvyuh ivugbh".split("\n").map((line, idx) => (
-                                    <p key={idx}>{line}</p>
-                                ))}
-                            </div>
-                            <div className=' flex gap-1 '>
-                                <Button variant={"outline"} className=' flex justify-center items-center gap-2 ' size={'sm'} > <Copy /></Button>
-                                <Button variant={"outline"} className=' flex justify-center items-center gap-2 ' size={"sm"} > <Edit /></Button>
-                                <AlertModal alertMode={1} >
-                                    <Button variant={"outline"} className=' flex justify-center items-center gap-2 hover:text-red-500 ' size={"sm"} > <Trash /></Button>
-                                </AlertModal>
-                            </div>
-
-                        </AccordionContent>
-                    </AccordionItem>
-
-
-
+                            </AccordionContent>
+                        </AccordionItem>))
+                    }
 
                 </Accordion>
 

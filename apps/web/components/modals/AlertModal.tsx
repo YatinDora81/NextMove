@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/alert-dialog"
 
 
-function AlertModal({ children = 'Open', alertMode = 1 }: { children: ReactNode, alertMode: number }) {
+function AlertModal({ children = 'Open', alertMode = 1, onConfirm }: { children: ReactNode, alertMode: number, onConfirm?: () => void }) {
 
     const alertDetails = [
         {
@@ -25,6 +25,12 @@ function AlertModal({ children = 'Open', alertMode = 1 }: { children: ReactNode,
             button2Variant: ' bg-red-500 hover:bg-red-600 text-white',
         }
     ]
+
+    const handleConfirm = () => {
+        if (onConfirm) {
+            onConfirm();
+        }
+    }
 
     return (
         <AlertDialog>
@@ -38,7 +44,12 @@ function AlertModal({ children = 'Open', alertMode = 1 }: { children: ReactNode,
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel>{alertDetails[(alertMode % alertDetails.length)]?.button1}</AlertDialogCancel>
-                    <AlertDialogAction className={alertDetails[(alertMode % alertDetails.length)]?.button2Variant}>{alertDetails[(alertMode % alertDetails.length)]?.button2}</AlertDialogAction>
+                    <AlertDialogAction 
+                        onClick={handleConfirm}
+                        className={alertDetails[(alertMode % alertDetails.length)]?.button2Variant}
+                    >
+                        {alertDetails[(alertMode % alertDetails.length)]?.button2}
+                    </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>

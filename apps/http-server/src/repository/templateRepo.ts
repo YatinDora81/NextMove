@@ -42,6 +42,9 @@ class TemplateRepo {
                             templateId: true,
                         }
                     }
+                },
+                orderBy: {
+                    createdAt: 'desc'
                 }
             })
 
@@ -64,16 +67,42 @@ class TemplateRepo {
                         content: data.content,
                         role: data.role,
                         user: userId,
-                    }
+                    },
+                    select: {
+                        id: true,
+                        name: true,
+                        description: true,
+                        type: true,
+                        content: true,
+                        createdAt: true,
+                        updatedAt: true,
+                        role: true,
+                        user: true,
+                        isDeleted: true,
+                        roleRelation: {
+                            select: {
+                                id: true,
+                                name: true,
+                                desc: true,
+                            }
+                        },
+                        rules: {
+                            select: {
+                                id: true,
+                                rule: true,
+                                templateId: true,
+                            }
+                        }
+                    },
                 })
 
-                const rules = await tx.templateRules.createMany({
+                const rules = await tx.templateRules.createManyAndReturn({
                     data: data.rules.map((rule) => ({
                         rule: rule,
                         templateId: template.id,
                     }))
                 })
-                return { template, rules }
+                return { template : {...template , "rules" : rules}, rules }
             })
 
             await clearRedis(`templates:${userId}`)
@@ -111,7 +140,7 @@ class TemplateRepo {
                         user: userId,
                         id: data.templateId
                     },
-                    data:{
+                    data: {
                         name: data.name,
                         description: data.description,
                         type: data.type,
@@ -126,13 +155,13 @@ class TemplateRepo {
                         }
                     })
                 }
-                const rules = await tx.templateRules.createMany({
+                const rules = await tx.templateRules.createManyAndReturn({
                     data: data.rules.map((rule) => ({
                         rule: rule,
                         templateId: data.templateId
                     }))
                 })
-                return { template, rules }
+                return { template : {...template , "rules" : rules}, rules }
             })
             await clearRedis(`templates:${userId}`)
             return res

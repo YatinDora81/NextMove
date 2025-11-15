@@ -77,7 +77,7 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
                 toast.error("Template is required")
                 return
             }
-            let myName = firstName 
+            let myName = firstName
             if (lastName) {
                 myName = myName + " " + lastName
             }

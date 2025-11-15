@@ -1,8 +1,11 @@
 const BASE_API = "http://localhost:3001";
 export const GET_ALL_ROLES = `${BASE_API}/api/roles/get-roles`;
 export const GET_ALL_TEMPLATES = `${BASE_API}/api/templates/get-templates`;
+export const DELETE_TEMPLATE = `${BASE_API}/api/templates/delete-template`;
 export const GENERATE_MESSAGE = `${BASE_API}/api/generate/generate-message`;
 export const GET_GENERATED_MESSAGES = `${BASE_API}/api/generate/get-generated-messages`;
 export const GET_ALL_ROOMS = `${BASE_API}/api/chat/get-all-chats`;
 export const ADD_NEW_MESSAGE = `${BASE_API}/api/chat/create-chat`;
 export const UPDATE_USER_DETAILS = `${BASE_API}/api/users/update-user-details`
+export const ADD_NEW_TEMPLATE = `${BASE_API}/api/templates/add-template`;
+export const UPDATE_TEMPLATE = `${BASE_API}/api/templates/update-template`;

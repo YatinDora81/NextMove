@@ -1,10 +1,10 @@
-import {z} from 'zod'
+import { z } from 'zod'
 
 export type Role = {
-    id: string
-    name: string
-    description?: string
-    createdAt: string
+  id: string
+  name: string
+  description?: string
+  createdAt: string
 }
 
 export const roleRelationSchema = z.object({
@@ -14,20 +14,20 @@ export const roleRelationSchema = z.object({
 });
 
 export const ruleSchema = z.object({
-  id: z.string()    ,
+  id: z.string(),
   rule: z.string(),
   templateId: z.string(),
 });
 
 export const TemplateSchema = z.object({
-    id: z.string(),
+  id: z.string(),
   name: z.string(),
   description: z.string().nullable(),
   type: z.literal("MESSAGE"),
   content: z.string(),
   createdAt: z.date(),
   updatedAt: z.date(),
-    role: z.string(),
+  role: z.string(),
   user: z.string(),
   isDeleted: z.boolean(),
   roleRelation: roleRelationSchema,
@@ -91,7 +91,7 @@ export const GeneratedMessageSchema = z.object({
   createdAt: z.date(),
   updatedAt: z.date(),
   user: z.string(),
-  
+
   // Relations (populated by backend)
   roleRel: roleRelationSchema.optional(),
   templateRel: TemplateRelationSchema.optional(),
@@ -125,3 +125,15 @@ export const RoomWithAIChateSchema = z.object({
 
 export type MessageType = z.infer<typeof MessageSchema>;
 export type RoomWithAIChatType = z.infer<typeof RoomWithAIChateSchema>;
+
+
+export const Template_Operation_Schema = z.object({
+    name: z.string(),
+    description: z.string(),
+    type: z.enum(["MESSAGE", "EMAIL"]),
+    content: z.string(),
+    role: z.string(),
+    rules: z.array(z.string()),
+})
+
+export type Template_Operation_Type = z.infer<typeof Template_Operation_Schema>;
