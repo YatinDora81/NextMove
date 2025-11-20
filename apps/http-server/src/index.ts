@@ -23,6 +23,13 @@ app.use('/api/roles', rolesRoutes)
 app.use('/api/chat', chatRoutes)
 app.use('/api/generate', generateRoutes)
 
+app.get('/' , (_,res)=>{
+    res.status(200).json({
+        status: "Ok",
+        time : Date.now(),
+        message: "Next Move Server is Up!!!"
+    })
+})
 
 app.listen(PORT, () => {
     console.log(`App is running on ${PORT} PORT`)
