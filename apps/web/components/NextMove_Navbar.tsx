@@ -11,7 +11,7 @@ function NextMove_Navbar() {
     const { isSignedIn, user } = useUser()
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const navbarItems: { name: string; link: string }[] = [
-        { name: 'Generate', link: '/' },
+        { name: 'Generate', link: '/generate' },
         { name: 'AI Chat', link: '/ai-chat' },
         { name: 'Templates', link: '/templates' },
         // { name: 'Resumes', link: '/resumes' },

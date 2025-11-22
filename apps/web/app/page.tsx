@@ -1,26 +1,417 @@
-import GeneratePromt from "@/pages/GeneratePromt";
-import { Role } from "@/utils/api_types";
-import { GET_ALL_ROLES } from "@/utils/url";
-import { auth } from "@clerk/nextjs/server";
-import { TemplateProvider } from "@/hooks/useTemplates";
+import { CheckCircle2, Sparkles, MessageSquare, BarChart3, Zap, Users, RefreshCw, GraduationCap, Briefcase, Star, Github, Linkedin, Twitter } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { LucideIcon } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import GetStartedButton from "@/components/GetStartedButton";
 
-export default async function LandingPage() {
-  const { getToken } = await auth();
-  const token = await getToken({ template: "frontend_token" })
+export default function LandingPage() {
+    const imageCards: { title: string, desc: string }[] = [
+        {
+            title: '95%',
+            desc: 'User Satisfaction'
+        },
+        {
+            title: '2 min',
+            desc: 'Average Setup Time'
+        },
+        {
+            title: '10x',
+            desc: 'Faster Applications'
+        },
+        {
+            title: '24/7',
+            desc: 'AI Availability'
+        }
+    ]
 
-  const res = await fetch(GET_ALL_ROLES, {
-    method: "GET",
-    headers: {
-      "Authorization": `Bearer ${token}`
-    }
-  })
-  const data = await res.json()
+    const featuresCard: { icon: LucideIcon, title: string, description: string }[] = [
+        {
+            icon: Sparkles,
+            title: "AI-Powered Messages",
+            description: "Generate personalized cover letters and messages tailored to each job posting in seconds."
+        },
+        {
+            icon: MessageSquare,
+            title: "Smart Templates",
+            description: "Pre-built templates optimized for different industries and job types."
+        },
+        {
+            icon: BarChart3,
+            title: "Application Tracking",
+            description: "Keep track of all your applications in one place with status updates."
+        },
+        {
+            icon: Zap,
+            title: "Instant Generation",
+            description: "Create professional applications 10x faster than traditional methods.",
+        },
+    ]
 
-  return (
-    <div className=" ">
-      <TemplateProvider>
-        <GeneratePromt allRoles={ data.data as Role[]} />
-      </TemplateProvider>
-    </div>
-  )
+    const appSteps: { step: number, icon: LucideIcon, title: string, description: string }[] = [
+        {
+            step: 1,
+            icon: Users,
+            title: "Create Your Profile",
+            description: "Add your experience, skills, and career goals to help our AI understand your background.",
+        },
+        {
+            step: 2,
+            icon: MessageSquare,
+            title: "Paste Job Details",
+            description: "Simply paste the job description and let our AI analyze the requirements.",
+        },
+        {
+            step: 3,
+            icon: Sparkles,
+            title: "Generate Message",
+            description: "AI creates a personalized, professional message highlighting your relevant skills.",
+        },
+        {
+            step: 4,
+            icon: BarChart3,
+            title: "Track & Apply",
+            description: "Send your application and track its status all in one place.",
+        },
+    ];
+
+    const useCases = [
+        {
+            icon: Users,
+            title: "Active Job Seekers",
+            description: "Apply to multiple positions efficiently while maintaining quality and personalization in every application.",
+        },
+        {
+            icon: RefreshCw,
+            title: "Career Changers",
+            description: "Navigate career transitions with professional messaging that highlights transferable skills.",
+        },
+        {
+            icon: GraduationCap,
+            title: "Recent Graduates",
+            description: "Enter the job market with confidence using professionally crafted messages that showcase your potential.",
+        },
+        {
+            icon: Briefcase,
+            title: "Professionals",
+            description: "Manage multiple opportunities while advancing your career with consistent, polished communication.",
+        },
+    ];
+
+    const testimonials = [
+        {
+            name: "Sarah Johnson",
+            role: "Software Engineer",
+            content: "NextMoveApp helped me land my dream job. The AI-generated messages were professional and saved me hours of writing time.",
+            rating: 5,
+        },
+        {
+            name: "Michael Chen",
+            role: "Product Manager",
+            content: "Managing multiple applications was overwhelming until I found NextMoveApp. The tracking feature alone is worth it.",
+            rating: 5,
+        },
+        {
+            name: "Emily Rodriguez",
+            role: "Marketing Specialist",
+            content: "As a career changer, I needed help crafting the right message. This tool gave me the confidence I needed.",
+            rating: 4,
+        },
+    ];
+
+
+    return (
+        <div className='w-full h-fit min-h-screen flex flex-col justify-center  gap-6'>
+
+            {/* hero section */}
+            <div className=" relative flex flex-col justify-evenly items-center h-[42rem] ">
+
+                <div
+                    className={cn(
+                        "absolute inset-0 z-0",
+                        "[background-size:40px_40px]",
+                        "[background-image:linear-gradient(to_right,#e4e4e7_1px,transparent_1px),linear-gradient(to_bottom,#e4e4e7_1px,transparent_1px)]",
+                        "dark:[background-image:linear-gradient(to_right,#262626_1px,transparent_1px),linear-gradient(to_bottom,#262626_1px,transparent_1px)]"
+                    )}
+                />
+                <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center bg-background [mask-image:radial-gradient(ellipse_at_center,transparent_10%,black)]"></div>
+
+                <div className=" z-[11] flex flex-col gap-8 items-center justify-evenly">
+                    {/* badge */}
+                    <div className="flex gap-2 bg-gray-200/50 dark:bg-zinc-700/50 mt-20 justify-center items-center border-2 border-gray-200 dark:border-zinc-700/10 rounded-3xl p-2 px-4">
+                        <Sparkles className="w-4 h-4 "></Sparkles>
+                        <div className=" font-[500] text-sm">AI-Powered Job Application Platform</div>
+                    </div>
+
+                    <div className=" flex flex-col items-center gap-12">
+
+                        <div className=" flex flex-col items-center gap-4">
+                            <div className=" text-7xl font-bold poppins-bold">
+                                Land Your Dream Job
+                            </div>
+                            <div className=" text-7xl font-bold poppins-bold" style={{
+                                // maskImage: 'linear-gradient(to right, black 90%, transparent 100%)',
+                                // WebkitMaskImage: 'linear-gradient(to right, black 90%, transparent 100%)'
+                            }}>
+                                10x Faster
+                            </div>
+                        </div>
+
+                        <div className=" flex flex-col items-center">
+                            <div className=" dark:text-gray-300 text-gray-500 poppins-medium text-2xl" >AI-powered messaging that gets you noticed by recruiters.</div>
+                            <div className=" dark:text-gray-300 text-gray-500 poppins-medium text-2xl" >Create professional applications in seconds.</div>
+                        </div>
+
+                        <div className=" flex justify-evenly items-center gap-[1.5rem]">
+                            {
+                                ["Instant AI Generation",
+                                    "Smart Templates",
+                                    "Application Tracking"].map((item, index) => (
+                                        <div className="border-[1px] p-2 px-3 rounded-3xl dark:bg-zinc-950/60 bg-white dark:border-gray-200/30 border-black/40 flex items-center gap-2" key={index}>
+                                            <CheckCircle2 className="w-4 h-4 " />
+                                            <div className="   poppins-medium text-sm" >{item}</div>
+                                        </div>
+                                    ))
+                            }
+                        </div>
+
+
+                        <div className=" flex items-center justify-center gap-4">
+                            <GetStartedButton className=" py-2 px-4">Get Started Free</GetStartedButton>
+                            <GetStartedButton variant='outline' className=" border border-gray-400/50">Learn More</GetStartedButton>
+                        </div>
+
+                        {/* <div className=" text-gray-500 poppins-medium text-sm">No credit card required • Free forever</div> */}
+
+                    </div>
+
+
+                </div>
+
+            </div>
+
+
+            <div className="w-[74rem]  mx-auto h-fit flex flex-col justify-center gap-10">
+                <div className=" relative w-full h-[40rem] min-h-[40rem] border border-zinc-700/30 dark:border-zinc-800/30 shadow-2xl shadow-zinc-500/20 rounded-2xl">
+                    <div className=" absolute top-0 left-0 w-full h-[7%] rounded-t-2xl dark:bg-zinc-900 bg-zinc-100 flex justify-start items-center  pl-6 gap-3">
+                        <div className=" bg-red-600 w-3 h-3 rounded-full "></div>
+                        <div className=" bg-yellow-500 w-3 h-3 rounded-full "></div>
+                        <div className=" bg-green-600 w-3 h-3 rounded-full "></div>
+                    </div>
+
+
+                    {/* Actual image */}
+                    <div className=" rounded-b-2xl h-[93%] w-full absolute left-0 bottom-0">
+
+                    </div>
+
+                </div>
+
+                <div className=" flex items-center justify-center gap-5 w-full">
+                    {
+                        imageCards.map((item, index) => (
+                            <div key={index} className=" w-[18%] rounded-2xl flex flex-col items-center justify-center gap-2 dark:bg-zinc-900/60 border dark:border-gray-200/30 border-zinc-700/30 px-8 py-6">
+                                <div className=" text-4xl font-bold">{item.title}</div>
+                                <div className=" text-sm text-black/80 dark:text-zinc-200/50">{item.desc}</div>
+                            </div>
+                        ))
+                    }
+                </div>
+
+            </div>
+
+
+            {/* Featues */}
+            <div className="w-[70rem] gap-12 mx-auto h-fit min-h-[35rem] mt-[5rem] flex  flex-col justify-center items-start" >
+                <div className="flex flex-col items-center w-full justify-center gap-5">
+                    <div className=" w-full text-center text-5xl font-bold">Everything You Need to Land Your Next Role</div>
+                    <div className=" dark:text-zinc-200/50 poppins-medium text-xl">Powerful features designed to streamline your job search process</div>
+                </div>
+
+                <div className=" flex items-center justify-center mx-auto gap-5 w-full">
+                    {
+                        featuresCard.map((item, index) => (
+                            <div key={index} className=" w-[40%] rounded-2xl flex flex-col items-center justify-between gap-3 dark:bg-[#171717] border dark:border-gray-700/30 h-[15rem] border-zinc-700/30 px-8 py-6">
+                                <div className="  text-4xl font-bold bg-black/10 dark:bg-zinc-700/50 rounded-lg p-3">
+                                    <item.icon className="w-5 h-5 " />
+                                </div>
+                                <div className=" text-center text-xl font-bold">{item.title}</div>
+                                <div className=" text-sm  text-center dark:text-zinc-100/70">{item.description}</div>
+                            </div>
+                        ))
+                    }
+                </div>
+
+            </div>
+
+
+            {/* How It Works */}
+            <div className="w-[70rem] gap-12 mx-auto  h-[45rem] flex  flex-col justify-center items-start" >
+                <div className="flex flex-col items-center w-full justify-center gap-5">
+                    <div className=" w-full text-center text-5xl font-bold">How It Works</div>
+                    <div className=" dark:text-zinc-200/50 poppins-medium text-xl">Get started in minutes and land your dream job faster</div>
+                </div>
+
+                <div className=" flex flex-wrap items-center justify-center mx-auto gap-5 w-full">
+                    {
+                        appSteps.map((item, index) => (
+                            <div key={index} className=" relative w-[48%] rounded-2xl flex flex-col items-start justify-between gap-3 dark:bg-[#171717] border dark:border-gray-700/30 h-[12rem] border-zinc-700/30 px-8 py-6">
+                                <div className="  text-4xl font-bold bg-black/10 dark:bg-zinc-700/50 rounded-lg p-3">
+                                    <item.icon className="w-5 h-5 " />
+                                </div>
+                                <div className=" text-sm  w-7 flex justify-center items-center  h-7 bg-black/10 dark:bg-zinc-700/50 rounded-full absolute right-6 top-3">
+                                    <div className=" p-1">{item.step}</div>
+                                </div>
+                                <div className=" flex gap-2 flex-col">
+                                    <div className="  text-xl font-bold">{item.title}</div>
+                                    <div className=" text-sm  dark:text-zinc-100/70">{item.description}</div>
+                                </div>
+                            </div>
+                        ))
+                    }
+                </div>
+
+            </div>
+
+            <div className="w-[70rem]  gap-12 mx-auto  h-[45rem] flex  flex-col justify-center items-start" >
+                <div className="flex flex-col items-center w-full justify-center gap-5">
+                    <div className=" w-full text-center text-5xl font-bold">Built For Every Job Seeker</div>
+                    <div className=" dark:text-zinc-200/50 poppins-medium text-xl w-[60%] mx-auto text-center">Whether you're starting out or advancing your career, NextMoveApp adapts to your needs</div>
+                </div>
+
+                <div className=" flex flex-wrap items-center justify-center mx-auto gap-5 w-full">
+                    {
+                        useCases.map((item, index) => (
+                            <div key={index} className=" relative w-[48%] rounded-2xl flex items-start  gap-3 dark:bg-[#171717] border dark:border-gray-700/30  min-h-[8rem] border-zinc-700/30 px-4 py-7">
+                                <div className="  text-4xl font-bold bg-black/10 dark:bg-zinc-700/50 rounded-lg p-3">
+                                    <item.icon className="w-5 h-5 " />
+                                </div>
+
+                                <div className=" flex gap-2 flex-col">
+                                    <div className="  text-xl font-bold">{item.title}</div>
+                                    <div className=" text-sm  dark:text-zinc-100/70">{item.description}</div>
+                                </div>
+                            </div>
+                        ))
+                    }
+                </div>
+
+            </div>
+
+            <div className=" dark:bg-zinc-900/60 gap-12 mx-auto h-fit min-h-[48rem] -mt-[1rem] w-full" >
+                <div className=" w-[70rem] flex  flex-col justify-center gap-12 items-center h-fit min-h-[48rem] mx-auto">
+                    <div className="flex flex-col items-center w-full justify-center gap-5">
+                        <div className=" w-full text-center text-5xl font-bold">Loved by Job Seekers</div>
+                        <div className=" dark:text-zinc-200/50 poppins-medium text-xl">See what our users have to say about their experience</div>
+                    </div>
+
+                    <div className=" flex items-center justify-center mx-auto gap-5 w-full">
+                        {testimonials.map((testimonial, index) => (
+                            <Card
+                                key={index}
+                                className="p-8  shadow-[0_8px_30px_rgb(0,0,0,0.12)] min-h-[21.5rem]  space-y-4 border-border bg-card"
+                            >
+                                <div className="flex gap-1">
+                                    {[...Array(testimonial.rating)].map((_, i) => (
+                                        <Star key={i} className="w-5 h-5 fill-yellow-500 text-yellow-500" />
+                                    ))}
+                                </div>
+                                <p className="text-muted-foreground leading-relaxed">
+                                    &ldquo;{testimonial.content}&rdquo;
+                                </p>
+                                <div className="pt-4 border-t border-border">
+                                    <div className="font-semibold">{testimonial.name}</div>
+                                    <div className="text-sm text-muted-foreground">{testimonial.role}</div>
+                                </div>
+                            </Card>
+                        ))}
+                    </div>
+
+                </div>
+            </div>
+
+            {/* CTA */}
+            <section className="py-20 md:py-32">
+                <div className="container mx-auto px-4">
+                    <div className="max-w-4xl mx-auto">
+                        <div className="relative overflow-hidden rounded-3xl bg-primary text-primary-foreground p-12 md:p-16">
+                            <div className="absolute inset-0 opacity-10">
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-primary-foreground rounded-full blur-3xl" />
+                                <div className="absolute bottom-0 left-0 w-96 h-96 bg-primary-foreground rounded-full blur-3xl" />
+                            </div>
+                            <div className="relative text-center space-y-8">
+                                <div className="space-y-4">
+                                    <h2 className="text-4xl md:text-5xl font-bold">
+                                        Ready to Transform Your Job Search?
+                                    </h2>
+                                    <p className="text-xl opacity-90 max-w-2xl mx-auto">
+                                        Join thousands of job seekers who are landing their dream roles with AI-powered applications
+                                    </p>
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                                    <GetStartedButton  />
+                                </div>
+                                <p className="text-sm opacity-75">
+                                    No credit card required • Start in minutes
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* footer */}
+            <footer className="border-t border-border bg-muted/30">
+                <div className="container mx-auto px-4 py-12 md:py-16">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+                        <div className="col-span-2 md:col-span-1">
+                            <h3 className="font-bold text-xl mb-4">NextMoveApp</h3>
+                            <p className="text-sm text-muted-foreground">
+                                AI-powered job application platform helping thousands land their dream roles.
+                            </p>
+                        </div>
+                        <div>
+                            <h4 className="font-semibold mb-4">Product</h4>
+                            <ul className="space-y-2 text-sm text-muted-foreground">
+                                <li><a href="#features" className="hover:text-primary">Features</a></li>
+                                <li><a href="#how-it-works" className="hover:text-primary">How It Works</a></li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className="font-semibold mb-4">Company</h4>
+                            <ul className="space-y-2 text-sm text-muted-foreground">
+                                <li><a href="#about" className="hover:text-primary transition-colors">About</a></li>
+                                <li><a href="#blog" className="hover:text-primary transition-colors">Blog</a></li>
+                                <li><a href="#careers" className="hover:text-primary transition-colors">Careers</a></li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className="font-semibold mb-4">Legal</h4>
+                            <ul className="space-y-2 text-sm text-muted-foreground">
+                                <li><a href="#privacy" className="hover:text-primary transition-colors">Privacy</a></li>
+                                <li><a href="#terms" className="hover:text-primary transition-colors">Terms</a></li>
+                                <li><a href="#security" className="hover:text-primary transition-colors">Security</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div className="pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center gap-4">
+                        <p className="text-sm text-muted-foreground">
+                            © {new Date().getFullYear()} NextMoveApp. All rights reserved.
+                        </p>
+                        <div className="flex gap-4">
+                            <a href="#twitter" className="text-muted-foreground hover:text-primary">
+                                <Twitter className="w-5 h-5" />
+                            </a>
+                            <a href="#linkedin" className="text-muted-foreground hover:text-primary">
+                                <Linkedin className="w-5 h-5" />
+                            </a>
+                            <a href="#github" className="text-muted-foreground hover:text-primary">
+                                <Github className="w-5 h-5" />
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </footer>
+
+        </div>
+    )
 }
