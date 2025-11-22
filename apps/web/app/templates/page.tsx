@@ -3,6 +3,12 @@ import TemplatesPage from "@/pages/TemplatesPage";
 import { Role } from "@/utils/api_types";
 import { GET_ALL_ROLES } from "@/utils/url";
 import { auth } from "@clerk/nextjs/server";
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+    title: 'Templates | NextMoveApp',
+    description: 'Manage your message templates for job applications',
+};
 
 export default async function Templates() {
     
@@ -22,3 +28,5 @@ export default async function Templates() {
         <TemplatesPage allRoles={data.data as Role[]} />
     </TemplateProvider>
 }
+
+export const dynamic = 'force-dynamic';

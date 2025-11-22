@@ -34,7 +34,7 @@ function AppliedPage({ messages }: { messages: GeneratedMessage[] }) {
                     </TableHeader>
                     <TableBody>
                         {
-                            messages.map((msg, index: number) => (<TableRow key={msg.id}>
+                            messages && messages.length > 0 ? messages.map((msg, index: number) => (<TableRow key={msg.id}>
                                 <TableCell className="font-medium">{index + 1}</TableCell>
                                 <TableCell className="">{msg.company_gen_rel?.name || ""}</TableCell>
                                 <TableCell className="">{msg.recruiterName}</TableCell>
@@ -51,7 +51,11 @@ function AppliedPage({ messages }: { messages: GeneratedMessage[] }) {
                                     >
                                         {msg.message.slice(0, 70) + '...'}</ShowMessage> : msg.message}</TableCell>
                                 <TableCell className="text-right">{new Date(msg.createdAt).toLocaleDateString()}</TableCell>
-                            </TableRow>))
+                            </TableRow>)) : (
+                                <TableRow>
+                                    <TableCell colSpan={7} className="text-center">No messages found</TableCell>
+                                </TableRow>
+                            )
                         }
 
                     </TableBody>

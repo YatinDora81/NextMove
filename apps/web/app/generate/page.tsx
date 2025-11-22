@@ -4,6 +4,12 @@ import { GET_ALL_ROLES } from "@/utils/url";
 import { auth } from "@clerk/nextjs/server";
 import { TemplateProvider } from "@/hooks/useTemplates";
 import { redirect } from "next/navigation";
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+    title: 'Generate Message | NextMoveApp',
+    description: 'Generate AI-powered job application messages tailored to each position',
+};
 
 export default async function LandingPage() {
   const { getToken } = await auth();
@@ -29,3 +35,5 @@ export default async function LandingPage() {
     </div>
   )
 }
+
+export const dynamic = 'force-dynamic';
