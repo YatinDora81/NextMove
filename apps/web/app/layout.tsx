@@ -6,7 +6,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import NextMove_Navbar from '@/components/NextMove_Navbar'
-import { Toaster } from 'react-hot-toast'
+import { ThemeAwareToaster } from '@/components/ThemeAwareToaster'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -59,7 +59,7 @@ export default function RootLayout({
             <NextMove_Navbar />
 
             {children}
-            <Toaster />
+            <ThemeAwareToaster />
           </body>
         </ThemeProvider>
       </html>

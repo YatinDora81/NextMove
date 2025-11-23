@@ -4,6 +4,9 @@ import { cn } from "@/lib/utils";
 import { LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import GetStartedButton from "@/components/GetStartedButton";
+import Image from "next/image";
+import DarkImage from '../public/dark.gif';
+import LightImage from '../public/light.gif';
 
 export const metadata: Metadata = {
     title: "NextMoveApp | AI Job Application Assistant",
@@ -207,7 +210,8 @@ export default function LandingPage() {
 
                     {/* Actual image */}
                     <div className=" rounded-b-2xl h-[93%] w-full absolute left-0 bottom-0">
-
+                            <Image src={DarkImage} className="w-full h-full object-cover hidden dark:block" alt="Dark Image"></Image>
+                            <Image src={LightImage} className="w-full h-full object-cover block dark:hidden" alt="Light Image"></Image>
                     </div>
 
                 </div>
@@ -404,13 +408,13 @@ export default function LandingPage() {
                             © {new Date().getFullYear()} NextMoveApp. All rights reserved.
                         </p>
                         <div className="flex gap-4">
-                            <a href="#twitter" className="text-muted-foreground hover:text-primary">
+                            <a target="_blank" href="https://x.com/YatinDora" className="text-muted-foreground hover:text-primary">
                                 <Twitter className="w-5 h-5" />
                             </a>
-                            <a href="#linkedin" className="text-muted-foreground hover:text-primary">
+                            <a target="_blank" href="https://www.linkedin.com/in/yatin-dora/" className="text-muted-foreground hover:text-primary">
                                 <Linkedin className="w-5 h-5" />
                             </a>
-                            <a href="#github" className="text-muted-foreground hover:text-primary">
+                            <a target="_blank" href="https://github.com/YatinDora81" className="text-muted-foreground hover:text-primary">
                                 <Github className="w-5 h-5" />
                             </a>
                         </div>

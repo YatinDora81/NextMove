@@ -11,3 +11,4 @@ export default function AiChatLayout({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
+  

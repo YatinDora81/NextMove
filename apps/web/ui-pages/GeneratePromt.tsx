@@ -67,6 +67,16 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
         setSelectedTemplate(null) // Reset template when role changes
     }, [templates, selectedRole])
 
+    const resetForm = () => {
+        setFormDetails({
+            recruiterName: "",
+            company: "",
+            isMale: false,
+        })
+        setSelectedRole(null)
+        setSelectedTemplate(null)
+    }
+
     const submitHandler = () => {
         try {
             if (formDetails.company.trim().length === 0 || formDetails.recruiterName.trim().length === 0) {
@@ -156,8 +166,11 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
             {/* {openSearch && <ModalContainer setOpen={setOpenSearch} />} */}
 
             <Card className=' min-w-[90%]  md:min-w-[70%] lg:min-w-[40%] h-fit '>
-                <CardHeader>
+                <CardHeader className='flex items-center justify-between'>
                     <CardTitle className=' text-2xl font-semibold'>Generate Message</CardTitle>
+                    <Button variant={"ghost"} size="icon" onClick={resetForm} aria-label='Reset form'>
+                        <RefreshCcwIcon className="w-4 h-4" />
+                    </Button>
                     {/* <CardDescription>Card Description</CardDescription> */}
                     {/* <CardAction>Card Action</CardAction>  */}
                 </CardHeader>
