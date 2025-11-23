@@ -1,8 +1,14 @@
+import type { Metadata } from "next";
 import { CheckCircle2, Sparkles, MessageSquare, BarChart3, Zap, Users, RefreshCw, GraduationCap, Briefcase, Star, Github, Linkedin, Twitter } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import GetStartedButton from "@/components/GetStartedButton";
+
+export const metadata: Metadata = {
+    title: "NextMoveApp | AI Job Application Assistant",
+    description: "NextMoveApp helps job seekers craft personalized applications, track progress, and collaborate with AI to land their next role faster.",
+};
 
 export default function LandingPage() {
     const imageCards: { title: string, desc: string }[] = [
