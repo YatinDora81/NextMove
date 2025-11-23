@@ -1,5 +1,5 @@
 import { TemplateProvider } from "@/hooks/useTemplates";
-import TemplatesPage from "@/pages/TemplatesPage";
+import TemplatesPage from "@/ui-pages/TemplatesPage";
 import { Role } from "@/utils/api_types";
 import { GET_ALL_ROLES } from "@/utils/url";
 import { auth } from "@clerk/nextjs/server";

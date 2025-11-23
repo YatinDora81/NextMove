@@ -1,4 +1,4 @@
-import GeneratePromt from "@/pages/GeneratePromt";
+import GeneratePromt from "@/ui-pages/GeneratePromt";
 import { Role } from "@/utils/api_types";
 import { GET_ALL_ROLES } from "@/utils/url";
 import { auth } from "@clerk/nextjs/server";
@@ -34,6 +34,5 @@ export default async function LandingPage() {
       </TemplateProvider>
     </div>
   )
-}
+}export const dynamic = 'force-dynamic';
 
-export const dynamic = 'force-dynamic';

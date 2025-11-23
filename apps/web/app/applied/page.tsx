@@ -1,4 +1,4 @@
-import AppliedPage from "@/pages/AppliedPage";
+import AppliedPage from "@/ui-pages/AppliedPage";
 import { GET_GENERATED_MESSAGES } from "@/utils/url";
 import { auth } from "@clerk/nextjs/server";
 import { GeneratedMessage } from "@/utils/api_types";

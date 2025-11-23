@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import { Navbar, NavItems, NavbarLogo, NavBody, MobileNav, MobileNavToggle, MobileNavHeader, MobileNavMenu, } from './ui/resizable-navbar'
 import { Button } from './ui/button'
 import { ModeToggle } from './ui/modeToggle'
+import Link from 'next/link'
 
 
 function NextMove_Navbar() {
@@ -99,14 +100,14 @@ function NextMove_Navbar() {
                         )}
                     </div>
                     {isSignedIn && navbarItems.map((item, idx) => (
-                        <a
+                        <Link
                             key={`mobile-link-${idx}`}
                             href={item.link}
                             onClick={() => setIsMobileMenuOpen(false)}
                             className="relative text-neutral-600 dark:text-neutral-300"
                         >
                             <span className="block">{item.name}</span>
-                        </a>
+                        </Link>
                     ))}
 
                 </MobileNavMenu>

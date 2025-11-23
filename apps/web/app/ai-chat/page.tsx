@@ -1,11 +1,7 @@
-import { AIProvider } from "@/hooks/useAI";
-import AiChatPage from "@/pages/AIChatPage";
-import type { Metadata } from 'next';
+"use client"
 
-export const metadata: Metadata = {
-    title: 'AI Chat | NextMoveApp',
-    description: 'Chat with AI to get help with your job applications',
-};
+import { AIProvider } from "@/hooks/useAI";
+import AiChatPage from "@/ui-pages/AIChatPage";
 
 export default function AIChat() {
     return (
@@ -14,5 +10,3 @@ export default function AIChat() {
         </AIProvider>
     )
 }
-
-export const dynamic = 'force-dynamic';
