@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { prismaClient } from '@repo/db/db'
 import templateRepo from "../repository/templateRepo.js";
-import { createTemplateSchema, deleteTemplateSchema, updateTemplateSchema } from "@repo/types/ZodTypes";
+import { createTemplateBulkSchema, createTemplateSchema, deleteTemplateSchema, updateTemplateSchema } from "@repo/types/ZodTypes";
 import logger from "@/config/logger.js";
 
 class Templates {
@@ -123,6 +123,39 @@ class Templates {
         }
         catch (error) {
             logger.error(`[CONTROLLER: updateTemplate] Error updating template for user: ${req.user?.user_id}`, error)
+            return res.status(500).json({
+                success: false,
+                data: `${error}`,
+                message: "Something Went Wrong!!!"
+            })
+        }
+    }
+    async addTemplateBulk(req: Request, res: Response) {
+        try {
+            if (!req?.user) {
+                return res.status(400).json({
+                    success: false,
+                    data: `User Not Authenticated!!!`,
+                    message: "User Not Authenticated!!!"
+                })
+            }
+            const parsedData = createTemplateBulkSchema.safeParse(req.body)
+            if (!parsedData.success) {
+                return res.status(400).json({
+                    success: false,
+                    data: parsedData.error,
+                    message: "Invalid Data!!!"
+                })
+            }
+            const createdTemplateBulk = await templateRepo.createTemplateBulk(parsedData.data, req.user.user_id)
+            return res.status(200).json({
+                success: true,
+                data: createdTemplateBulk,
+                message: "Template Bulk Created Successfully!!!"
+            })
+        }
+        catch (error) {
+            logger.error(`[CONTROLLER: addTemplateBulk] Error adding template bulk for user: ${req.user?.user_id}`, error)
             return res.status(500).json({
                 success: false,
                 data: `${error}`,

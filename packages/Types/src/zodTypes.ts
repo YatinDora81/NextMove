@@ -35,6 +35,10 @@ export const createTemplateSchema = z.object({
     role: z.string(),
     rules: z.array(z.string()),
 })
+
+export const createTemplateBulkSchema = z.array(createTemplateSchema);
+export type createTemplateBulkSchemaType = z.infer<typeof createTemplateBulkSchema>;
+
 export type createTemplateSchemaType = z.infer<typeof createTemplateSchema>;
 
 export const deleteTemplateSchema = z.object({
