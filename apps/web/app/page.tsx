@@ -129,7 +129,7 @@ export default function LandingPage() {
 
 
     return (
-        <div className='w-full h-fit min-h-screen flex flex-col justify-center  gap-6'>
+        <div className='w-full h-fit min-h-screen flex flex-col justify-center gap-6'>
 
             {/* hero section */}
             <div className=" relative flex flex-col justify-evenly items-center h-[45rem] sm:h-[50rem] md:h-[42rem] px-4">
@@ -231,7 +231,7 @@ export default function LandingPage() {
 
 
             {/* Featues */}
-            <div className="w-full md:w-[70rem] gap-8 sm:gap-10 md:gap-12 mx-auto h-fit min-h-[35rem] mt-[3rem] sm:mt-[4rem] md:mt-[5rem] flex flex-col justify-center items-start px-4 sm:px-6" >
+            <div className="w-full md:w-[70rem] gap-8 sm:gap-10 md:gap-12 mx-auto h-fit min-h-[35rem] mt-[6rem] sm:mt-[4rem] md:mt-[5rem] flex flex-col justify-center items-start px-4 sm:px-6" >
                 <div className="flex flex-col items-center w-full justify-center gap-3 sm:gap-4 md:gap-5">
                     <div className=" w-full text-center text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold px-4">Everything You Need to Land Your Next Role</div>
                     <div className=" dark:text-zinc-200/50 poppins-medium text-base sm:text-lg md:text-xl text-center px-4">Powerful features designed to streamline your job search process</div>
@@ -255,7 +255,7 @@ export default function LandingPage() {
 
 
             {/* How It Works */}
-            <div className="w-full md:w-[70rem] gap-8 sm:gap-10 md:gap-12 mx-auto h-fit min-h-[45rem] flex flex-col justify-center items-start px-4 sm:px-6" >
+            <div className="w-full md:w-[70rem] gap-8 sm:gap-10 md:gap-12 mx-auto h-fit min-h-[45rem] flex flex-col justify-center items-start mt-[4rem] sm:mt-0 px-4 sm:px-6" >
                 <div className="flex flex-col items-center w-full justify-center gap-3 sm:gap-4 md:gap-5">
                     <div className=" w-full text-center text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold px-4">How It Works</div>
                     <div className=" dark:text-zinc-200/50 poppins-medium text-base sm:text-lg md:text-xl text-center px-4">Get started in minutes and land your dream job faster</div>
@@ -282,7 +282,7 @@ export default function LandingPage() {
 
             </div>
 
-            <div className="w-full md:w-[70rem] gap-8 sm:gap-10 md:gap-12 mx-auto h-fit min-h-[45rem] flex flex-col justify-center items-start px-4 sm:px-6" >
+            <div className="w-full md:w-[70rem] gap-8 sm:gap-10 md:gap-12 mx-auto h-fit min-h-[45rem] flex flex-col justify-center items-start px-4 sm:px-6 mt-[4rem] sm:mt-0" >
                 <div className="flex flex-col items-center w-full justify-center gap-3 sm:gap-4 md:gap-5">
                     <div className=" w-full text-center text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold px-4">Built For Every Job Seeker</div>
                     <div className=" dark:text-zinc-200/50 poppins-medium text-base sm:text-lg md:text-xl w-full sm:w-[90%] md:w-[60%] mx-auto text-center px-4">Whether you're starting out or advancing your career, NextMoveApp adapts to your needs</div>
@@ -307,7 +307,7 @@ export default function LandingPage() {
 
             </div>
 
-            <div className=" dark:bg-zinc-900/60 gap-8 sm:gap-10 md:gap-12 mx-auto h-fit min-h-[48rem] -mt-[1rem] w-full" >
+            <div className=" dark:bg-zinc-900/60 gap-8 sm:gap-10 md:gap-12 mx-auto h-fit min-h-[48rem] sm:-mt-[1rem] w-full mt-[4rem] " >
                 <div className=" w-full md:w-[70rem] flex flex-col justify-center gap-8 sm:gap-10 md:gap-12 items-center h-fit min-h-[48rem] mx-auto px-4 sm:px-6">
                     <div className="flex flex-col items-center w-full justify-center gap-3 sm:gap-4 md:gap-5">
                         <div className=" w-full text-center text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold px-4">Loved by Job Seekers</div>
@@ -340,7 +340,7 @@ export default function LandingPage() {
             </div>
 
             {/* CTA */}
-            <section className="py-12 sm:py-16 md:py-20 lg:py-32">
+            <section className="py-12 sm:py-16 md:py-0">
                 <div className="container mx-auto px-4">
                     <div className="max-w-4xl mx-auto">
                         <div className="relative overflow-hidden rounded-3xl bg-primary text-primary-foreground p-6 sm:p-8 md:p-12 lg:p-16">
