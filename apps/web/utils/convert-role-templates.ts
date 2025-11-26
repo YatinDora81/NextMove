@@ -2,15 +2,14 @@ const fs = require('fs');
 const path = require('path');
 
 // Read the current role-templates.json file
-const inputFile = path.join(__dirname, 'role-templates.json');
-const outputFile = path.join(__dirname, 'role-templates-object.json');
+const inputFile = path.join(__dirname, '../public/role-templates.json');
+const outputFile = path.join(__dirname, '../public/role-templates-object.json');
 
 try {
   // Read the JSON file as buffer first
   const buffer = fs.readFileSync(inputFile);
   const encodingsToTry = ['utf8', 'utf16le'];
-  let jsonData;
-  let templatesArray;
+  let templatesArray: any[] | undefined;
   let lastError;
   
   for (const encoding of encodingsToTry) {
@@ -26,7 +25,6 @@ try {
       console.log(`Last 40 chars (${encoding}):`, JSON.stringify(candidate.slice(-40)));
       const parsed = JSON.parse(candidate);
       console.log(`Parsed using ${encoding} encoding`);
-      jsonData = candidate;
       templatesArray = parsed;
       break;
     } catch (err) {
@@ -39,11 +37,11 @@ try {
   }
   
   // Convert array to object with role ID as key
-  const templatesObject = {};
+  const templatesObject: Record<string, any> = {};
   
-  templatesArray.forEach(template => {
+  templatesArray.forEach((template: any) => {
     const roleId = template.role;
-    templatesObject[roleId] = template;
+    templatesObject[roleId] = [template];
   });
   
   // Write the converted object to a new file
@@ -55,14 +53,16 @@ try {
   
   // Show example of the new structure
   const firstKey = Object.keys(templatesObject)[0];
+  const firstTemplate = templatesObject[firstKey][0];
   console.log(`\n📝 Example structure:`);
-  console.log(`"${firstKey}": {`);
-  console.log(`  "name": "${templatesObject[firstKey].name}",`);
-  console.log(`  "role": "${templatesObject[firstKey].role}",`);
+  console.log(`"${firstKey}": [{`);
+  console.log(`  "name": "${firstTemplate.name}",`);
+  console.log(`  "role": "${firstTemplate.role}",`);
   console.log(`  "roleRelation": { ... },`);
   console.log(`  ...`);
-  console.log(`}`);
+  console.log(`}]`);
   
-} catch (error) {
+} catch (error: any) {
   console.error('❌ Error converting file:', error.message);
 }
+
