@@ -23,6 +23,7 @@ export const createUserSchema = z.object({
     lastName: z.string().nullable(),
     email: z.email(),
     profilePic: z.string().nullable(),
+    isPaid: z.boolean().optional(),
 })
 
 export type createUserSchemaType = z.infer<typeof createUserSchema>;

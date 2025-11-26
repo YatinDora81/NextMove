@@ -5,17 +5,18 @@ import { auth } from "@clerk/nextjs/server";
 import { TemplateProvider } from "@/hooks/useTemplates";
 import { redirect } from "next/navigation";
 import type { Metadata } from 'next';
+import { DeviceProvider } from "@/hooks/useDevice";
 
 export const metadata: Metadata = {
-    title: 'Generate Message | NextMoveApp',
-    description: 'Generate AI-powered job application messages tailored to each position',
+  title: 'Generate Message | NextMoveApp',
+  description: 'Generate AI-powered job application messages tailored to each position',
 };
 
 export default async function LandingPage() {
   const { getToken } = await auth();
   const token = await getToken({ template: "frontend_token" })
 
-  if(!token){
+  if (!token) {
     redirect("/")
   }
 
@@ -29,10 +30,12 @@ export default async function LandingPage() {
 
   return (
     <div className=" ">
-      <TemplateProvider>
-        <GeneratePromt allRoles={ data.data as Role[]} />
-      </TemplateProvider>
+      <DeviceProvider>
+        <TemplateProvider>
+          <GeneratePromt allRoles={data.data as Role[]} />
+        </TemplateProvider>
+      </DeviceProvider>
     </div>
   )
-}export const dynamic = 'force-dynamic';
+} export const dynamic = 'force-dynamic';
 

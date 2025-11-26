@@ -1,5 +1,5 @@
 "use client"
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
     Card,
     CardContent,
@@ -28,6 +28,8 @@ import { capitalizeWords } from '@/utils/strings'
 import { GENERATE_MESSAGE } from '@/utils/url'
 import { EditIcon, RefreshCcwIcon } from 'lucide-react'
 import EditName from '@/components/modals/EditName'
+import PreTemplates from '../public/role-templates-object.json'
+import { useDevice } from '@/hooks/useDevice'
 
 function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
 
@@ -40,6 +42,7 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
     const [lastName, setLastName] = useState('')
     const { getToken } = useAuth()
     const editBtnRef = useRef<HTMLButtonElement>(null)
+    const { isLaptop } = useDevice()
 
     useEffect(() => {
         setFirstName(capitalizeWords(user?.firstName || ''))
@@ -59,13 +62,26 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
     const { templates } = useTemplates()
 
     useEffect(() => {
-        if (selectedRole) {
-            setRoleWithTemplate(templates.filter((template) => template.role === selectedRole?.id))
-        } else {
+        if (!selectedRole) {
             setRoleWithTemplate([])
+            return
         }
-        setSelectedTemplate(null) // Reset template when role changes
+
+        const dbTemplates = templates.filter((template) => template.role === selectedRole.id)
+        const predefinedTemplates =
+            (PreTemplates[selectedRole.id as keyof typeof PreTemplates] || []) as TemplateType[]
+
+        const normalizedPredefinedTemplates = predefinedTemplates.map((template, index) => ({
+            ...template,
+            id: template.id ?? `${selectedRole.id}-default-${index}`,
+        })) as TemplateType[]
+
+        setRoleWithTemplate([...dbTemplates, ...normalizedPredefinedTemplates])
     }, [templates, selectedRole])
+
+    useEffect(() => {
+        setSelectedTemplate(null)
+    }, [selectedRole])
 
     const resetForm = () => {
         setFormDetails({
@@ -160,6 +176,14 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
         }
     }
 
+    const selectedTemplateName = useMemo(() => {
+        if (!selectedTemplate) return undefined
+        if (!isLaptop && selectedTemplate.name.length > 25) {
+            return selectedTemplate.name.slice(0, 25) + "..."
+        }
+        return selectedTemplate.name
+    }, [selectedTemplate, isLaptop])
+
     return (
         <div className='  w-full h-screen flex justify-center items-center'>
 
@@ -199,7 +223,9 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
                                 }}
                             >
                                 <SelectTrigger className="w-full">
-                                    <SelectValue placeholder={selectedRole ? "Select Template" : "Select Role First"} />
+                                    <SelectValue placeholder={selectedRole ? "Select Template" : "Select Role First"}>
+                                        {isLaptop ? selectedTemplateName : selectedTemplate?.name.slice(0, 15) + "..."}
+                                    </SelectValue>
                                 </SelectTrigger>
                                 <SelectContent>
                                     {roleWithTemplate.map((template) => (

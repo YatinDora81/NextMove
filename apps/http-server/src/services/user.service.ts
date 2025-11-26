@@ -16,13 +16,13 @@ class UserService {
                 }
             }
 
-            const { id, firstName, lastName, email, profilePic } = data
+            const { id, firstName, lastName, email, profilePic, isPaid } = data
             let user;
 
             try {
                 user = await prismaClient.users.create({
                     data: {
-                        id, firstName, lastName, email, profilePic
+                        id, firstName, lastName, email, profilePic, isPaid: isPaid ?? false
                     }
                 })
             }

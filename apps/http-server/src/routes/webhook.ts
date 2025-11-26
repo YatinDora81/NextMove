@@ -41,6 +41,7 @@ router.post('/clerk', express.raw({ type: 'application/json' }), async (req: Req
                     firstName: event.data.first_name,
                     lastName: event.data.last_name!==null ? event.data.last_name : '',
                     profilePic: event.data.image_url,
+                    isPaid: true,
                 }
                 await userService.createUser(data);
                 break;

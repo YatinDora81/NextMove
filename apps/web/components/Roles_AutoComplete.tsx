@@ -19,10 +19,11 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { Label } from "@radix-ui/react-label"
+import { useDevice } from "@/hooks/useDevice"
 
 export function Roles_AutoComplete({ selectedRole, setSelectedRole, allRoles }: { selectedRole: Role | null, setSelectedRole: (role: Role | null) => void, allRoles: Role[] }) {
   const [open, setOpen] = useState(false)
-  
+  const { isLaptop } = useDevice()
 
   return (
     <div className=" flex flex-col ">
@@ -37,7 +38,7 @@ export function Roles_AutoComplete({ selectedRole, setSelectedRole, allRoles }: 
             className="w-full justify-between"
           >
             {selectedRole
-              ? allRoles.find((role) => role.id === selectedRole?.id)?.name
+              ? ( isLaptop ? allRoles.find((role) => role.id === selectedRole?.id)?.name : allRoles.find((role) => role.id === selectedRole?.id)?.name.slice(0, 10) + "..." )
               : "Select Role..."}
             <ChevronsUpDownIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
