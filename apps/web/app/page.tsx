@@ -210,8 +210,8 @@ export default function LandingPage() {
 
                     {/* Actual image */}
                     <div className=" rounded-b-2xl h-[93%] w-full absolute left-0 bottom-0">
-                            <Image src={DarkImage} className="w-full h-full object-cover hidden dark:block" alt="Dark Image"></Image>
-                            <Image src={LightImage} className="w-full h-full object-cover block dark:hidden" alt="Light Image"></Image>
+                            <Image src={DarkImage} className="rounded-b-2xl w-full h-full object-cover hidden dark:block" alt="Dark Image"></Image>
+                            <Image src={LightImage} className=" rounded-b-2xl w-full h-full object-cover block dark:hidden" alt="Light Image"></Image>
                     </div>
 
                 </div>
