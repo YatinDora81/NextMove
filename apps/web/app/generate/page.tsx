@@ -16,6 +16,8 @@ export default async function LandingPage() {
   const { getToken } = await auth();
   const token = await getToken({ template: "frontend_token" })
 
+  console.log("token is" , token);
+
   if (!token) {
     redirect("/")
   }
