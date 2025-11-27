@@ -28,14 +28,14 @@ import { capitalizeWords } from '@/utils/strings'
 import { GENERATE_MESSAGE } from '@/utils/url'
 import { EditIcon, RefreshCcwIcon } from 'lucide-react'
 import EditName from '@/components/modals/EditName'
-import PreTemplates from '../public/role-templates-object.json'
+// import PreTemplates from '../public/role-templates-object.json'
 import { useDevice } from '@/hooks/useDevice'
 
-function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
+function GeneratePromt({ allRoles , predefinedTemplates }: { allRoles: Role[], predefinedTemplates: TemplateType[] }) {
 
     // const [openSearch, setOpenSearch] = useState<boolean>(true)
     const [selectedRole, setSelectedRole] = useState<Role | null>(null)
-    const [roleWithTemplate, setRoleWithTemplate] = useState<TemplateType[]>([])
+    const [roleWithTemplate, setRoleWithTemplate] = useState<TemplateType[]>(predefinedTemplates)
     const [selectedTemplate, setSelectedTemplate] = useState<TemplateType | null>(null)
     const { user } = useUser()
     const [firstName, setFirstName] = useState('')
@@ -43,6 +43,7 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
     const { getToken } = useAuth()
     const editBtnRef = useRef<HTMLButtonElement>(null)
     const { isLaptop } = useDevice()
+    const [isAlreadyFilledForm, setIsAlreadyFilledForm] = useState<boolean>(false);
 
     useEffect(() => {
         setFirstName(capitalizeWords(user?.firstName || ''))
@@ -67,17 +68,12 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
             return
         }
 
-        const dbTemplates = templates.filter((template) => template.role === selectedRole.id)
-        const predefinedTemplates =
-            (PreTemplates[selectedRole.id as keyof typeof PreTemplates] || []) as TemplateType[]
+        const dbTemplates = [...templates, ...predefinedTemplates].filter((template) => template.role === selectedRole.id)
 
-        const normalizedPredefinedTemplates = predefinedTemplates.map((template, index) => ({
-            ...template,
-            id: template.id ?? `${selectedRole.id}-default-${index}`,
-        })) as TemplateType[]
 
-        setRoleWithTemplate([...dbTemplates, ...normalizedPredefinedTemplates])
-    }, [templates, selectedRole])
+        setRoleWithTemplate([...dbTemplates])
+        setIsAlreadyFilledForm(false)
+    }, [templates, selectedRole, predefinedTemplates])
 
     useEffect(() => {
         setSelectedTemplate(null)
@@ -91,6 +87,7 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
         })
         setSelectedRole(null)
         setSelectedTemplate(null)
+        setIsAlreadyFilledForm(false)
     }
 
     const submitHandler = () => {
@@ -119,7 +116,7 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
 
             navigator.clipboard.writeText(newMessage)
             toast.success("Message copied.")
-            generateMessage(newMessage)
+            if (!isAlreadyFilledForm) generateMessage(newMessage)
         } catch (error) {
             toast.error("Something went wrong")
             console.log(error)
@@ -168,6 +165,7 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
             console.log(data)
             if (data.success) {
                 console.log("Message generated successfully")
+                setIsAlreadyFilledForm(true)
             } else {
                 console.log(data.message)
             }
@@ -201,7 +199,10 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
                 <CardContent>
                     <div className="mb-4 flex flex-col gap-2">
                         <Label htmlFor="email">Recruiter Name</Label>
-                        <Input value={formDetails.recruiterName} onChange={(e) => setFormDetails({ ...formDetails, recruiterName: e.target.value })} id="email" placeholder="Jhon Doe...." type="text" />
+                        <Input value={formDetails.recruiterName} onChange={(e) => {
+                            setFormDetails({ ...formDetails, recruiterName: e.target.value })
+                            setIsAlreadyFilledForm(false)
+                        }} id="email" placeholder="Jhon Doe...." type="text" />
                     </div>
 
 
@@ -218,6 +219,7 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
                                     const template = roleWithTemplate.find(t => t.id === value)
                                     if (template) {
                                         setSelectedTemplate(template)
+                                        setIsAlreadyFilledForm(false)
                                         console.log("Selected template:", template)
                                     }
                                 }}
@@ -239,7 +241,10 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
 
                     <div className="mb-2 flex flex-col gap-2">
                         <Label htmlFor="email">Company Name</Label>
-                        <Input value={formDetails.company} onChange={(e) => setFormDetails({ ...formDetails, company: e.target.value })} id="email" placeholder="Company Name...." type="text" />
+                        <Input value={formDetails.company} onChange={(e) => {
+                            setFormDetails({ ...formDetails, company: e.target.value })
+                            setIsAlreadyFilledForm(false)
+                        }} id="email" placeholder="Company Name...." type="text" />
                     </div>
 
 
@@ -251,11 +256,17 @@ function GeneratePromt({ allRoles }: { allRoles: Role[] }) {
                             {selectedTemplate && selectedTemplate.rules.find(rule => rule.rule === "[GENDER]") && <RadioGroup className=' flex ' defaultValue="male">
                                 {/* preselect male */}
                                 <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="male" id="male" onChange={() => setFormDetails({ ...formDetails, isMale: true })} />
+                                    <RadioGroupItem value="male" id="male" onChange={() => {
+                                        setFormDetails({ ...formDetails, isMale: true })
+                                        setIsAlreadyFilledForm(false)
+                                    }} />
                                     <Label htmlFor="option-one">Male</Label>
                                 </div>
                                 <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="female" id="female" onChange={() => setFormDetails({ ...formDetails, isMale: false })} />
+                                    <RadioGroupItem value="female" id="female" onChange={() => {
+                                        setFormDetails({ ...formDetails, isMale: false })
+                                        setIsAlreadyFilledForm(false)
+                                    }} />
                                     <Label htmlFor="option-two">Female</Label>
                                 </div>
                             </RadioGroup>}
