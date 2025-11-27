@@ -104,10 +104,10 @@ class TemplateRepo {
                         templateId: template.id,
                     }))
                 })
-                return { template : {...template , "rules" : rules}, rules }
+                return { template: { ...template, "rules": rules }, rules }
             })
 
-            
+
             return res
 
         }
@@ -129,7 +129,7 @@ class TemplateRepo {
                     isDeleted: true
                 }
             })
-            
+
             return res
         } catch (error) {
             logger.error(`[REPO: deleteTemplate] Error deleting template for user: ${userId}`, error)
@@ -166,9 +166,9 @@ class TemplateRepo {
                         templateId: data.templateId
                     }))
                 })
-                return { template : {...template , "rules" : rules}, rules }
+                return { template: { ...template, "rules": rules }, rules }
             })
-            
+
             return res
         }
         catch (error) {
@@ -178,6 +178,7 @@ class TemplateRepo {
     }
     async createTemplateBulk(data: createTemplateBulkSchemaType, userId: string) {
         try {
+            await clearRedis('common-templates')
             const res = await prismaClient.$transaction(async (tx: any) => {
                 const templates = await tx.templates.createManyAndReturn({
                     data: data.map((template) => ({
@@ -187,6 +188,7 @@ class TemplateRepo {
                         content: template.content,
                         role: template.role,
                         user: userId,
+                        isCommon: true,
                     })),
                     select: {
                         id: true,
@@ -224,7 +226,7 @@ class TemplateRepo {
                         return { template: { ...template, rules }, rules };
                     })
                 );
-                return templates.map((t: any,i: number)=>{return {...t, rules: allRules[i]?.rules}});
+                return templates.map((t: any, i: number) => { return { ...t, rules: allRules[i]?.rules } });
             })
 
             return res
@@ -233,6 +235,50 @@ class TemplateRepo {
         catch (error) {
             logger.error(`[REPO: createTemplateBulk] Error creating template bulk for user: ${userId}`, error)
             throw new Error(`Error at creating template bulk ${error}`)
+        }
+    }
+
+    async getCommonTemplates() {
+        try {
+            const data = await prismaClient.templates.findMany({
+                where: {
+                    isCommon: true,
+                    isDeleted: false
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    description: true,
+                    type: true,
+                    content: true,
+                    createdAt: true,
+                    updatedAt: true,
+                    role: true,
+                    user: true,
+                    isDeleted: true,
+                    roleRelation: {
+                        select: {
+                            id: true,
+                            name: true,
+                            desc: true,
+                        }
+                    },
+                    rules: {
+                        select: {
+                            id: true,
+                            rule: true,
+                            templateId: true,
+                        }
+                    }
+                },
+                orderBy: {
+                    createdAt: 'desc'
+                }
+            })
+            return data
+        } catch (error) {
+            logger.error(`[REPO: getCommonTemplates] Error getting common templates`, error)
+            throw new Error(`Error at getting common templates ${error}`)
         }
     }
 }

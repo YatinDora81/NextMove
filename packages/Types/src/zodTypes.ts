@@ -35,6 +35,7 @@ export const createTemplateSchema = z.object({
     content: z.string(),
     role: z.string(),
     rules: z.array(z.string()),
+    isCommon: z.boolean().optional(),
 })
 
 export const createTemplateBulkSchema = z.array(createTemplateSchema);

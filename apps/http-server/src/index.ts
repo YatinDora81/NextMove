@@ -7,7 +7,7 @@ import chatRoutes from './routes/chat.js'
 import generateRoutes from './routes/generatedMessage.js'
 import webhookRoutes from './routes/webhook.js'
 import cors from 'cors'
-import logger from './config/logger.js'
+import cacheRoutes from './routes/cache.js'
 
 const app = express()
 config()
@@ -23,24 +23,16 @@ app.use('/api/templates', templatesRoutes)
 app.use('/api/roles', rolesRoutes)
 app.use('/api/chat', chatRoutes)
 app.use('/api/generate', generateRoutes)
+app.use('/api/cache', cacheRoutes)
 
-app.get('/' , (_,res)=>{
+app.get('/', (_, res) => {
     res.status(200).json({
         status: "Ok",
-        time : Date.now(),
+        timestamp: new Date().toISOString(),
         message: "Next Move Server is Up!!!"
     })
 })
 
-// // Global error handler middleware (catches errors from routes)
-// app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-//     logger.error('[GLOBAL ERROR HANDLER] Unhandled error in route:', err)
-//     res.status(500).json({
-//         success: false,
-//         data: err,
-//         message: "Internal Server Error"
-//     })
-// })
 
 app.listen(PORT, () => {
     console.log(`App is running on ${PORT} PORT`)

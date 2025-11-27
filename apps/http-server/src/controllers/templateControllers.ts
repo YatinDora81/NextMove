@@ -3,6 +3,7 @@ import { prismaClient } from '@repo/db/db'
 import templateRepo from "../repository/templateRepo.js";
 import { createTemplateBulkSchema, createTemplateSchema, deleteTemplateSchema, updateTemplateSchema } from "@repo/types/ZodTypes";
 import logger from "@/config/logger.js";
+import { getRedis, setRedis } from "@/utils/redisCommon.js";
 
 class Templates {
     async getTemplates(req: Request, res: Response) {
@@ -163,7 +164,36 @@ class Templates {
             })
         }
     }
+
+    async getCommonTemplates(req: Request, res: Response) {
+        try {
+            const cachedTemplates = await getRedis('common-templates')
+            if (cachedTemplates) {
+                res.status(200).json({
+                    success: true,
+                    data: JSON.parse(cachedTemplates),
+                    message: "Common Templates Fetched Successfully!!!"
+                })
+                return
+            }
+            const commonTemplates = await templateRepo.getCommonTemplates()
+            await setRedis('common-templates', JSON.stringify(commonTemplates), 604800)
+
+            return res.status(200).json({
+                success: true,
+                data: commonTemplates,
+                message: "Common Templates Fetched Successfully!!!"
+            })
+        }
+        catch (error) {
+            logger.error(`[CONTROLLER: getCommonTemplates] Error getting common templates`, error)
+            return res.status(500).json({
+                success: false,
+                data: `${error}`,
+                message: "Something Went Wrong!!!"
+            })
+        }
+    }
 }
 
 export default new Templates();
-

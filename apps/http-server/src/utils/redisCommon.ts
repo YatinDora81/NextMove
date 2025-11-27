@@ -29,3 +29,4 @@ export const setRedis = async (key: string, value: string, expiration: number) =
         logger.error(`${Date.now()} Redis Set error: ${error}`)
     }
 }
+

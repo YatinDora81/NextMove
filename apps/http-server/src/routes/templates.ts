@@ -12,6 +12,8 @@ router.put('/update-template', authenticateUser, Templates.updateTemplate)
 
 router.delete('/delete-template', authenticateUser, Templates.deleteTemplate)
 
-router.post('/add-template-bulk', authenticateUser, isAdmin,Templates.addTemplateBulk)
+router.post('/add-template-bulk', authenticateUser, isAdmin, Templates.addTemplateBulk)
+
+router.get('/get-common-templates', authenticateUser, Templates.getCommonTemplates)
 
 export default router;
