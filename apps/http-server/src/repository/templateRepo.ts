@@ -58,6 +58,8 @@ class TemplateRepo {
     }
     async createTemplate(data: createTemplateSchemaType, userId: string) {
         try {
+            await clearRedis(`templates:${userId}`)
+
             const res = await prismaClient.$transaction(async (tx) => {
                 const template = await tx.templates.create({
                     data: {
@@ -105,7 +107,7 @@ class TemplateRepo {
                 return { template : {...template , "rules" : rules}, rules }
             })
 
-            await clearRedis(`templates:${userId}`)
+            
             return res
 
         }
@@ -116,6 +118,8 @@ class TemplateRepo {
     }
     async deleteTemplate(data: deleteTemplateSchemaType, userId: string) {
         try {
+            await clearRedis(`templates:${userId}`)
+
             const res = await prismaClient.templates.update({
                 where: {
                     user: userId,
@@ -125,7 +129,7 @@ class TemplateRepo {
                     isDeleted: true
                 }
             })
-            await clearRedis(`templates:${userId}`)
+            
             return res
         } catch (error) {
             logger.error(`[REPO: deleteTemplate] Error deleting template for user: ${userId}`, error)
@@ -134,6 +138,7 @@ class TemplateRepo {
     }
     async updateTemplate(data: updateTemplateSchemaType, userId: string) {
         try {
+            await clearRedis(`templates:${userId}`)
             const res = await prismaClient.$transaction(async (tx) => {
                 const template = await tx.templates.update({
                     where: {
@@ -163,7 +168,7 @@ class TemplateRepo {
                 })
                 return { template : {...template , "rules" : rules}, rules }
             })
-            await clearRedis(`templates:${userId}`)
+            
             return res
         }
         catch (error) {

@@ -7,6 +7,7 @@ class UserRepo {
     async updateUserDetails(data: updateUserDetailsSchemaType) {
         try {
             const { firstName, lastName, image_url, userId } = data
+            await clearRedis(`user-${userId}`);
             const res = await prismaClient.users.update({
                 where: {
                     id: userId
@@ -18,7 +19,7 @@ class UserRepo {
                 }
             })
 
-            clearRedis(`user-${userId}`);
+            
             logger.info(`User details updated successfully in DB , ${res}`)
             return res;
         } catch (error) {

@@ -22,8 +22,10 @@ class GeneratedMessageControllers {
                     message: "Invalid Data"
                 })
             }
-            const data = await generateMessageRepo.generateMessage(req.user.user_id, parsedData.data);
             await clearRedis(`generated-${req.user.user_id}`);
+            
+            const data = await generateMessageRepo.generateMessage(req.user.user_id, parsedData.data);
+            
 
             return res.status(200).json({
                 success: true,

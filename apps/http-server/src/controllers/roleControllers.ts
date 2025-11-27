@@ -46,8 +46,8 @@ class RoleControllers {
                 })
             }
 
-            const data = await roleRepo.createRole(parsedData.data);
             await clearRedis('roles');
+            const data = await roleRepo.createRole(parsedData.data);
 
             return res.status(200).json({
                 success: true,
@@ -74,8 +74,8 @@ class RoleControllers {
                 })
             }
 
-            const data = await roleRepo.deleteRole(parsedData.data);
             await clearRedis('roles');
+            const data = await roleRepo.deleteRole(parsedData.data);
 
             res.status(200).json({
                 success: true,

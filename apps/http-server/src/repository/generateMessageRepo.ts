@@ -5,7 +5,7 @@ import logger from "@/config/logger.js";
 class GenerateMessageRepo {
     async generateMessage(userId: string, parsedData: generateMessageSchemaType) {
         try {
-            const data = prismaClient.$transaction(async tx => {
+            const data = await prismaClient.$transaction(async tx => {
                 let newCompanyData;
                 if (parsedData.isNewCompany) {
                     newCompanyData = await tx.company.create({
@@ -16,7 +16,7 @@ class GenerateMessageRepo {
                     })
                 }
 
-                await tx.generatedMessages.create({
+                const generatedMessage = await tx.generatedMessages.create({
                     data: {
                         user: userId,
                         company: parsedData.isNewCompany ? newCompanyData?.id! : parsedData.company!,
@@ -28,7 +28,9 @@ class GenerateMessageRepo {
                         gender: parsedData.gender
                     }
                 })
+                return generatedMessage;
             })
+            return data;
         }
         catch (error) {
             logger.error(`[REPO: generateMessage] Error generating message for user: ${userId}`, error)

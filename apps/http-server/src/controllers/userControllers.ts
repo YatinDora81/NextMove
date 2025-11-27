@@ -128,9 +128,9 @@ class UserControllers {
         }
 
         const user = await userRepo.updatePremium(parsedData.data)
-        user.forEach(async (user) => {
+        await Promise.all(user.map(async (user) => {
             await clearRedis(`premium:${user.id}`)
-        })
+        }))
         res.status(200).json({
             success: true,
             data: user,
