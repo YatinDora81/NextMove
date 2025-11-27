@@ -5,7 +5,7 @@ import logger from "@/config/logger.js";
 class GenerateMessageRepo {
     async generateMessage(userId: string, parsedData: generateMessageSchemaType) {
         try {
-            const data = await prismaClient.$transaction(async tx => {
+            const data = await prismaClient.$transaction(async (tx: any) => {
                 let newCompanyData;
                 if (parsedData.isNewCompany) {
                     newCompanyData = await tx.company.create({

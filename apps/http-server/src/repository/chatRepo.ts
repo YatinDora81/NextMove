@@ -58,7 +58,7 @@ class ChatRepo {
     }
     async createNewChat(userId: string, message: string, roomId: string, parsedData: createChatSchemaType) {
         try {
-            const chat = await prismaClient.$transaction(async tx =>{
+            const chat = await prismaClient.$transaction(async (tx: any) =>{
                 const newChatMessages = await tx.message.createManyAndReturn({
                     data: [{
                         userId: userId,

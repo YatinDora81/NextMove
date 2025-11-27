@@ -85,6 +85,9 @@ model Templates {
   role              String
   user              String
   isDeleted         Boolean             @default(false)
+  isCommon          Boolean             @default(false)
+
+  // relations
   roleRelation      Role                @relation("RolesRelation", fields: [role], references: [id])
   userRelation      Users               @relation("User_Templates", fields: [user], references: [id])
   rules             TemplateRules[]     @relation("TemplateRules")

@@ -60,7 +60,7 @@ class TemplateRepo {
         try {
             await clearRedis(`templates:${userId}`)
 
-            const res = await prismaClient.$transaction(async (tx) => {
+            const res = await prismaClient.$transaction(async (tx: any) => {
                 const template = await tx.templates.create({
                     data: {
                         name: data.name,
@@ -139,7 +139,7 @@ class TemplateRepo {
     async updateTemplate(data: updateTemplateSchemaType, userId: string) {
         try {
             await clearRedis(`templates:${userId}`)
-            const res = await prismaClient.$transaction(async (tx) => {
+            const res = await prismaClient.$transaction(async (tx: any) => {
                 const template = await tx.templates.update({
                     where: {
                         user: userId,
@@ -178,7 +178,7 @@ class TemplateRepo {
     }
     async createTemplateBulk(data: createTemplateBulkSchemaType, userId: string) {
         try {
-            const res = await prismaClient.$transaction(async (tx) => {
+            const res = await prismaClient.$transaction(async (tx: any) => {
                 const templates = await tx.templates.createManyAndReturn({
                     data: data.map((template) => ({
                         name: template.name,
@@ -210,7 +210,7 @@ class TemplateRepo {
                 })
 
                 const allRules = await Promise.all(
-                    templates.map(async (template, index) => {
+                    templates.map(async (template: any, index: number) => {
                         const templateData = data[index];
                         if (!templateData) {
                             throw new Error(`Template data not found for index ${index}`);
@@ -224,7 +224,7 @@ class TemplateRepo {
                         return { template: { ...template, rules }, rules };
                     })
                 );
-                return templates.map((t,i)=>{return {...t, rules: allRules[i]?.rules}});
+                return templates.map((t: any,i: number)=>{return {...t, rules: allRules[i]?.rules}});
             })
 
             return res
