@@ -7,6 +7,7 @@ import GetStartedButton from "@/components/GetStartedButton";
 import Image from "next/image";
 import DarkImage from '../public/dark.gif';
 import LightImage from '../public/light.gif';
+import { BASE_API } from "../utils/url";
 
 export const metadata: Metadata = {
     title: "NextMoveApp | AI Job Application Assistant",
@@ -14,6 +15,9 @@ export const metadata: Metadata = {
 };
 
 export default function LandingPage() {
+
+    fetch(BASE_API!);
+
     const imageCards: { title: string, desc: string }[] = [
         {
             title: '95%',
@@ -210,8 +214,8 @@ export default function LandingPage() {
 
                     {/* Actual image */}
                     <div className=" rounded-b-2xl h-[93%] w-full absolute left-0 bottom-0">
-                            <Image src={DarkImage} className="rounded-b-2xl w-full h-full object-cover hidden dark:block" alt="Dark Image"></Image>
-                            <Image src={LightImage} className=" rounded-b-2xl w-full h-full object-cover block dark:hidden" alt="Light Image"></Image>
+                        <Image src={DarkImage} className="rounded-b-2xl w-full h-full object-cover hidden dark:block" alt="Dark Image"></Image>
+                        <Image src={LightImage} className=" rounded-b-2xl w-full h-full object-cover block dark:hidden" alt="Light Image"></Image>
                     </div>
 
                 </div>

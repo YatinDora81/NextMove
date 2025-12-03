@@ -1,4 +1,4 @@
-const BASE_API = process.env.NEXT_PUBLIC_BASE_URL;
+export const BASE_API = process.env.NEXT_PUBLIC_BASE_URL;
 export const GET_ALL_ROLES = `${BASE_API}/api/roles/get-roles`;
 export const GET_ALL_TEMPLATES = `${BASE_API}/api/templates/get-templates`;
 export const DELETE_TEMPLATE = `${BASE_API}/api/templates/delete-template`;
