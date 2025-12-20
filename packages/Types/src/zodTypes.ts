@@ -38,6 +38,16 @@ export const createTemplateSchema = z.object({
     isCommon: z.boolean().optional(),
 })
 
+export const makeTemplateUsingGeminiSchema = z.object({
+    type: z.enum(['MESSAGE', 'EMAIL']),
+    content: z.string(),
+    roleName: z.string(), // should be actual role name
+    roleNameId: z.string(),
+    history: z.array(z.string()),
+})
+
+export type makeTemplateUsingGeminiSchemaType = z.infer<typeof makeTemplateUsingGeminiSchema>;
+
 export const createTemplateBulkSchema = z.array(createTemplateSchema);
 export type createTemplateBulkSchemaType = z.infer<typeof createTemplateBulkSchema>;
 

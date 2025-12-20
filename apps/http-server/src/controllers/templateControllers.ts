@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { prismaClient } from '@repo/db/db'
 import templateRepo from "../repository/templateRepo.js";
-import { createTemplateBulkSchema, createTemplateSchema, deleteTemplateSchema, updateTemplateSchema } from "@repo/types/ZodTypes";
+import { createTemplateBulkSchema, createTemplateSchema, deleteTemplateSchema, makeTemplateUsingGeminiSchema, updateTemplateSchema } from "@repo/types/ZodTypes";
 import logger from "@/config/logger.js";
 import { getRedis, setRedis } from "@/utils/redisCommon.js";
 
@@ -187,6 +187,39 @@ class Templates {
         }
         catch (error) {
             logger.error(`[CONTROLLER: getCommonTemplates] Error getting common templates`, error)
+            return res.status(500).json({
+                success: false,
+                data: `${error}`,
+                message: "Something Went Wrong!!!"
+            })
+        }
+    }
+    async aiGenerateTemplate(req: Request, res: Response) {
+        try {
+            if (!req?.user) {
+                return res.status(400).json({
+                    success: false,
+                    data: `User Not Authenticated!!!`,
+                    message: "User Not Authenticated!!!"
+                })
+            }
+            const parsedData = makeTemplateUsingGeminiSchema.safeParse(req.body)
+            if (!parsedData.success) {
+                return res.status(400).json({
+                    success: false,
+                    data: parsedData.error,
+                    message: "Invalid Data!!!"
+                })
+            }
+            const generatedTemplate = await templateRepo.aiGenerateTemplate(parsedData.data, req.user.user_id)
+            return res.status(200).json({
+                success: true,
+                data: generatedTemplate,
+                message: "Template Generated Successfully!!!"
+            })
+        }
+        catch (error) {
+            logger.error(`[CONTROLLER: aiGenerateTemplate] Error generating template for user: ${req.user?.user_id}`, error)
             return res.status(500).json({
                 success: false,
                 data: `${error}`,

@@ -75,17 +75,18 @@ model Role {
 }
 
 model Templates {
-  id                String              @id @default(uuid())
-  name              String
-  description       String?
-  type              MessageType         @default(MESSAGE)
-  content           String
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  role              String
-  user              String
-  isDeleted         Boolean             @default(false)
-  isCommon          Boolean             @default(false)
+  id          String      @id @default(uuid())
+  name        String
+  description String?
+  type        MessageType @default(MESSAGE)
+  content     String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  role        String
+  user        String
+  isDeleted   Boolean     @default(false)
+  isCommon    Boolean     @default(false)
+  createdBy   CreatedBy   @default(SELF)
 
   // relations
   roleRelation      Role                @relation("RolesRelation", fields: [role], references: [id])
@@ -150,4 +151,9 @@ enum MessageBy {
 enum MessageType {
   EMAIL
   MESSAGE
+}
+
+enum CreatedBy {
+  AI
+  SELF
 }

@@ -1,4 +1,4 @@
-import { GPT_INSTRUCTION } from "@/utils/gpt_Instruction.js";
+import { GPT_INSTRUCTION } from "@/utils/ai-chat-Instruction.js";
 import { GoogleGenAI } from "@google/genai";
 import { config } from "dotenv";
 import logger from "./logger.js";
@@ -19,8 +19,8 @@ class Gemini {
         isNewRoom: boolean,
         message: string,
         previousMessages: string[],
-        predefinedMessages: string[]
-    }) {
+        predefinedMessages: string[],
+    } | {[key : string]:any}, gpt_template: string = GPT_INSTRUCTION) {
         try {
             const client = this.ai[this.currentClientNumber]!;
             const response = await client.models.generateContent({
@@ -28,7 +28,7 @@ class Gemini {
                     contents: JSON.stringify(messageObj),
                     config:{
                         // responseJsonSchema: true,
-                        systemInstruction: GPT_INSTRUCTION
+                        systemInstruction: gpt_template
                     }
         
                 });

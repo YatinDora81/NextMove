@@ -1,7 +1,9 @@
 import { prismaClient } from "@repo/db/db"
-import { createTemplateBulkSchemaType, createTemplateSchemaType, deleteTemplateSchemaType, updateTemplateSchemaType } from "@repo/types/ZodTypes"
+import { createTemplateBulkSchemaType, createTemplateSchemaType, deleteTemplateSchemaType, makeTemplateUsingGeminiSchemaType, updateTemplateSchemaType } from "@repo/types/ZodTypes"
 import logger from "@/config/logger.js"
 import { clearRedis, getRedis, setRedis } from "../utils/redisCommon.js"
+import gemini from "@/config/gemini.js"
+import { Template_GPT_Instuction } from "@/utils/template-instruction.js"
 
 class TemplateRepo {
     async getAllTemplates(userId: string) {
@@ -279,6 +281,62 @@ class TemplateRepo {
         } catch (error) {
             logger.error(`[REPO: getCommonTemplates] Error getting common templates`, error)
             throw new Error(`Error at getting common templates ${error}`)
+        }
+    }
+    async aiGenerateTemplate(data: makeTemplateUsingGeminiSchemaType, userId: string) {
+        try {
+            const generatedTemplate = await gemini.generateMessage(data, Template_GPT_Instuction)
+            const jsonData = await JSON.parse(generatedTemplate as unknown as string)
+            const db_data = await prismaClient.$transaction(async (tx: any) => {
+                const template = await tx.templates.create({
+                    data: {
+                        name: jsonData.templateName,
+                        description: jsonData.templateDescription,
+                        type: data.type,
+                        content: jsonData.message,
+                        role: data.roleNameId,
+                        user: userId,
+                        createdBy: "AI"
+                    },
+                    select: {
+                        id: true,
+                        name: true,
+                        description: true,
+                        type: true,
+                        content: true,
+                        createdAt: true,
+                        updatedAt: true,
+                        role: true,
+                        user: true,
+                        isDeleted: true,
+                        roleRelation: {
+                            select: {
+                                id: true,
+                                name: true,
+                                desc: true,
+                            }
+                        },
+                        rules: {
+                            select: {
+                                id: true,
+                                rule: true,
+                                templateId: true,
+                            }
+                        }
+                    },
+                })
+                const rules = await tx.templateRules.createMany({
+                    data: jsonData.rules.map((rule: string) => ({
+                        rule: rule,
+                        templateId: template.id
+                    }))
+                })
+                return { template: { ...template, "rules": rules }, }
+            })
+            return { data: db_data, ai_data: jsonData }
+        } catch (error) {
+            logger.error(`[REPO: aiGenerateTemplate] Error generating template for user: ${userId}`, error)
+            throw new Error(`Error at generating template ${error}`)
         }
     }
 }
