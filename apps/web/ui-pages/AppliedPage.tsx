@@ -16,9 +16,9 @@ function AppliedPage({ messages }: { messages: GeneratedMessage[] }) {
 
     return (
         <div className=' w-full min-h-screen pt-[8vh] md:pt-[12vh] flex justify-center items-center'>
-            <div className=' w-[80%] min-h-screen h-[200vh] flex flex-col justify-start items-start'>
+            <div className=' w-[80%] min-h-screen flex flex-col justify-start items-start'>
 
-                <Table>
+                <Table className=' bg-pink-500'>
                     <TableCaption>A list of your applied Companies.</TableCaption>
                     <TableHeader>
                         <TableRow>
