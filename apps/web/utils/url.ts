@@ -10,3 +10,4 @@ export const UPDATE_USER_DETAILS = `${BASE_API}/api/users/update-user-details`
 export const ADD_NEW_TEMPLATE = `${BASE_API}/api/templates/add-template`;
 export const UPDATE_TEMPLATE = `${BASE_API}/api/templates/update-template`;
 export const GET_PREDEFINED_TEMPLATES = `${BASE_API}/api/templates/get-common-templates`;
+export const GENERATE_AI_TEMPLATE = `${BASE_API}/api/templates/ai-generate-template`;

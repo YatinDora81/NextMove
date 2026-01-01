@@ -21,7 +21,7 @@ import { Roles_AutoComplete } from '../Roles_AutoComplete'
 import { ADD_NEW_TEMPLATE, UPDATE_TEMPLATE } from '@/utils/url'
 import { useAuth } from '@clerk/nextjs'
 import { useTemplates } from '@/hooks/useTemplates'
-import Gen_AI_Template from '../Gen_AI_Template'
+import Gen_AI_Template from './Gen_AI_Template'
 
 function TemplateOpeartion({ children, isUpdate = false, currData = null, allRoles }: { children: ReactNode, isUpdate?: boolean, currData?: any, allRoles: Role[] }) {
 
@@ -91,6 +91,14 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
                 toast.error("Content is required")
                 return
             }
+            if (!templateData.content.includes("[Recruiter Name]") && templateData.rules.includes("[Recruiter Name]")) {
+                toast.error("[Recruiter Name] is not present in the content")
+                return
+            }
+            if (!templateData.content.includes("[Company Name]") && templateData.rules.includes("[Company Name]")) {
+                toast.error("[Company Name] is not present in the content")
+                return
+            }
             if (templateData.name.trim() === "") {
                 toast.error("Name is required")
                 return
@@ -142,7 +150,7 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
             setOpen(false)
             setCreatedTemplate(newTemplate)
             setSuccessDialogOpen(true)
-            
+
             if (!isUpdate) {
                 setTemplateData({
                     content: '',
@@ -211,7 +219,7 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
 
                             <div className="my-4 relative flex flex-col items-start gap-2 overflow-auto max-w-[100%]">
                                 <Label htmlFor="tempp" className="text-black dark:text-white">Template Description</Label>
-                                <div className=' absolute right-1 top-8'> <Gen_AI_Template></Gen_AI_Template> </div>
+                                <div className=' absolute right-1 top-8'> <Gen_AI_Template selectedRole={selectedRole} setSelectedRole={setSelectedRole} allRoles={allRoles} templateData={templateData} setTemplateData={setTemplateData} /> </div>
                                 <Textarea id="tempp" value={templateData.content} onChange={(e) => setTemplateData({ ...templateData, content: e.target.value })} placeholder="Hi [Recruiter Name] i want to join your [Company]" wrap="soft" className=' resize-none h-[25vh] overflow-y-auto whitespace-normal break-words text-black dark:text-white w-full' style={{ wordWrap: 'break-word', wordBreak: 'break-word', overflowWrap: 'break-word' }} />
                             </div>
 
@@ -271,7 +279,7 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
 
                             <div className='flex w-full justify-evenly items-center'>
                                 {isUpdate && <Button onClick={() => setOpen(false)} className='w-[48%] hover:text-red-500 ' variant={'outline'}>Cancel</Button>}
-                                <Button onClick={submitHandler} className={`${isUpdate ? 'w-[48%] ' : 'w-full'}`}>{isUpdate ? 'Update Template' : 'Generate Template'}</Button>
+                                <Button onClick={submitHandler} className={`${isUpdate ? 'w-[48%] ' : 'w-full'}`}>{isUpdate ? 'Update Template' : 'Save Template'}</Button>
                             </div>
 
                         </DialogDescription>

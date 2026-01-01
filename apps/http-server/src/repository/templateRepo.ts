@@ -286,54 +286,97 @@ class TemplateRepo {
     async aiGenerateTemplate(data: makeTemplateUsingGeminiSchemaType, userId: string) {
         try {
             const generatedTemplate = await gemini.generateMessage(data, Template_GPT_Instuction)
-            const jsonData = await JSON.parse(generatedTemplate as unknown as string)
-            const db_data = await prismaClient.$transaction(async (tx: any) => {
-                const template = await tx.templates.create({
-                    data: {
-                        name: jsonData.templateName,
-                        description: jsonData.templateDescription,
-                        type: data.type,
-                        content: jsonData.message,
-                        role: data.roleNameId,
-                        user: userId,
-                        createdBy: "AI"
-                    },
-                    select: {
-                        id: true,
-                        name: true,
-                        description: true,
-                        type: true,
-                        content: true,
-                        createdAt: true,
-                        updatedAt: true,
-                        role: true,
-                        user: true,
-                        isDeleted: true,
-                        roleRelation: {
-                            select: {
-                                id: true,
-                                name: true,
-                                desc: true,
-                            }
-                        },
-                        rules: {
-                            select: {
-                                id: true,
-                                rule: true,
-                                templateId: true,
-                            }
-                        }
-                    },
-                })
-                const rules = await tx.templateRules.createMany({
-                    data: jsonData.rules.map((rule: string) => ({
-                        rule: rule,
-                        templateId: template.id
-                    }))
-                })
-                return { template: { ...template, "rules": rules }, }
+            
+            // Strip markdown code blocks if AI wrapped the JSON in them
+            let cleanedResponse = (generatedTemplate as unknown as string).trim()
+            if (cleanedResponse.startsWith('```json')) {
+                cleanedResponse = cleanedResponse.slice(7) // Remove ```json
+            } else if (cleanedResponse.startsWith('```')) {
+                cleanedResponse = cleanedResponse.slice(3) // Remove ```
+            }
+            if (cleanedResponse.endsWith('```')) {
+                cleanedResponse = cleanedResponse.slice(0, -3) // Remove trailing ```
+            }
+            cleanedResponse = cleanedResponse.trim()
+            
+            const jsonData = await JSON.parse(cleanedResponse)
+            // const db_data = await prismaClient.$transaction(async (tx: any) => {
+            //     const template = await tx.templates.create({
+            //         data: {
+            //             name: jsonData.templateName,
+            //             description: jsonData.templateDescription,
+            //             type: data.type,
+            //             content: jsonData.message,
+            //             role: data.roleNameId,
+            //             user: userId,
+            //             createdBy: "AI"
+            //         },
+            //         select: {
+            //             id: true,
+            //             name: true,
+            //             description: true,
+            //             type: true,
+            //             content: true,
+            //             createdAt: true,
+            //             updatedAt: true,
+            //             role: true,
+            //             user: true,
+            //             isDeleted: true,
+            //             roleRelation: {
+            //                 select: {
+            //                     id: true,
+            //                     name: true,
+            //                     desc: true,
+            //                 }
+            //             },
+            //             rules: {
+            //                 select: {
+            //                     id: true,
+            //                     rule: true,
+            //                     templateId: true,
+            //                 }
+            //             }
+            //         },
+            //     })
+            //     const rules = await tx.templateRules.createMany({
+            //         data: jsonData.rules.map((rule: string) => ({
+            //             rule: rule,
+            //             templateId: template.id
+            //         }))
+            //     })
+            //     return { template: { ...template, "rules": rules }, }
+            // })
+            const aiTemplate = await prismaClient.aiTemplate.create({
+                data: {
+                    message: jsonData?.message || '',
+                    rules: jsonData?.rules || [],
+                    templateName: jsonData?.templateName || '',
+                    templateDescription: jsonData?.templateDescription || '',
+                    history: data.history || [],
+                    prompt: data.content,
+                    roleName: data.roleName,
+                    roleNameId: data.roleNameId,
+                    userId: userId
+                },
+                select: {
+                    id: true,
+                    message: true,
+                    rules: true,
+                    templateName: true,
+                    templateDescription: true,
+                    history: true,
+                    prompt: true,
+                    roleName: true,
+                    roleNameId: true,
+                    userId: true,
+                    createdAt: true,
+                    updatedAt: true
+                }
             })
-            return { data: db_data, ai_data: jsonData }
+            return {
+                data: aiTemplate,
+                ai_data: jsonData
+            }
         } catch (error) {
             logger.error(`[REPO: aiGenerateTemplate] Error generating template for user: ${userId}`, error)
             throw new Error(`Error at generating template ${error}`)

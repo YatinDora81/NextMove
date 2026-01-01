@@ -92,8 +92,12 @@ function GeneratePromt({ allRoles , predefinedTemplates }: { allRoles: Role[], p
 
     const submitHandler = () => {
         try {
-            if (formDetails.company.trim().length === 0 || formDetails.recruiterName.trim().length === 0) {
-                toast.error("Company and Recruiter Name are required")
+            // if (formDetails.company.trim().length === 0 || formDetails.recruiterName.trim().length === 0) {
+            //     toast.error("Company and Recruiter Name are required")
+            //     return
+            // }
+            if(!selectedRole){
+                toast.error("Role is required")
                 return
             }
             if (!selectedTemplate) {
@@ -104,8 +108,19 @@ function GeneratePromt({ allRoles , predefinedTemplates }: { allRoles: Role[], p
             if (lastName) {
                 myName = myName + " " + lastName
             }
-
+            
             let newMessage = selectedTemplate.content
+            if(selectedTemplate.content.includes("[Recruiter Name]") && formDetails.recruiterName.trim().length === 0){
+                toast.error("Recruiter Name is required")
+                return
+            }
+            if(selectedTemplate.content.includes("[Company Name]") && formDetails.company.trim().length === 0){
+                toast.error("Company Name is required")
+                return
+            }
+            // if(selectedTemplate.content.includes("[Role]") && selectedTemplate.roleRelation.name.trim().length === 0){
+            //     toast.error("Role is required")
+            // }
             // Use global replace (/g flag) to replace ALL occurrences
             newMessage = newMessage.replace(/\[Recruiter Name\]/g, capitalizeWords(formDetails.recruiterName))
             newMessage = newMessage.replace(/\[Company Name\]/g, capitalizeWords(formDetails.company))
