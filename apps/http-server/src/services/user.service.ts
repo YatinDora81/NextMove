@@ -66,7 +66,7 @@ class UserService {
                 where: { id: userId }
             })
             return { user, message: "User Deleted Successfully" }
-        } catch (error) {
+        } catch (error: any) {
             if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
                 return { user: null, message: "User not found, skipping deletion" }
             }
