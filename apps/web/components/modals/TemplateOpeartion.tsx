@@ -21,6 +21,7 @@ import { Roles_AutoComplete } from '../Roles_AutoComplete'
 import { ADD_NEW_TEMPLATE, UPDATE_TEMPLATE } from '@/utils/url'
 import { useAuth } from '@clerk/nextjs'
 import { useTemplates } from '@/hooks/useTemplates'
+import Gen_AI_Template from '../Gen_AI_Template'
 
 function TemplateOpeartion({ children, isUpdate = false, currData = null, allRoles }: { children: ReactNode, isUpdate?: boolean, currData?: any, allRoles: Role[] }) {
 
@@ -208,9 +209,10 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
                                 <Input id="name" value={templateData.name} onChange={(e) => setTemplateData({ ...templateData, name: e.target.value })} placeholder="For CEO of Company" type='text' className="text-black dark:text-white" />
                             </div>
 
-                            <div className="my-4 flex flex-col items-start gap-2 overflow-auto">
+                            <div className="my-4 relative flex flex-col items-start gap-2 overflow-auto max-w-[100%]">
                                 <Label htmlFor="tempp" className="text-black dark:text-white">Template Description</Label>
-                                <Textarea id="tempp" value={templateData.content} onChange={(e) => setTemplateData({ ...templateData, content: e.target.value })} placeholder="Hi [Recruiter Name] i want to join your [Company]" className=' resize-none h-[25vh]  overflow-y-auto text-black dark:text-white' />
+                                <div className=' absolute right-1 top-8'> <Gen_AI_Template></Gen_AI_Template> </div>
+                                <Textarea id="tempp" value={templateData.content} onChange={(e) => setTemplateData({ ...templateData, content: e.target.value })} placeholder="Hi [Recruiter Name] i want to join your [Company]" wrap="soft" className=' resize-none h-[25vh] overflow-y-auto whitespace-normal break-words text-black dark:text-white w-full' style={{ wordWrap: 'break-word', wordBreak: 'break-word', overflowWrap: 'break-word' }} />
                             </div>
 
                             <div className=' w-full flex items-center justify-between'>
@@ -271,7 +273,6 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
                                 {isUpdate && <Button onClick={() => setOpen(false)} className='w-[48%] hover:text-red-500 ' variant={'outline'}>Cancel</Button>}
                                 <Button onClick={submitHandler} className={`${isUpdate ? 'w-[48%] ' : 'w-full'}`}>{isUpdate ? 'Update Template' : 'Generate Template'}</Button>
                             </div>
-
 
                         </DialogDescription>
                     </DialogHeader>
