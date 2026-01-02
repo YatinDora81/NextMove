@@ -14,8 +14,9 @@ import { Textarea } from '../ui/textarea'
 import { Switch } from "@/components/ui/switch"
 import { Button } from '../ui/button'
 import toast from 'react-hot-toast'
-import { Copy, CheckCircle2 } from 'lucide-react'
+import { Copy, CheckCircle2, Info } from 'lucide-react'
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group'
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { Role, Template_Operation_Type, TemplateType } from '@/utils/api_types'
 import { Roles_AutoComplete } from '../Roles_AutoComplete'
 import { ADD_NEW_TEMPLATE, UPDATE_TEMPLATE } from '@/utils/url'
@@ -39,6 +40,15 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
         rules: [],
     })
     const [selectedRole, setSelectedRole] = useState<Role | null>(null)
+    const [exampleIndex, setExampleIndex] = useState(0)
+    
+    const exampleMessages = [
+        "Hi [Recruiter Name], I'm [MY NAME], a Frontend Developer. Any openings at [Company Name] you could refer me for?",
+        "Hey [Recruiter Name]! I'm [MY NAME], looking for Backend roles. Would love a referral if there's an opening at [Company Name].",
+        "Hi [Recruiter Name], this is [MY NAME]. Are there any Full Stack positions at [Company Name]? Would appreciate a referral!",
+        "Hello [Recruiter Name], I'm [MY NAME]. Looking for DevOps roles - any opportunities at [Company Name] you could connect me with?",
+        "Hi [Recruiter Name]! I'm [MY NAME], interested in Data Science roles at [Company Name]. Could you refer me if there's an opening?"
+    ]
 
     // Load data when dialog opens in update mode
     useEffect(() => {
@@ -195,6 +205,14 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, isUpdate])
 
+    // Cycle through example messages
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setExampleIndex((prev) => (prev + 1) % exampleMessages.length)
+        }, 3000)
+        return () => clearInterval(interval)
+    }, [exampleMessages.length])
+
     const copyToClipboard = () => {
         if (createdTemplate?.content) {
             navigator.clipboard.writeText(createdTemplate.content)
@@ -218,9 +236,74 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
                             </div>
 
                             <div className="my-4 relative flex flex-col items-start gap-2 overflow-auto max-w-[100%]">
-                                <Label htmlFor="tempp" className="text-black dark:text-white">Template Description</Label>
+                                <div className="flex items-center gap-2">
+                                    <Label htmlFor="tempp" className="text-black dark:text-white">Template Content</Label>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <button className="p-1 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
+                                                <Info className="w-4 h-4 text-muted-foreground" />
+                                            </button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-72 max-w-[90vw]" side="bottom" align="start">
+                                            <div className="space-y-3">
+                                                <div className="font-medium text-sm">How to write template</div>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Use placeholders in your template. These will be replaced with actual values when you send the message.
+                                                </p>
+                                                <div className="space-y-2 text-xs">
+                                                    <div className="flex items-center gap-2">
+                                                        <code className="font-mono bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded">[Recruiter Name]</code>
+                                                        <span className="text-muted-foreground">→ Recipient&apos;s name</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <code className="font-mono bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded">[MY NAME]</code>
+                                                        <span className="text-muted-foreground">→ Your name</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <code className="font-mono bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded">[Company Name]</code>
+                                                        <span className="text-muted-foreground">→ Company name</span>
+                                                    </div>
+                                                </div>
+                                                <div className="pt-2 border-t">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <span className="font-medium text-xs">Examples:</span>
+                                                        <div className="flex gap-1">
+                                                            {exampleMessages.map((_, i) => (
+                                                                <div 
+                                                                    key={i} 
+                                                                    className={`w-1.5 h-1.5 rounded-full transition-colors ${i === exampleIndex ? 'bg-primary' : 'bg-zinc-300 dark:bg-zinc-600'}`} 
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-xs text-muted-foreground bg-zinc-50 dark:bg-zinc-800/50 p-2 rounded-md min-h-[50px] transition-all duration-300">
+                                                        {exampleMessages[exampleIndex]}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </PopoverContent>
+                                    </Popover>
+                                </div>
                                 <div className=' absolute right-1 top-8'> <Gen_AI_Template selectedRole={selectedRole} setSelectedRole={setSelectedRole} allRoles={allRoles} templateData={templateData} setTemplateData={setTemplateData} /> </div>
-                                <Textarea id="tempp" value={templateData.content} onChange={(e) => setTemplateData({ ...templateData, content: e.target.value })} placeholder="Hi [Recruiter Name] i want to join your [Company]" wrap="soft" className=' resize-none h-[25vh] overflow-y-auto whitespace-normal break-words text-black dark:text-white w-full' style={{ wordWrap: 'break-word', wordBreak: 'break-word', overflowWrap: 'break-word' }} />
+                                <Textarea id="tempp" value={templateData.content} onChange={(e) => setTemplateData({ ...templateData, content: e.target.value })} placeholder="Hi [Recruiter Name], I'm [MY NAME] looking for opportunities at [Company Name]..." wrap="soft" className=' resize-none h-[25vh] overflow-y-auto whitespace-normal break-words text-black dark:text-white w-full' style={{ wordWrap: 'break-word', wordBreak: 'break-word', overflowWrap: 'break-word' }} />
+                                
+                                {/* Rotating example messages */}
+                                <div className="w-full">
+                                    <div className="flex items-center justify-between mb-1.5">
+                                        <span className="text-xs text-muted-foreground">💡 Example:</span>
+                                        <div className="flex gap-1">
+                                            {exampleMessages.map((_, i) => (
+                                                <div 
+                                                    key={i} 
+                                                    className={`w-1.5 h-1.5 rounded-full transition-colors ${i === exampleIndex ? 'bg-primary' : 'bg-zinc-300 dark:bg-zinc-600'}`} 
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="text-xs text-muted-foreground bg-zinc-100 dark:bg-zinc-800/50 px-3 py-2 rounded-md transition-all duration-300">
+                                        {exampleMessages[exampleIndex]}
+                                    </div>
+                                </div>
                             </div>
 
                             <div className=' w-full flex items-center justify-between'>
@@ -315,10 +398,19 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
                                         </div>
                                         <p className="mt-2 p-3 bg-gray-100/50 dark:bg-zinc-800/30 rounded-md whitespace-pre-wrap text-black dark:text-white">{createdTemplate.content}</p>
                                     </div>
-                                    {/* <div>
-                                    <Label className="font-semibold">Type:</Label>
-                                    <p>{createdTemplate.type}</p>
-                                </div> */}
+                                    
+                                    {/* How to use section */}
+                                    <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-md">
+                                        <div className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">💡 How to use</div>
+                                        <div className="text-xs text-blue-700 dark:text-blue-400 space-y-1">
+                                            <p>Replace the placeholders before sending:</p>
+                                            <ul className="list-disc list-inside space-y-0.5 mt-1">
+                                                <li><span className="font-mono bg-blue-100 dark:bg-blue-900/50 px-1 rounded">[Recruiter Name]</span> → Actual name (e.g., John)</li>
+                                                <li><span className="font-mono bg-blue-100 dark:bg-blue-900/50 px-1 rounded">[MY NAME]</span> → Your name</li>
+                                                <li><span className="font-mono bg-blue-100 dark:bg-blue-900/50 px-1 rounded">[Company Name]</span> → Company name (e.g., Google)</li>
+                                            </ul>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
                         </DialogDescription>
