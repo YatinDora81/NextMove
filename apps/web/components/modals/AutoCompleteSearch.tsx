@@ -21,7 +21,7 @@ function AutoCompleteSearch({ setOpen, searchFor = "String" }: { setOpen?: (v: b
                 <Input
                     type='text'
                     style={{ fontSize: '1rem' }}
-                    placeholder="Your search..."
+                    placeholder="Search here..."
                     // value={search}
                     // onChange={(event) => setSearch(event.target.value)}
                     className=" px-8 h-12 "

@@ -232,7 +232,7 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
 
                             <div className="my-4 flex flex-col items-start gap-2 overflow-auto">
                                 <Label htmlFor="name" className="text-black dark:text-white">Template Name</Label>
-                                <Input id="name" value={templateData.name} onChange={(e) => setTemplateData({ ...templateData, name: e.target.value })} placeholder="For CEO of Company" type='text' className="text-black dark:text-white" />
+                                <Input id="name" value={templateData.name} onChange={(e) => setTemplateData({ ...templateData, name: e.target.value })} placeholder="e.g., Friend Referral - Full Stack" type='text' className="text-black dark:text-white" />
                             </div>
 
                             <div className="my-4 relative flex flex-col items-start gap-2 overflow-auto max-w-[100%]">

@@ -37,12 +37,21 @@ NextMoveApp is a full-stack web application designed to simplify the job applica
 - Support for both simple messages and email formats
 - Context-aware message generation based on job role, company, and recruiter
 - Real-time conversation flow with option-based selections
+- **AI Template Generator**: Create ready-to-use templates with AI
+  - Generates short, direct messages (4-5 lines max)
+  - Automatically selects relevant technologies based on role
+  - Direct referral/job inquiry focused messaging
+  - Smart template naming based on user's prompt context
 
 ### 📝 Template Management
 - Create, edit, and delete message templates
+- **AI-Powered Template Generation**: Generate templates using AI based on role and context
 - Filter templates by type (Email, Message, All)
-- Categorize templates for easy organization
-- Template sharing and reuse functionality
+- Categorize templates by job roles for easy organization
+- Smart placeholder system: `[Recruiter Name]`, `[MY NAME]`, `[Company Name]`
+- **Interactive examples**: Rotating example messages to guide template creation
+- **Context-aware naming**: Auto-generates names like "Friend Referral - Full Stack", "Senior Referral - Frontend"
+- "How to use" guide with placeholder explanations
 
 ### 📊 Application Tracking
 - Track all job applications in one place
@@ -74,6 +83,7 @@ NextMoveApp is a full-stack web application designed to simplify the job applica
 - **Styling**: Tailwind CSS 4.x with custom utilities
 - **UI Components**: Radix UI primitives, custom components
 - **Icons**: Lucide React (Sparkles, MessageSquare, BarChart3, Zap, Users, etc.)
+- **Animations**: Motion (Framer Motion) for smooth UI animations
 - **Images**: Next.js Image optimization with dark/light mode variants
 - **Typography**: Geist font family (GeistVF, GeistMonoVF)
 - **Authentication**: Clerk with protected routes
@@ -232,6 +242,7 @@ NextMoveApp/
 - `POST /api/templates` - Create new template
 - `PUT /api/templates/:id` - Update template
 - `DELETE /api/templates/:id` - Delete template
+- `POST /api/templates/ai-generate` - Generate template using AI
 
 ### Message Generation
 - `POST /api/generated-messages` - Generate AI message

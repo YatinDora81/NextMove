@@ -111,12 +111,12 @@ function EditName({ children }: { children: ReactNode }) {
                     <div className=' flex w-full items-center  gap-3 pb-4'>
                         <div className=' gap-2 w-[48%] flex flex-col'>
                             <Label htmlFor="yourName">First Name</Label>
-                            <Input placeholder="Enter Your Name" value={firstName} onChange={(e) => setFirstName(e.target.value)} type="text" disabled={loading} />
+                            <Input placeholder="e.g., John" value={firstName} onChange={(e) => setFirstName(e.target.value)} type="text" disabled={loading} />
 
                         </div>
                         <div className=' gap-2 w-[48%] flex flex-col'>
                             <Label htmlFor="yourName">Last Name (Optional)</Label>
-                            <Input placeholder="Enter Your Name" value={lastName} onChange={(e) => setLastName(e.target.value)} type="text" disabled={loading} />
+                            <Input placeholder="e.g., Smith" value={lastName} onChange={(e) => setLastName(e.target.value)} type="text" disabled={loading} />
                         </div>
                     </div>
 

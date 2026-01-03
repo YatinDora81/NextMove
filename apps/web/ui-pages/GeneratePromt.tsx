@@ -217,7 +217,7 @@ function GeneratePromt({ allRoles , predefinedTemplates }: { allRoles: Role[], p
                         <Input value={formDetails.recruiterName} onChange={(e) => {
                             setFormDetails({ ...formDetails, recruiterName: e.target.value })
                             setIsAlreadyFilledForm(false)
-                        }} id="email" placeholder="Jhon Doe...." type="text" />
+                        }} id="email" placeholder="e.g., John Smith" type="text" />
                     </div>
 
 
@@ -259,7 +259,7 @@ function GeneratePromt({ allRoles , predefinedTemplates }: { allRoles: Role[], p
                         <Input value={formDetails.company} onChange={(e) => {
                             setFormDetails({ ...formDetails, company: e.target.value })
                             setIsAlreadyFilledForm(false)
-                        }} id="email" placeholder="Company Name...." type="text" />
+                        }} id="email" placeholder="e.g., Google, Microsoft" type="text" />
                     </div>
 
 
@@ -294,7 +294,7 @@ function GeneratePromt({ allRoles , predefinedTemplates }: { allRoles: Role[], p
                         <div className="mb-4 flex flex-col gap-2">
                             <Label htmlFor="yourName">Your Name</Label>
                             <div className='flex gap-1'>
-                                <Input className=' ' value={firstName + " " + lastName} disabled id="yourName" placeholder="Your Name...." type="text" />
+                                <Input className=' ' value={firstName + " " + lastName} disabled id="yourName" placeholder="Your full name" type="text" />
                                 {/* <Button ref={editBtnRef} variant={"secondary"} onClick={() => { }} className=' ' size="icon"><RefreshCcwIcon className="w-4 h-4" /></Button> */}
                                 <EditName><Button variant={"secondary"} className=' ' size="icon">
                                     <EditIcon className="w-4 h-4" />
