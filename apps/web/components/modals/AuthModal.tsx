@@ -115,12 +115,12 @@ function LoginForm({ setPopup, redirectUrl }: { setPopup: (p: PopUpType) => void
                 // Set cookies via server action
                 await setAuthCookiesAction(data.data.token, data.data.user)
                 toast.success("Logged in successfully!")
-                setPopup(null)
-                // Use window.location for full page reload to pick up server-side cookies
+                // Navigate to clean URL (remove popup params) with full page reload
                 if (redirectUrl) {
                     window.location.href = redirectUrl
                 } else {
-                    window.location.reload()
+                    // Go to home page without popup params
+                    window.location.href = window.location.pathname
                 }
             } else {
                 toast.error(data.message || "Failed to login")
@@ -245,12 +245,12 @@ function SignupForm({ setPopup, redirectUrl }: { setPopup: (p: PopUpType) => voi
                 // Set cookies via server action
                 await setAuthCookiesAction(data.data.token, data.data.user)
                 toast.success("Account created successfully!")
-                setPopup(null)
-                // Use window.location for full page reload to pick up server-side cookies
+                // Navigate to clean URL (remove popup params) with full page reload
                 if (redirectUrl) {
                     window.location.href = redirectUrl
                 } else {
-                    window.location.reload()
+                    // Go to home page without popup params
+                    window.location.href = window.location.pathname
                 }
             } else {
                 toast.error(data.message || "Failed to create account")
