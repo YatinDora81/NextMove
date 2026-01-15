@@ -2,7 +2,7 @@
 
 import { TemplateType } from "@/utils/api_types";
 import { GET_ALL_TEMPLATES, DELETE_TEMPLATE } from "@/utils/url";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth } from "@/hooks/useAuth";
 import { createContext, useContext, useEffect, useState } from "react"
 import toast from "react-hot-toast";
 
@@ -26,7 +26,7 @@ export const TemplateProvider = ({ children }: { children: React.ReactNode }) =>
     const fetchTemplates = async () => {
         try {
             setIsTemplateLoading(true);
-            const token = await getToken({ template: "frontend_token" })
+            const token = await getToken()
             if (!token) {
                 throw new Error("Token not found")
             }
@@ -52,7 +52,7 @@ export const TemplateProvider = ({ children }: { children: React.ReactNode }) =>
 
     const deleteTemplate = async (templateId: string) => {
         try {
-            const token = await getToken({ template: "frontend_token" })
+            const token = await getToken()
             if (!token) {
                 throw new Error("Token not found")
             }

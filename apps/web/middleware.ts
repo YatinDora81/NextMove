@@ -1,17 +1,32 @@
-import { clerkMiddleware,createRouteMatcher } from '@clerk/nextjs/server'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
+const AUTH_COOKIE_NAME = "nextmove_auth_token"
 
-const isProtectedRoute = createRouteMatcher(['/dashboard(.*)', '/forum(.*)' , '/generate(.*)','on-boarding(.*)','templates(.*)','applied(.*)' , '/ai-chat(.*)'])
+const protectedRoutes = ['/dashboard', '/forum', '/generate', '/on-boarding', '/templates', '/applied', '/ai-chat']
 
-export default clerkMiddleware(async (auth, req) => {
-  if (isProtectedRoute(req)) await auth.protect()
-})
+export function middleware(request: NextRequest) {
+    const { pathname } = request.nextUrl
+    const token = request.cookies.get(AUTH_COOKIE_NAME)?.value
+
+    // Check if the route is protected
+    const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
+
+    if (isProtectedRoute && !token) {
+        // Redirect to home with login popup and redirect_url
+        const redirectUrl = pathname + request.nextUrl.search
+        const url = new URL('/', request.url)
+        url.searchParams.set('popup', 'login')
+        url.searchParams.set('redirect_url', redirectUrl)
+        return NextResponse.redirect(url)
+    }
+
+    return NextResponse.next()
+}
 
 export const config = {
-  matcher: [
-    // Skip Next.js internals and all static files, unless found in search params
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-    // Always run for API routes
-    '/(api|trpc)(.*)',
-  ],
+    matcher: [
+        '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+        '/(api|trpc)(.*)',
+    ],
 }

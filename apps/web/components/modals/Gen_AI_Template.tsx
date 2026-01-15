@@ -16,7 +16,7 @@ import { Label } from '../ui/label'
 import { Roles_AutoComplete } from '../Roles_AutoComplete'
 import { Role, Template_Operation_Type, TemplateType } from '@/utils/api_types'
 import { toast } from 'react-hot-toast'
-import { useAuth } from '@clerk/nextjs'
+import { useAuth } from '@/hooks/useAuth'
 import { GENERATE_AI_TEMPLATE } from '@/utils/url'
 import { Loader2 } from 'lucide-react'
 
@@ -53,7 +53,7 @@ function Gen_AI_Template({ selectedRole, setSelectedRole, allRoles, templateData
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${await getToken({ template: "frontend_token" })}`
+                    'Authorization': `Bearer ${await getToken()}`
                 },
                 body: JSON.stringify({
                     "type": "MESSAGE",

@@ -1,5 +1,59 @@
 import { z } from 'zod';
 
+// ==================
+// Auth Schemas (Zod v4)
+// ==================
+
+export const signUpSchema = z.object({
+    firstName: z.string({ error: "First name is required" })
+        .min(1, "First name is required")
+        .max(50, "First name must be less than 50 characters"),
+    lastName: z.string().max(50, "Last name must be less than 50 characters").optional(),
+    email: z.string({ error: "Email is required" })
+        .email("Please enter a valid email address"),
+    password: z.string({ error: "Password is required" })
+        .min(6, "Password must be at least 6 characters")
+        .max(100, "Password must be less than 100 characters"),
+});
+export type signUpSchemaType = z.infer<typeof signUpSchema>;
+
+export const signInSchema = z.object({
+    email: z.string({ error: "Email is required" })
+        .email("Please enter a valid email address"),
+    password: z.string({ error: "Password is required" })
+        .min(1, "Password is required"),
+});
+export type signInSchemaType = z.infer<typeof signInSchema>;
+
+export const forgotPasswordSchema = z.object({
+    email: z.string({ error: "Email is required" })
+        .email("Please enter a valid email address"),
+});
+export type forgotPasswordSchemaType = z.infer<typeof forgotPasswordSchema>;
+
+export const verifyOtpSchema = z.object({
+    email: z.string({ error: "Email is required" })
+        .email("Please enter a valid email address"),
+    otp: z.string({ error: "OTP is required" })
+        .length(6, "OTP must be 6 digits"),
+});
+export type verifyOtpSchemaType = z.infer<typeof verifyOtpSchema>;
+
+export const changePasswordSchema = z.object({
+    email: z.string({ error: "Email is required" })
+        .email("Please enter a valid email address"),
+    resetToken: z.string({ error: "Reset token is required" })
+        .min(1, "Reset token is required"),
+    newPassword: z.string({ error: "New password is required" })
+        .min(6, "Password must be at least 6 characters")
+        .max(100, "Password must be less than 100 characters"),
+});
+export type changePasswordSchemaType = z.infer<typeof changePasswordSchema>;
+
+// ==================
+// Other Schemas
+// ==================
+
 export const authTokenSchema = z.object({
     azp: z.string(),
     email: z.string(),

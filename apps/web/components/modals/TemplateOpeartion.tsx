@@ -20,7 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { Role, Template_Operation_Type, TemplateType } from '@/utils/api_types'
 import { Roles_AutoComplete } from '../Roles_AutoComplete'
 import { ADD_NEW_TEMPLATE, UPDATE_TEMPLATE } from '@/utils/url'
-import { useAuth } from '@clerk/nextjs'
+import { useAuth } from '@/hooks/useAuth'
 import { useTemplates } from '@/hooks/useTemplates'
 import Gen_AI_Template from './Gen_AI_Template'
 
@@ -121,7 +121,7 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
                 toast.error("Type is required")
                 return
             }
-            const token = await getToken({ template: "frontend_token" })
+            const token = await getToken()
 
             const res = await fetch(!isUpdate ? ADD_NEW_TEMPLATE : UPDATE_TEMPLATE, {
                 method: !isUpdate ? "POST" : "PUT",

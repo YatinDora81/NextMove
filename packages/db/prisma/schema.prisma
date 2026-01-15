@@ -9,10 +9,11 @@ datasource db {
 }
 
 model Users {
-  id         String   @id
+  id         String   @id @default(uuid())
   firstName  String   @default("")
   lastName   String?  @default("")
   email      String   @unique
+  password   String?  // Hashed password
   profilePic String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -26,8 +27,24 @@ model Users {
   generatedMessages GeneratedMessages[] @relation("User_gen_rel")
   templates         Templates[]         @relation("User_Templates")
   aiTemplates       AiTemplate[]        @relation("User_AiTemplate")
+  passwordResets    PasswordReset[]     @relation("User_PasswordReset")
 
   @@index([id, email])
+}
+
+model PasswordReset {
+  id         String   @id @default(uuid())
+  userId     String
+  otp        String
+  resetToken String?  // Generated after OTP verification
+  expiresAt  DateTime
+  used       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  user Users @relation("User_PasswordReset", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([otp])
 }
 
 model GeneratedMessages {

@@ -9,7 +9,7 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from '../ui/input'
-import { useAuth, useUser } from '@clerk/nextjs'
+import { useAuth, useUser } from '@/hooks/useAuth'
 import { Label } from '../ui/label'
 import { capitalizeWords } from '@/utils/strings'
 import { Button } from '../ui/button'
@@ -55,7 +55,7 @@ function EditName({ children }: { children: ReactNode }) {
 
         setLoading(true)
         try {
-            const token = await getToken({ template: "frontend_token" })
+            const token = await getToken()
             if(!token) {
                 toast.error("Token not found")
                 setLoading(false)
@@ -78,9 +78,7 @@ function EditName({ children }: { children: ReactNode }) {
             
             if(res.ok){
                 toast.success("Name updated successfully")
-                toast("Please refresh the page to see the changes or will take 1-2 minutes to update.")
-                // Reload user data
-                await user?.reload()
+                toast("Please refresh the page to see the changes.")
                 // Close dialog
                 setOpen(false)
             } else {

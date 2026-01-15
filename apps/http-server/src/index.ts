@@ -6,6 +6,7 @@ import rolesRoutes from './routes/roles.js'
 import chatRoutes from './routes/chat.js'
 import generateRoutes from './routes/generatedMessage.js'
 import webhookRoutes from './routes/webhook.js'
+import authRoutes from './routes/auth.js'
 import cors from 'cors'
 import cacheRoutes from './routes/cache.js'
 
@@ -13,11 +14,25 @@ const app = express()
 config()
 
 app.use('/api/webhooks', webhookRoutes)
-app.use(cors())
+
+const allowedOrigins: string[] | string = process.env.ORIGINS || [];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      return callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true
+}));
 
 app.use(express.json())
 const PORT = process.env.PORT
 
+app.use('/api/auth', authRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/templates', templatesRoutes)
 app.use('/api/roles', rolesRoutes)

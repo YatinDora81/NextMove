@@ -1,8 +1,9 @@
 import AppliedPage from "@/ui-pages/AppliedPage";
 import { GET_GENERATED_MESSAGES } from "@/utils/url";
-import { auth } from "@clerk/nextjs/server";
 import { GeneratedMessage } from "@/utils/api_types";
 import type { Metadata } from 'next';
+import { getServerToken } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
     title: 'Applied Jobs | NextMoveApp',
@@ -10,8 +11,12 @@ export const metadata: Metadata = {
 };
 
 export default async function Applied() {
-    const { getToken } = await auth();
-    const token = await getToken({ template: "frontend_token" })
+    const token = await getServerToken()
+
+    if (!token) {
+        redirect("/?popup=login&redirect_url=/applied")
+    }
+
     const res = await fetch(GET_GENERATED_MESSAGES, {
         method: "GET",
         headers: {
@@ -20,13 +25,12 @@ export default async function Applied() {
     })
     const data = await res.json()
     
-    if(!data.success){
+    if (!data.success) {
         return <div>Error: {data.message}</div>
     }
 
-
     return (
-        <AppliedPage  messages={data.data as GeneratedMessage[]} />
+        <AppliedPage messages={data.data as GeneratedMessage[]} />
     )
 }
 

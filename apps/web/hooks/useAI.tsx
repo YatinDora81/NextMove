@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { RoomWithAIChatType } from "@/utils/api_types";
 import { ADD_NEW_MESSAGE, GET_ALL_ROOMS } from "@/utils/url";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth } from "@/hooks/useAuth";
 import { createContext, useContext, useEffect, useState } from "react"
 import toast from "react-hot-toast";
 
@@ -44,7 +44,7 @@ export const AIProvider = ({ children }: { children: React.ReactNode }) => {
     const addNewMessage = async (message: string, roomId: string | null, roomNew: boolean = false, roomPredefinedMessages: string[] | null = null, roomAllMessages: string[] = []) => {
         try {
             setMessageResponseLoading(true);
-            const token = await getToken({ template: "frontend_token" })
+            const token = await getToken()
             if (!token) {
                 throw new Error("Token not found")
             }
@@ -149,7 +149,7 @@ export const AIProvider = ({ children }: { children: React.ReactNode }) => {
     const fetchRooms = async () => {
         setIsAIChatLoading(true);
         try {
-            const token = await getToken({ template: "frontend_token" })
+            const token = await getToken()
             if (!token) {
                 throw new Error("Token not found")
             }

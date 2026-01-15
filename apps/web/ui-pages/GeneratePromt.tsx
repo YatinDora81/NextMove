@@ -23,7 +23,7 @@ import { Role, TemplateType } from '@/utils/api_types'
 import { Roles_AutoComplete } from '@/components/Roles_AutoComplete'
 import { useTemplates } from '@/hooks/useTemplates'
 import toast from 'react-hot-toast'
-import { useAuth, useUser } from '@clerk/nextjs'
+import { useAuth, useUser } from '@/hooks/useAuth'
 import { capitalizeWords } from '@/utils/strings'
 import { GENERATE_MESSAGE } from '@/utils/url'
 import { EditIcon, RefreshCcwIcon } from 'lucide-react'
@@ -140,7 +140,7 @@ function GeneratePromt({ allRoles , predefinedTemplates }: { allRoles: Role[], p
 
     const generateMessage = async (message: string = "") => {
         try {
-            const token = await getToken({ template: "frontend_token" })
+            const token = await getToken()
             if (!token) {
                 throw new Error("Token not found")
             }
