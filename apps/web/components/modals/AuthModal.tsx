@@ -11,7 +11,8 @@ import Image from "next/image"
 import { useAuth } from "@/hooks/useAuth"
 import { useRouter } from "next/navigation"
 import toast from "react-hot-toast"
-import { AUTH_FORGOT_PASSWORD, AUTH_VERIFY_OTP, AUTH_CHANGE_PASSWORD } from "@/utils/url"
+import { AUTH_LOGIN, AUTH_SIGNUP, AUTH_FORGOT_PASSWORD, AUTH_VERIFY_OTP, AUTH_CHANGE_PASSWORD } from "@/utils/url"
+import { setAuthCookiesAction } from "@/lib/auth-actions"
 
 type PopUpType = "login" | "signup" | "forgot-password" | null
 
@@ -88,7 +89,6 @@ function LoginForm({ setPopup, redirectUrl }: { setPopup: (p: PopUpType) => void
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [loading, setLoading] = useState(false)
-    const { signIn } = useAuth()
     const router = useRouter()
 
     const handleGoogleLogin = () => {
@@ -103,18 +103,27 @@ function LoginForm({ setPopup, redirectUrl }: { setPopup: (p: PopUpType) => void
         }
         setLoading(true)
         try {
-            const result = await signIn(email, password)
-            if (result.success) {
+            // Direct client-side API call (like forgot password)
+            const res = await fetch(AUTH_LOGIN, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password })
+            })
+            const data = await res.json()
+            
+            if (data.success) {
+                // Set cookies via server action
+                await setAuthCookiesAction(data.data.token, data.data.user)
                 toast.success("Logged in successfully!")
                 setPopup(null)
                 // Use window.location for full page reload to pick up server-side cookies
                 if (redirectUrl) {
                     window.location.href = redirectUrl
                 } else {
-                    router.refresh()
+                    window.location.reload()
                 }
             } else {
-                toast.error(result.error || "Failed to login")
+                toast.error(data.message || "Failed to login")
             }
         } catch {
             toast.error("Failed to login")
@@ -206,7 +215,6 @@ function SignupForm({ setPopup, redirectUrl }: { setPopup: (p: PopUpType) => voi
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [loading, setLoading] = useState(false)
-    const { signUp } = useAuth()
     const router = useRouter()
 
     const handleGoogleSignup = () => {
@@ -221,18 +229,31 @@ function SignupForm({ setPopup, redirectUrl }: { setPopup: (p: PopUpType) => voi
         }
         setLoading(true)
         try {
-            const result = await signUp(name, email, password)
-            if (result.success) {
+            const nameParts = name.trim().split(" ")
+            const firstName = nameParts[0]
+            const lastName = nameParts.slice(1).join(" ") || ""
+
+            // Direct client-side API call (like forgot password)
+            const res = await fetch(AUTH_SIGNUP, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ firstName, lastName, email, password })
+            })
+            const data = await res.json()
+            
+            if (data.success) {
+                // Set cookies via server action
+                await setAuthCookiesAction(data.data.token, data.data.user)
                 toast.success("Account created successfully!")
                 setPopup(null)
                 // Use window.location for full page reload to pick up server-side cookies
                 if (redirectUrl) {
                     window.location.href = redirectUrl
                 } else {
-                    router.refresh()
+                    window.location.reload()
                 }
             } else {
-                toast.error(result.error || "Failed to create account")
+                toast.error(data.message || "Failed to create account")
             }
         } catch {
             toast.error("Failed to create account")

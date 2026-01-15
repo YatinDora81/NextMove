@@ -1,7 +1,11 @@
 "use server"
 
 import { cookies } from "next/headers"
-import { AUTH_LOGIN, AUTH_SIGNUP, AUTH_FORGOT_PASSWORD, AUTH_VERIFY_OTP, AUTH_CHANGE_PASSWORD } from "@/utils/url"
+import { AUTH_LOGIN, AUTH_SIGNUP, AUTH_FORGOT_PASSWORD, AUTH_VERIFY_OTP, AUTH_CHANGE_PASSWORD, BASE_API } from "@/utils/url"
+
+// Debug: Log the base URL at startup
+console.log("[AUTH] BASE_API:", BASE_API)
+console.log("[AUTH] NEXT_PUBLIC_BASE_URL:", process.env.NEXT_PUBLIC_BASE_URL)
 
 const AUTH_COOKIE_NAME = "nextmove_auth_token"
 const USER_COOKIE_NAME = "nextmove_user"
@@ -22,10 +26,13 @@ type OTPResult = {
  */
 export async function signInAction(email: string, password: string): Promise<AuthResult> {
     try {
+        console.log("[AUTH] Login URL:", AUTH_LOGIN)
+        
         const res = await fetch(AUTH_LOGIN, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email, password }),
+            cache: "no-store",
         })
 
         const data = await res.json()
@@ -64,6 +71,8 @@ export async function signInAction(email: string, password: string): Promise<Aut
  */
 export async function signUpAction(name: string, email: string, password: string): Promise<AuthResult> {
     try {
+        console.log("[AUTH] Signup URL:", AUTH_SIGNUP)
+        
         const nameParts = name.trim().split(" ")
         const firstName = nameParts[0]
         const lastName = nameParts.slice(1).join(" ") || ""
@@ -72,6 +81,7 @@ export async function signUpAction(name: string, email: string, password: string
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ firstName, lastName, email, password }),
+            cache: "no-store",
         })
 
         const data = await res.json()
@@ -112,6 +122,29 @@ export async function signOutAction(): Promise<void> {
     const cookieStore = await cookies()
     cookieStore.delete(AUTH_COOKIE_NAME)
     cookieStore.delete(USER_COOKIE_NAME)
+}
+
+/**
+ * Server action: Set auth cookies (called from client after successful login/signup)
+ */
+export async function setAuthCookiesAction(token: string, user: { id: string; email: string; firstName: string; lastName: string | null }): Promise<void> {
+    const cookieStore = await cookies()
+    
+    cookieStore.set(AUTH_COOKIE_NAME, token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 7,
+        path: "/",
+    })
+
+    cookieStore.set(USER_COOKIE_NAME, JSON.stringify(user), {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 7,
+        path: "/",
+    })
 }
 
 /**
