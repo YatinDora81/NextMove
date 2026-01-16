@@ -52,14 +52,16 @@ export function Roles_AutoComplete({ selectedRole, setSelectedRole, allRoles }: 
                 {allRoles.map((role) => (
                   <CommandItem
                     key={role.id}
-                    value={role.id}
+                    value={role.name}
                     onSelect={(currentValue) => {
-                      if (selectedRole?.id === currentValue) {
+                      // cmdk lowercases the value, so we need to find by name case-insensitively
+                      const selectedRoleData = allRoles.find(
+                        (r) => r.name.toLowerCase() === currentValue.toLowerCase()
+                      )
+                      if (selectedRole?.id === selectedRoleData?.id) {
                         setSelectedRole(null)
-                      }
-                      else {
-                        const selectedRoleData = allRoles.find((role) => role.id === currentValue) as Role
-                        setSelectedRole(selectedRoleData)
+                      } else {
+                        setSelectedRole(selectedRoleData || null)
                       }
                       setOpen(false)
                     }}
