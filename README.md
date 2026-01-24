@@ -4,7 +4,7 @@ A comprehensive job application management platform that helps job seekers strea
 
 ## 🌐 Live Application
 
-**Visit the live application**: [https://nextmove.yatindora.xyz/](https://nextmove.yatindora.xyz/)
+**Visit the live application**: [https://nextmove.yatindora.xyz/](https://nextmove-yatin.vercel.app/)
 
 ## 📋 Table of Contents
 
@@ -226,7 +226,7 @@ NextMoveApp/
    ```
 
 6. **Access the Application**
-   - **Live Application**: [https://nextmove.yatindora.xyz/](https://nextmove.yatindora.xyz/)
+   - **Live Application**: [https://nextmove.yatindora.xyz/](https://nextmove-yatin.vercel.app/)
    - **Local Development**:
      - Frontend: http://localhost:3000
      - Backend API: http://localhost:3001
