@@ -9,6 +9,8 @@ import webhookRoutes from './routes/webhook.js'
 import authRoutes from './routes/auth.js'
 import cors from 'cors'
 import cacheRoutes from './routes/cache.js'
+import { isRedisReady } from './config/redis.js'
+import logger from './config/logger.js'
 
 const app = express()
 config()
@@ -44,10 +46,18 @@ app.get('/', (_, res) => {
     res.status(200).json({
         status: "Ok",
         timestamp: new Date().toISOString(),
+        redis: isRedisReady() ? "connected" : "disconnected",
         message: "Next Move Server is Up!!!"
     })
 })
 
+process.on('unhandledRejection', (reason) => {
+    logger.error(`Unhandled promise rejection: ${reason}`)
+})
+
+process.on('uncaughtException', (error) => {
+    logger.error(`Uncaught exception: ${error?.stack || error}`)
+})
 
 app.listen(PORT, () => {
     console.log(`App is running on ${PORT} PORT`)

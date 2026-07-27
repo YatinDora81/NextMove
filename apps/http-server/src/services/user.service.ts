@@ -1,6 +1,5 @@
 import logger from "@/config/logger.js";
-import { redisClient } from "@/config/redis.js";
-import { getRedis } from "@/utils/redisCommon.js";
+import { getRedis, setRedis } from "@/utils/redisCommon.js";
 import Prisma, { prismaClient } from "@repo/db/db";
 import { createUserSchemaType, deleteUserSchemaType, updateUserDetailsSchemaType } from "@repo/types/ZodTypes";
 
@@ -35,11 +34,8 @@ class UserService {
                 } else throw error
             }
 
-            try {
-                await redisClient.set(`user:${id}`, JSON.stringify(user), { expiration: { type: 'EX', value: 86400 } })
-            } catch (redisError) {
-                logger.error(`${Date.now()} redisError`, redisError)
-            }
+            await setRedis(`user:${id}`, JSON.stringify(user), 86400)
+
             return { user, message: "User Created Successfully" }
         } catch (error) {
             logger.error(`[SERVICE: createUser] Error creating user`, error)
