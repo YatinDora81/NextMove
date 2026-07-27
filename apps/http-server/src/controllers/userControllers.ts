@@ -1,7 +1,6 @@
 import { prismaClient } from '@repo/db/db'
 import { createUserSchema, updatePremiumSchema, updateUserDetailsSchema } from '@repo/types/ZodTypes'
 import { Request, Response } from 'express'
-import { redisClient } from '../config/redis.js'
 import { clearRedis, getRedis, setRedis } from '../utils/redisCommon.js'
 import logger from '../config/logger.js'
 import { updateUserDeatilsClerk } from '@/utils/updateUserDetails.js'

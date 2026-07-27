@@ -5,7 +5,7 @@ import logger from './logger.js'
 config()
 
 const BASE_RECONNECT_DELAY = 1000
-const MAX_RECONNECT_DELAY = 32000
+const MAX_RECONNECT_DELAY = 16000
 const CONNECT_TIMEOUT = 10000
 const PING_INTERVAL = 30000
 
