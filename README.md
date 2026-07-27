@@ -1,224 +1,649 @@
-# NextMoveApp 🚀
+# NextMoveApp
 
-A comprehensive job application management platform that helps job seekers streamline their application process through AI-powered message generation, template management, and application tracking.
+> An AI-powered job application management platform that helps job seekers craft personalized recruiter messages, manage reusable templates, track applications, and accelerate the path to their next role.
 
-## 🌐 Live Application
+**Live App:** https://nextmove-yatin.vercel.app/
 
-**Visit the live application**: [https://nextmove.yatindora.xyz/](https://nextmove-yatin.vercel.app/)
+**Visit the live application**: [https://nextmove-yatin.vercel.app/](https://nextmove-yatin.vercel.app/)
+---
 
-## 📋 Table of Contents
+## Table of Contents
 
-- [Overview](#overview)
-- [Features](#features)
+- [Project Overview](#project-overview)
+- [Core Features (In Detail)](#core-features-in-detail)
+- [Architecture at a Glance](#architecture-at-a-glance)
 - [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
-- [Getting Started](#getting-started)
-- [API Documentation](#api-documentation)
+- [Monorepo Layout](#monorepo-layout)
 - [Database Schema](#database-schema)
+- [Authentication System](#authentication-system)
+- [API Reference](#api-reference)
+- [Caching Strategy (Redis)](#caching-strategy-redis)
+- [AI Integration (Google Gemini)](#ai-integration-google-gemini)
+- [Frontend Architecture](#frontend-architecture)
+- [Middleware & Authorization](#middleware--authorization)
+- [Environment Variables](#environment-variables)
+- [Local Development Setup](#local-development-setup)
+- [Build, Lint, and Type-check](#build-lint-and-type-check)
+- [Database Migrations & Seeding](#database-migrations--seeding)
+- [Deployment Notes](#deployment-notes)
+- [Project Complexity Breakdown](#project-complexity-breakdown)
+- [Roadmap / Possible Improvements](#roadmap--possible-improvements)
 - [Contributing](#contributing)
 - [License](#license)
 
-## 🎯 Overview
+---
 
-NextMoveApp is a full-stack web application designed to simplify the job application process. It combines AI-powered message generation with template management and application tracking to help job seekers create personalized, professional communications with recruiters and employers.
+## Project Overview
 
-### Key Benefits
+NextMoveApp is a **full-stack TypeScript monorepo** built around the recurring pain points of an active job-seeker:
 
-- **AI-Powered Message Generation**: Create personalized messages for job applications
-- **Template Management**: Store and reuse message templates
-- **Application Tracking**: Keep track of all your job applications
-- **Professional Communication**: Ensure consistent, professional messaging
-- **User-Friendly Interface**: Modern, responsive design with dark/light theme support
+1. Writing personalized but professional outreach messages over and over again.
+2. Keeping track of which templates work for which roles.
+3. Maintaining a history of who they messaged, for what role, at which company.
+4. Iterating on outreach with AI without losing the user's voice.
 
-## ✨ Features
+The app combines:
 
-### 🤖 AI Chat & Message Generation
-- Interactive AI chat interface for generating personalized messages
-- Support for both simple messages and email formats
-- Context-aware message generation based on job role, company, and recruiter
-- Real-time conversation flow with option-based selections
-- **AI Template Generator**: Create ready-to-use templates with AI
-  - Generates short, direct messages (4-5 lines max)
-  - Automatically selects relevant technologies based on role
-  - Direct referral/job inquiry focused messaging
-  - Smart template naming based on user's prompt context
+- A **Next.js 15 (App Router)** front end with custom-themed Tailwind 4 UI, motion animations, Radix UI primitives, and a fully custom marketing landing page.
+- An **Express 5 + TypeScript** REST API on Node.js, secured with JWT and gated by tier (free vs. premium) and role (admin).
+- A **PostgreSQL + Prisma** persistence layer modeled around Users, Templates, AI Templates, Generated Messages, Roles, Companies, and a Chat Room/Message structure.
+- **Google Gemini (`@google/genai`)** for two distinct generative flows: per-message generation and full template generation.
+- **Redis** for hot-path caching of premium status, generated messages, and shared / common templates.
+- **Nodemailer + Gmail SMTP** wrapped behind an internal-secret-protected Next.js API route to deliver branded HTML OTP emails.
+- A **Clerk → custom-JWT migration**: Clerk webhooks are still wired in, but the primary login/signup is now a self-hosted email + password + OTP flow with bcrypt hashing.
 
-### 📝 Template Management
-- Create, edit, and delete message templates
-- **AI-Powered Template Generation**: Generate templates using AI based on role and context
-- Filter templates by type (Email, Message, All)
-- Categorize templates by job roles for easy organization
-- Smart placeholder system: `[Recruiter Name]`, `[MY NAME]`, `[Company Name]`
-- **Interactive examples**: Rotating example messages to guide template creation
-- **Context-aware naming**: Auto-generates names like "Friend Referral - Full Stack", "Senior Referral - Frontend"
-- "How to use" guide with placeholder explanations
+---
 
-### 📊 Application Tracking
-- Track all job applications in one place
-- View application history with company, role, and status information
-- Monitor application progress and outcomes
-- Export application data for record keeping
+## Core Features (In Detail)
 
-### 👤 User Management
-- Secure authentication with Clerk
-- User profile management
-- Role-based access control
-- Personalized dashboard
+### 1. Custom Authentication (Email + Password + OTP)
 
-### 🎨 Modern UI/UX
-- **Landing Page**: Beautiful, conversion-optimized homepage with hero section, features, testimonials, and CTA
-- Responsive design for all devices (mobile-first approach)
-- Dark and light theme support with automatic theme switching
-- Modern component library with Radix UI primitives
-- Smooth animations and transitions using CSS and Tailwind
-- Accessibility-first design with ARIA labels and keyboard navigation
-- Custom typography with Geist font family
-- Interactive elements with hover states and micro-interactions
+A complete, self-hosted auth system built end-to-end:
 
-## 🛠 Tech Stack
+- **Signup** — Zod-validated, bcrypt-hashed (12 rounds), JWT-signed (7-day expiry), automatic cookie issue.
+- **Login** — Email + password with case-insensitive email matching and graceful messaging when a user originally signed up via social login (no password set).
+- **Forgot Password / OTP Flow** — 3-step state machine:
+  1. `POST /api/auth/forgot-password` → generates a 6-digit OTP, persists to `PasswordReset` with a 10-minute expiry, and emails a branded HTML OTP template.
+  2. `POST /api/auth/verify-otp` → validates the OTP, returns a short-lived `resetToken` (5-minute expiry).
+  3. `POST /api/auth/change-password` → consumes the `resetToken`, marks the row as `used`, and writes a new bcrypt hash.
+- **Cookie strategy** — `nextmove_auth_token` (HttpOnly, Secure in prod, `sameSite: lax`, 7-day) for the JWT, plus `nextmove_user` (non-HttpOnly, JSON-serialized) for client-side UI hydration.
+- **Route protection** — `apps/web/middleware.ts` matches on `/generate`, `/templates`, `/applied`, `/ai-chat`, `/dashboard`, `/forum`, `/on-boarding` and redirects unauthenticated visitors to `/?popup=login&redirect_url=…` so they can sign in inline and bounce back.
+- **Popup-based UI** — All auth flows are URL-driven via `?popup=login|signup|forgot-password`, which means deep-linking, sharing, and back-button behavior all work.
+- **Internal email API** — Backend never holds SMTP credentials directly; instead it calls the Next.js `/api/internal/send-email` route protected by a shared `INTERNAL_API_SECRET` header, keeping the email surface inside one runtime.
+- **Clerk fallback** — Clerk is still installed (`@clerk/nextjs`, `@clerk/backend`) and the `/api/webhooks/clerk` route handles `user.created`, `user.updated`, and `user.deleted` events via Svix verification, so users provisioned through Clerk continue to sync into the local `Users` table.
 
-### Frontend
-- **Framework**: Next.js 15 with App Router
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS 4.x with custom utilities
-- **UI Components**: Radix UI primitives, custom components
-- **Icons**: Lucide React (Sparkles, MessageSquare, BarChart3, Zap, Users, etc.)
-- **Animations**: Motion (Framer Motion) for smooth UI animations
-- **Images**: Next.js Image optimization with dark/light mode variants
-- **Typography**: Geist font family (GeistVF, GeistMonoVF)
-- **Authentication**: Clerk with protected routes
-- **State Management**: React hooks and context API
-- **Landing Page**: Custom-built marketing page with sections:
-  - Hero with animated backgrounds
-  - Feature showcase
-  - Product demo (browser mockup)
-  - Statistics/metrics
-  - How it works
-  - Use cases
-  - Testimonials
-  - CTA sections
-  - Footer with navigation
+### 2. AI Message Generation
 
-### Backend
-- **Runtime**: Node.js with Express.js
-- **Language**: TypeScript
-- **Database**: PostgreSQL with Prisma ORM
-- **Authentication**: Clerk Backend
-- **AI Integration**: Google Gemini AI
-- **Caching**: Redis
-- **Logging**: Winston
-- **Validation**: Zod schemas
+- Built on **Google Gemini** through `@google/genai`.
+- Prompt-engineered with a multi-section system prompt (`apps/http-server/src/utils/ai-chat-Instruction.ts`) that:
+  - Forces strict JSON output (no markdown fences) for reliable parsing.
+  - Distinguishes "Message" (single-paragraph LinkedIn DM) vs. "Email" (multi-paragraph) format.
+  - Detects follow-ups by inspecting `predefinedMessages` and `previousMessages`, and rephrases instead of duplicating prior text.
+  - Auto-derives a chat-room name (e.g. `"Ram Google Follow-up"`) and description on first turn.
+  - Reformulates casual/typo'd user inputs ("what aboud hr round") into polished outreach.
+- All generations are persisted in `GeneratedMessages`, linked to the originating `Templates`, `Role`, `Company`, and `Users` rows.
+- Caching: list endpoint reads through `generated-{userId}` Redis key; the writer invalidates that key on every new generation.
 
-### Development Tools
-- **Package Manager**: pnpm
-- **Monorepo**: Turborepo
-- **Linting**: ESLint
-- **Type Checking**: TypeScript
-- **Build Tool**: Next.js with Turbopack
+### 3. AI Template Generator
 
-## 📁 Project Structure
+- A second, distinct Gemini prompt (`template-instruction.ts`) tuned specifically for **referral / job-inquiry templates**:
+  - Hard cap of 4–5 lines for `MESSAGE` type, 6–8 for `EMAIL`.
+  - Allowed placeholders are strictly `[Recruiter Name]` and `[MY NAME]`. Any other "fill-in" placeholder is forbidden.
+  - The model picks role-appropriate technologies inline (e.g. "React, Node.js, and PostgreSQL" for Full Stack, "Docker, Kubernetes, and AWS" for DevOps) — no `[mention tech]` blanks.
+  - Returns `{ message, rules, templateName, templateDescription }` so the UI can immediately surface a context-aware name like "Friend Referral - Full Stack" or "Senior Referral - Frontend".
+- Stored in a dedicated `AiTemplate` table with `prompt`, `history[]`, `roleName`, `roleNameId`, and `rules[]`, enabling iterative refinement (the user can keep typing follow-up prompts and the model sees the full history).
+- Gated behind `isPremium` middleware.
+
+### 4. Template Management
+
+- CRUD endpoints under `/api/templates` for user-owned templates.
+- Soft-delete via `isDeleted` flag (no row-level loss).
+- `isCommon` flag for shared/common templates that any user can read; cached at `common-templates`.
+- `createdBy` enum (`SELF` | `AI`) so the UI can badge AI-generated templates differently.
+- `TemplateRules` 1-to-many sub-table for free-form rules attached to a template (used by the placeholder substitution UI).
+- Bulk upload endpoint (`/add-template-bulk`, admin-only) used by the seed script.
+- Filter, categorize by job role, and filter by type (`EMAIL` / `MESSAGE`).
+
+### 5. Application Tracking ("Applied")
+
+- Every generated message is effectively a tracked application: who you messaged, for which role, at which company, with which template, and on what date.
+- The "Applied" page (`apps/web/app/applied/page.tsx`) is the read view over `GeneratedMessages` joined to `Role`, `Company`, and `Templates`.
+
+### 6. AI Chat (Premium)
+
+- Persistent conversation rooms (`Room`) with messages (`Message`) tagged by `MessageBy` (`AI` | `SELF`).
+- Predefined message starters per room (`predefinedMessages: String[]`) so the user can fire off a "Follow Up" or "Generate" with one tap.
+- Gated behind `authenticateUser` + `isPremium` middleware chain.
+
+### 7. Roles & Companies
+
+- `Role` is a first-class entity with name + description; admin-only create/delete (`isAdmin`).
+- `Company` is auto-created per generation flow and tied back to the user who first added it.
+- Both are reused as foreign keys across templates and generated messages so analytics/grouping is trivial.
+
+### 8. Admin & Premium Tiers
+
+- **Admin** is configured via the `ADMIN_EMAILS` env var — any email in that list passes `isAdmin`.
+  Admin-only actions: bulk template insert, role create/delete, cache flush, user list, premium toggle.
+- **Premium** is a per-user `isPaid` boolean. The `isPremium` middleware reads through Redis (`premium:{userId}`, 24-hour TTL), so toggling premium-only features stays cheap on the hot path.
+
+### 9. Themed UI & Landing Page
+
+- Marketing landing page with hero, animated background, dark/light product-screenshot GIFs, stats, feature grid, "How it works", use cases, testimonials, multiple CTAs, and a footer.
+- Custom resizable navbar (`components/ui/resizable-navbar.tsx`) that collapses on scroll.
+- Mobile-first, fully responsive (`text-3xl` on mobile → `text-7xl` on desktop, etc.).
+- `next-themes` for dark/light mode with no flash on hydration.
+- Geist + Geist Mono custom fonts.
+- Toast notifications via `react-hot-toast`, theme-aware (`ThemeAwareToaster`).
+
+---
+
+## Architecture at a Glance
 
 ```
-NextMoveApp/
+                      ┌────────────────────────────┐
+                      │       Browser (User)       │
+                      └──────────────┬─────────────┘
+                                     │  HTTPS
+                                     ▼
+                ┌─────────────────────────────────────────┐
+                │   Next.js 15 (App Router) — apps/web    │
+                │   • Landing + protected pages           │
+                │   • Auth modals via ?popup=… URLs       │
+                │   • middleware.ts route guard           │
+                │   • /api/internal/send-email (SMTP)     │
+                └──────────────┬──────────────────────────┘
+                               │  fetch + Bearer JWT
+                               ▼
+                ┌─────────────────────────────────────────┐
+                │ Express 5 API — apps/http-server        │
+                │   • /api/auth   (JWT + bcrypt + OTP)    │
+                │   • /api/users  /templates  /roles      │
+                │   • /api/generate  /chat  /cache        │
+                │   • /api/webhooks/clerk (Svix verified) │
+                │   • Middleware: authenticate / isAdmin  │
+                │                  / isPremium            │
+                └──┬──────────────────┬─────────────────┬─┘
+                   │                  │                 │
+                   ▼                  ▼                 ▼
+        ┌───────────────────┐ ┌───────────────┐ ┌────────────────┐
+        │  Postgres (Prisma)│ │  Redis cache  │ │  Google Gemini │
+        │  Users, Templates │ │  premium:*    │ │  text-gen API  │
+        │  GeneratedMessages│ │  generated-*  │ │                │
+        │  Role, Company,   │ │  common-*     │ └────────────────┘
+        │  Room, Message,   │ └───────────────┘
+        │  AiTemplate, etc. │
+        └───────────────────┘
+```
+
+---
+
+## Tech Stack
+
+### Frontend (`apps/web`)
+
+| Concern              | Choice                                                                 |
+| -------------------- | ---------------------------------------------------------------------- |
+| Framework            | **Next.js 15.5.9** (App Router, Turbopack dev)                         |
+| Language             | TypeScript 5.9.2                                                       |
+| Styling              | Tailwind CSS 4.1, `tw-animate-css`, `class-variance-authority`, `clsx` |
+| Component primitives | Radix UI (Dialog, DropdownMenu, Tabs, Popover, AlertDialog, …)         |
+| Icons                | `lucide-react`, `@tabler/icons-react`, `react-icons`                   |
+| Animation            | `motion` (Framer Motion successor)                                     |
+| Forms                | Custom forms + Zod 4 schemas                                           |
+| State                | React 19 hooks; small custom hooks (`useAuth`, `usePopUp`, `useAI`, …) |
+| HTTP                 | `axios` 1.12                                                           |
+| Theme                | `next-themes`                                                          |
+| Toast                | `react-hot-toast`                                                      |
+| Email (server route) | `nodemailer` 7                                                         |
+| Auth UI              | `@clerk/nextjs` (legacy), custom AuthModal (primary)                   |
+| Command UI           | `cmdk`                                                                 |
+
+### Backend (`apps/http-server`)
+
+| Concern         | Choice                                          |
+| --------------- | ----------------------------------------------- |
+| Runtime         | Node.js ≥ 18 (Dockerfile pins `node:24-alpine`) |
+| Framework       | Express 5.1                                     |
+| Language        | TypeScript 5 with `tsc-alias` path aliasing     |
+| Auth            | `jsonwebtoken` 9, `bcrypt` 6 (12 rounds)        |
+| Validation      | Zod 4 (shared via `@repo/types`)                |
+| ORM             | Prisma 6.16 (Postgres)                          |
+| Cache           | `redis` 5.8                                     |
+| AI              | `@google/genai` 1.22 (Gemini)                   |
+| Logging         | Winston 3                                       |
+| Webhook signing | `svix` 1.77 (Clerk)                             |
+| Dev runner      | `tsx` 4 + `tsc -b` build                        |
+
+### Shared packages
+
+- `@repo/db` — single Prisma client export consumed by every app.
+- `@repo/types` — Zod schemas + inferred TS types (`createTemplateSchema`, `signUpSchema`, `authTokenSchemaType`, …) keeping FE/BE in lockstep.
+- `@repo/ui` — common React components (`button`, `card`, `code`).
+- `@repo/eslint-config`, `@repo/typescript-config` — shared lint and tsconfig presets.
+
+### Tooling / Build
+
+- **Monorepo:** Turborepo 2.5 + pnpm 10.17 workspaces.
+- **Lint:** ESLint 9 (`next lint --max-warnings 0`).
+- **Format:** Prettier 3.6.
+- **Type-check:** `turbo run check-types` → `tsc --noEmit` per app.
+- **Container:** `docker/Dockerfile.backend` (Alpine, Node 24).
+
+---
+
+## Monorepo Layout
+
+```
+NextMove/
 ├── apps/
-│   ├── web/                    # Next.js frontend application
-│   │   ├── app/                # App Router pages
-│   │   │   ├── page.tsx        # Landing page (marketing homepage)
-│   │   │   ├── ai-chat/        # AI chat interface
-│   │   │   ├── applied/        # Application tracking
-│   │   │   ├── generate/       # Message generation
-│   │   │   ├── templates/      # Template management
-│   │   │   ├── api/            # API routes
-│   │   │   └── layout.tsx      # Root layout
-│   │   ├── components/         # Reusable UI components
-│   │   │   ├── modals/         # Modal components
-│   │   │   ├── ui/             # Base UI components (Radix UI)
+│   ├── web/                          Next.js 15 frontend
+│   │   ├── app/
+│   │   │   ├── page.tsx              Marketing landing page
+│   │   │   ├── layout.tsx            Root layout, ThemeProvider, Toaster
+│   │   │   ├── ai-chat/              Premium AI chat rooms
+│   │   │   ├── applied/              Application history
+│   │   │   ├── generate/             Single-shot message generator
+│   │   │   ├── templates/            Template library + AI generator
+│   │   │   ├── api/
+│   │   │   │   ├── auth/             (placeholder routes — kept for future)
+│   │   │   │   └── internal/send-email/route.ts   Nodemailer endpoint
+│   │   │   ├── not-found.tsx
+│   │   │   └── globals.css           Tailwind 4 + custom CSS variables
+│   │   ├── components/
+│   │   │   ├── modals/               AuthModal, AlertModal, Gen_AI_Template, …
+│   │   │   ├── ui/                   shadcn-style Radix wrappers
+│   │   │   ├── NextMove_Navbar.tsx
+│   │   │   ├── Roles_AutoComplete.tsx
+│   │   │   ├── theme-provider.tsx
+│   │   │   ├── ThemeAwareToaster.tsx
 │   │   │   └── GetStartedButton.tsx
-│   │   ├── lib/                # Utility functions
-│   │   │   └── utils.ts        # Helper functions (cn, etc.)
-│   │   ├── public/             # Static assets
-│   │   │   ├── dark.gif        # Dark mode showcase image
-│   │   │   └── light.gif       # Light mode showcase image
-│   │   └── globals.css         # Global styles
-│   └── http-server/            # Express.js backend API
+│   │   ├── hooks/                    useAuth, useAI, usePopUp, useTemplates, useDevice
+│   │   ├── lib/                      auth.ts, auth-actions.ts, email.ts, toast.tsx, utils.ts
+│   │   ├── ui-pages/                 Page-level container components
+│   │   ├── utils/                    api_types.ts, url.ts, types.ts, strings.ts
+│   │   ├── middleware.ts             Route guard
+│   │   ├── next.config.js
+│   │   └── postcss.config.mjs
+│   │
+│   └── http-server/                  Express 5 API
 │       ├── src/
-│       │   ├── controllers/    # Route controllers
-│       │   ├── middleware/     # Express middleware
-│       │   ├── repository/     # Data access layer
-│       │   ├── routes/         # API routes
-│       │   └── utils/          # Utility functions
-│       └── dist/               # Compiled JavaScript
+│       │   ├── index.ts              App bootstrap, CORS, route mounting
+│       │   ├── config/               logger (Winston), redis client
+│       │   ├── controllers/          auth, user, template, role, chat, generatedMessage, cache
+│       │   ├── repository/           Prisma data-access per domain
+│       │   ├── routes/               Express Routers (one per domain)
+│       │   ├── services/             user.service.ts (Clerk-sync helpers)
+│       │   ├── middleware/           authenticateUser, isAdmin, isPremium
+│       │   └── utils/                ai-chat-Instruction, template-instruction, redisCommon, …
+│       ├── logs/                     Winston rotating logs
+│       └── tsconfig.json
+│
 ├── packages/
-│   ├── db/                     # Prisma database package
-│   ├── Types/                  # Shared TypeScript types
-│   ├── eslint-config/          # ESLint configurations
-│   ├── typescript-config/      # TypeScript configurations
-│   └── ui/                     # Shared UI components
-└── docs/                       # Documentation
+│   ├── db/                           Prisma schema + generated client
+│   │   ├── prisma/
+│   │   │   ├── schema.prisma
+│   │   │   └── migrations/           13 timestamped migrations
+│   │   └── src/index.ts              Singleton PrismaClient export
+│   ├── Types/                        Zod schemas + inferred types
+│   ├── ui/                           Shared React components
+│   ├── eslint-config/
+│   └── typescript-config/
+│
+├── scripts/
+│   └── seed-roles-templates.js       Generates role-specific templates via Gemini
+├── docker/
+│   └── Dockerfile.backend
+├── turbo.json
+├── pnpm-workspace.yaml
+└── package.json
 ```
 
-## 🚀 Getting Started
+---
+
+## Database Schema
+
+PostgreSQL via Prisma 6. Source of truth: `packages/db/prisma/schema.prisma`.
+
+### Models
+
+| Model                | Purpose                                                                 | Key fields                                                                                                                                                      |
+| -------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Users**            | Account, profile, premium flag, parent of every user-owned record.      | `id`, `email` (unique), `password?` (bcrypt), `firstName`, `lastName?`, `profilePic?`, `isPaid`, timestamps. Indexed on `(id, email)`.                          |
+| **PasswordReset**    | Stateful OTP and reset-token flow.                                      | `userId`, `otp`, `resetToken?`, `expiresAt`, `used`. Cascading delete with `Users`. Indexed on `userId` and `otp`.                                              |
+| **Templates**        | Reusable user templates (or AI-created).                                | `name`, `description?`, `type` (`MESSAGE` / `EMAIL`), `content`, `role` FK, `user` FK, `isDeleted`, `isCommon`, `createdBy` (`SELF` / `AI`), `TemplateRules[]`. |
+| **TemplateRules**    | Free-form rules / placeholder hints attached to a template.             | `rule`, `templateId` FK.                                                                                                                                        |
+| **AiTemplate**       | Iterative AI-generated drafts before the user saves to `Templates`.    | `message`, `rules[]`, `templateName`, `templateDescription?`, `history[]`, `prompt`, `roleName`, `roleNameId`, `userId`.                                        |
+| **GeneratedMessages**| Every AI-generated outreach message, fully linked.                      | `recruiterName?`, `role` FK, `template` FK, `company` FK, `user` FK, `message`, `gender?`, `messageType` enum, timestamps.                                      |
+| **Role**             | Job role taxonomy (e.g. "Frontend Developer").                          | `name`, `desc?`, plus relations to `Templates`, `Company`, `GeneratedMessages`.                                                                                 |
+| **Company**          | Companies the user has reached out to.                                  | `name`, `createdBy` FK, `roles[]`.                                                                                                                              |
+| **Resumes**          | Stored resume references per user.                                      | `name`, `link`, `userId` FK. Indexed on `userId`.                                                                                                               |
+| **Room**             | Persistent AI chat conversation.                                        | `name`, `description`, `predefinedMessages[]`, `userId` FK.                                                                                                     |
+| **Message**          | Individual chat turns.                                                  | `message`, `by` enum (`AI` / `SELF`), `userId`, `roomId`.                                                                                                       |
+
+### Enums
+
+- `MessageBy { AI, SELF }`
+- `MessageType { EMAIL, MESSAGE }`
+- `CreatedBy { AI, SELF }`
+
+### Relationship summary
+
+- A **User** owns many Resumes, Templates, AiTemplates, GeneratedMessages, Rooms, Messages, Companies, and PasswordResets.
+- A **Template** belongs to a User and a Role, has many TemplateRules, and is referenced by many GeneratedMessages.
+- A **GeneratedMessage** points at exactly one Template, Role, Company, and User — a fully traceable application record.
+
+### Migration history (13 migrations)
+
+Captures the project's evolution: initial schema → generated messages → soft-delete → AI templates → auth (Jan 2026).
+
+---
+
+## Authentication System
+
+### Token model
+
+- **JWT** signed with `JWT_SECRET`, 7-day expiry.
+- Payload mirrors `authTokenSchemaType` (shared from `@repo/types`):
+  ```
+  { user_id, email, full_name, azp, iss, sub, image_url, phone_number }
+  ```
+- Authorization header: `Authorization: Bearer <token>`.
+- Middleware (`authenticateUser`) verifies, attaches `req.user`, and returns `401` with explicit `TokenExpiredError` / `JsonWebTokenError` discrimination so the client can distinguish "session expired" from "tampered".
+
+### Cookie model
+
+| Cookie                | HttpOnly | Purpose                          | Expiry  |
+| --------------------- | -------- | -------------------------------- | ------- |
+| `nextmove_auth_token` | yes      | JWT, sent to backend             | 7 days  |
+| `nextmove_user`       | no       | Hydrate UI without an extra fetch | 7 days  |
+
+Cookies are flagged `secure` when `NODE_ENV === "production"` and use `sameSite: "lax"`.
+
+### Validation rules (Zod)
+
+| Field      | Rule                          |
+| ---------- | ----------------------------- |
+| firstName  | required, 1–50 chars          |
+| lastName   | optional, ≤ 50 chars          |
+| email      | required, valid email         |
+| password   | required, 6–100 chars         |
+| otp        | required, exactly 6 digits    |
+| resetToken | required                      |
+
+### Security posture
+
+1. bcrypt with **12 rounds** (cost calibrated for ~250 ms/hash).
+2. JWT secrets enforced at startup — `signup` throws if `JWT_SECRET` is missing.
+3. OTP TTL 10 minutes; reset-token TTL 5 minutes.
+4. `PasswordReset.used = true` after consumption (single-use).
+5. `INTERNAL_API_SECRET` gate on the email API so only the backend can trigger SMTP.
+6. CORS allowlist via `ORIGINS` env var, with credentials enabled.
+
+---
+
+## API Reference
+
+> Base URL = `process.env.NEXT_PUBLIC_BASE_URL` (e.g. `http://localhost:3001`).
+> All non-auth routes require `Authorization: Bearer <jwt>`.
+
+### Auth — `/api/auth`
+
+| Method | Path                | Auth   | Description                                                                       |
+| ------ | ------------------- | ------ | --------------------------------------------------------------------------------- |
+| POST   | `/signup`           | public | Create user. Returns `{ user, token }`.                                           |
+| POST   | `/login`            | public | Email + password. Returns `{ user, token }`.                                      |
+| POST   | `/forgot-password`  | public | Generate + email a 6-digit OTP.                                                   |
+| POST   | `/verify-otp`       | public | Validate OTP, return short-lived `resetToken`.                                    |
+| POST   | `/change-password`  | public | Consume `resetToken`, persist new bcrypt hash.                                    |
+
+### Users — `/api/users`
+
+| Method | Path                     | Auth         | Description                                  |
+| ------ | ------------------------ | ------------ | -------------------------------------------- |
+| POST   | `/create-user`           | JWT          | Idempotent local user provisioning.          |
+| POST   | `/update-user-details`   | JWT          | Update profile.                              |
+| GET    | `/is_premium`            | JWT          | Returns `isPaid` for current user.           |
+| POST   | `/update-premium`        | JWT + admin  | Toggle premium status.                       |
+| GET    | `/users`                 | JWT + admin  | List all users.                              |
+
+### Templates — `/api/templates`
+
+| Method | Path                      | Auth                | Description                                           |
+| ------ | ------------------------- | ------------------- | ----------------------------------------------------- |
+| GET    | `/get-templates`          | JWT                 | List user templates.                                  |
+| POST   | `/add-template`           | JWT                 | Create.                                               |
+| PUT    | `/update-template`        | JWT                 | Update.                                               |
+| DELETE | `/delete-template`        | JWT                 | Soft-delete (`isDeleted = true`).                     |
+| GET    | `/get-common-templates`   | JWT                 | List `isCommon = true` templates (cached).            |
+| POST   | `/add-template-bulk`      | JWT + admin         | Used by the seed script.                              |
+| POST   | `/ai-generate-template`   | JWT + premium       | Calls Gemini with `template-instruction.ts` prompt.   |
+
+### Roles — `/api/roles`
+
+| Method | Path           | Auth          | Description                |
+| ------ | -------------- | ------------- | -------------------------- |
+| GET    | `/get-roles`   | JWT           | List all roles.            |
+| POST   | `/create-role` | JWT + admin   | Create role.               |
+| DELETE | `/delete-role` | JWT + admin   | Delete role.               |
+
+### Generate — `/api/generate`
+
+| Method | Path                      | Auth | Description                                          |
+| ------ | ------------------------- | ---- | ---------------------------------------------------- |
+| POST   | `/generate-message`       | JWT  | Calls Gemini, persists `GeneratedMessages` row.      |
+| GET    | `/get-generated-messages` | JWT  | List, cached at `generated-{userId}`.                |
+
+### Chat — `/api/chat` (premium)
+
+| Method | Path             | Auth             | Description                  |
+| ------ | ---------------- | ---------------- | ---------------------------- |
+| GET    | `/get-all-chats` | JWT + premium    | List user rooms.             |
+| POST   | `/create-chat`   | JWT + premium    | Create room + first message. |
+
+### Cache — `/api/cache`
+
+| Method | Path               | Auth          | Description                    |
+| ------ | ------------------ | ------------- | ------------------------------ |
+| DELETE | `/clear-all-cache` | JWT + admin   | Flush all Redis keys (ops only). |
+
+### Webhooks — `/api/webhooks`
+
+| Method | Path     | Description                                                                 |
+| ------ | -------- | --------------------------------------------------------------------------- |
+| POST   | `/clerk` | Svix-verified Clerk webhook handling `user.created` / `updated` / `deleted`. |
+
+### Internal (Next.js) — `/api/internal`
+
+| Method | Path          | Auth                  | Description                       |
+| ------ | ------------- | --------------------- | --------------------------------- |
+| POST   | `/send-email` | `x-internal-secret`   | Sends OTP or generic email via SMTP. |
+
+---
+
+## Caching Strategy (Redis)
+
+Wrappers in `utils/redisCommon.ts` (`getRedis`, `setRedis`, `clearRedis`) all swallow errors and log via Winston so a Redis outage degrades gracefully (cache miss → DB hit) instead of breaking the request.
+
+| Key                          | Value                              | TTL      | Invalidation                            |
+| ---------------------------- | ---------------------------------- | -------- | --------------------------------------- |
+| `premium:{userId}`           | `{ isPaid }` JSON                  | 24 h     | TTL only.                               |
+| `generated-{userId}`         | List of generated messages         | n/a      | Cleared on every new generation.        |
+| `common-templates`           | Common templates payload           | n/a      | Admin via `/clear-all-cache`.           |
+
+---
+
+## AI Integration (Google Gemini)
+
+Two carefully separated prompts:
+
+1. **`ai-chat-Instruction.ts`** — outreach **message** generator.
+   - Forces strict-JSON `{ new_message, name?, description? }`.
+   - Distinguishes "Generate / Follow Up" intent.
+   - Reformulates colloquial user input into recruiter-ready prose.
+   - Auto-generates short, structured room names like `"Sarah Google Application"`.
+
+2. **`template-instruction.ts`** — reusable **template** generator.
+   - Forces strict-JSON `{ message, rules, templateName, templateDescription }`.
+   - Hard length limits, role-aware tech-stack inlining, only `[Recruiter Name]` and `[MY NAME]` placeholders allowed.
+   - History-aware iterative refinement.
+
+Both prompts are designed for **deterministic JSON parsing** — no markdown fences — and the controllers fail fast with a `400` if the model returns malformed JSON.
+
+---
+
+## Frontend Architecture
+
+### Page surface
+
+| Path        | Layout                       | Notes                                                                |
+| ----------- | ---------------------------- | -------------------------------------------------------------------- |
+| `/`         | Public marketing             | Hero, stats, features, demo, "How it works", testimonials, CTAs.     |
+| `/generate` | Authenticated                | Single-shot generator (paste job + role + recruiter → message).      |
+| `/templates`| Authenticated                | Template library, filters, AI template modal.                        |
+| `/ai-chat`  | Authenticated + premium      | Multi-turn AI conversation with persistent rooms.                    |
+| `/applied`  | Authenticated                | Read view of `GeneratedMessages` joined to role/company/template.    |
+
+### Hooks
+
+- **`useAuth`** — `signIn`, `signUp`, `signOut`, `getToken`, plus a `useUser` companion (`isSignedIn`, `isLoaded`, `user`).
+- **`usePopUp`** — URL-param-driven modal state (`?popup=login|signup|forgot-password`) with `redirect_url` support so deep-link flows survive auth.
+- **`useAI`** — wraps Gemini-backed endpoints with loading/error state.
+- **`useTemplates`** — fetch + mutate templates with optimistic cache busting.
+- **`useDevice`** — viewport and pointer detection for the resizable navbar.
+
+### UI primitives
+
+`components/ui/` contains shadcn-style wrappers around Radix UI: `dialog`, `dropdown-menu`, `tabs`, `popover`, `alert-dialog`, `accordion`, `select`, `radio-group`, `checkbox`, `switch`, `progress`, `command`, `card`, `button`, `input`, `label`, `textarea`, `table`, `resizable-navbar`, plus a `shadcn-io/` namespace.
+
+### Modals
+
+- `AuthModal.tsx` — login / signup / forgot-password / OTP / change-password as a single mounted component driven by `?popup=…`.
+- `Gen_AI_Template.tsx` — premium AI template generation with prompt history and iterative refinement.
+- `TemplateOpeartion.tsx` — create/edit/delete template flows.
+- `ShowMessage.tsx` — view a generated message with copy-to-clipboard.
+- `EditName.tsx`, `AutoCompleteSearch.tsx`, `AlertModal.tsx`.
+
+---
+
+## Middleware & Authorization
+
+Three layered middlewares in `apps/http-server/src/middleware/`:
+
+1. **`authenticateUser`** — decodes JWT, attaches `req.user`. Differentiates between expired/invalid/server errors.
+2. **`isAdmin`** — checks `user.email ∈ ADMIN_EMAILS`.
+3. **`isPremium`** — read-through Redis (`premium:{userId}`, 24 h) before falling back to Postgres.
+
+Route mounting in `index.ts` keeps the chains explicit, e.g. `router.post('/ai-generate-template', authenticateUser, isPremium, …)`.
+
+CORS is allowlisted via `process.env.ORIGINS` and accepts only configured origins (with credentials).
+
+---
+
+## Environment Variables
+
+### `apps/web/.env`
+
+```env
+# Frontend → Backend
+NEXT_PUBLIC_BASE_URL=http://localhost:3001
+
+# Internal email API
+INTERNAL_API_SECRET=<generate via: openssl rand -hex 32>
+
+# SMTP (Gmail App Password)
+MAIL_USER=your-email@gmail.com
+MAIL_PASS=your-app-password
+
+# Clerk (legacy, optional)
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=...
+CLERK_SECRET_KEY=...
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/
+NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/
+```
+
+### `apps/http-server/.env`
+
+```env
+# Server
+PORT=3001
+ORIGINS=http://localhost:3000,https://nextmove-yatin.vercel.app
+
+# Postgres
+DATABASE_URL=postgresql://user:pass@host:5432/nextmove
+
+# JWT
+JWT_SECRET=<generate via: openssl rand -hex 32>
+
+# Internal email API (must match the value in apps/web)
+NEXTJS_URL=http://localhost:3000
+INTERNAL_API_SECRET=<same secret as apps/web>
+
+# Redis
+REDIS_URL=redis://localhost:6379
+
+# Gemini
+GEMINI_API_KEY=...
+
+# Clerk (legacy webhook + SDK)
+CLERK_SECRET_KEY=...
+CLERK_WEBHOOK_SECRET=...
+
+# Authorization
+ADMIN_EMAILS=admin@example.com,owner@example.com
+```
+
+### `packages/db/.env`
+
+```env
+DATABASE_URL=postgresql://user:pass@host:5432/nextmove
+```
+
+---
+
+## Local Development Setup
 
 ### Prerequisites
 
-- Node.js 18+ 
-- pnpm 8+
-- PostgreSQL database
-- Redis server (optional, for caching)
-- Clerk account (for authentication)
-- Google Gemini API key (for AI features)
+- Node.js ≥ 18 (Docker uses Node 24).
+- pnpm ≥ 10.17.
+- Postgres ≥ 14.
+- Redis ≥ 6.
+- Gmail account with an app password (for SMTP).
+- Google AI Studio API key (Gemini).
 
-### Installation
+### One-time
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/your-username/NextMoveApp.git
-   cd NextMoveApp
-   ```
+```bash
+git clone <repo-url> NextMove
+cd NextMove
+pnpm install
+```
 
-2. **Install dependencies**
-   ```bash
-   pnpm install
-   ```
+### Database
 
-3. **Environment Setup**
-   
-   Create `.env` files in both `apps/web` and `apps/http-server`:
+```bash
+cd packages/db
+pnpm dlx prisma migrate dev   # apply 13 migrations
+pnpm dlx prisma generate
+cd ../..
+```
 
-   **apps/web/.env.local**
-   ```env
-   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
-   CLERK_SECRET_KEY=your_clerk_secret_key
-   NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
-   NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
-   NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/
-   NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/
-   ```
+### Run the apps
 
-   **apps/http-server/.env**
-   ```env
-   DATABASE_URL="postgresql://username:password@localhost:5432/nextmoveapp"
-   CLERK_SECRET_KEY=your_clerk_secret_key
-   GEMINI_API_KEY=your_gemini_api_key
-   REDIS_URL=redis://localhost:6379
-   PORT=3001
-   ```
+```bash
+# from repo root — runs every workspace's `dev` task in parallel
+pnpm dev
+```
 
-4. **Database Setup**
-   ```bash
-   cd packages/db
-   pnpm prisma migrate dev
-   pnpm prisma generate
-   ```
+Or run each individually:
 
-5. **Start Development Servers**
-   
-   In separate terminals:
-
-   ```bash
-   # Start backend server
-   cd apps/http-server
-   pnpm dev
+```bash
+# Backend (port 3001)
+cd apps/http-server
+pnpm dev          # tsc build + node ./dist/index.js
 
    # Start frontend server
    cd apps/web
@@ -226,7 +651,7 @@ NextMoveApp/
    ```
 
 6. **Access the Application**
-   - **Live Application**: [https://nextmove.yatindora.xyz/](https://nextmove-yatin.vercel.app/)
+   - **Live Application**: [https://nextmove-yatin.vercel.app/](https://nextmove-yatin.vercel.app/)
    - **Local Development**:
      - Frontend: http://localhost:3000
      - Backend API: http://localhost:3001
@@ -343,35 +768,18 @@ The landing page is fully optimized for mobile devices with:
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. Fork and create a feature branch (`git checkout -b feat/<area>`).
+2. Follow the existing TypeScript/ESLint conventions.
+3. Use shared Zod schemas in `packages/Types` for any new request bodies — never duplicate validation across FE/BE.
+4. Add or update a Prisma migration for any schema change; do not edit existing migrations.
+5. Run `pnpm lint && pnpm check-types && pnpm build` before opening a PR.
+6. Open a PR with a description of intent and screenshots/curl examples for any user-facing change.
 
-### Development Guidelines
-- Follow TypeScript best practices
-- Write meaningful commit messages
-- Add tests for new features
-- Update documentation as needed
-- Follow the existing code style
+---
 
-## 📄 License
+## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- [Next.js](https://nextjs.org/) for the amazing React framework
-- [Radix UI](https://www.radix-ui.com/) for accessible component primitives
-- [Tailwind CSS](https://tailwindcss.com/) for utility-first styling
-- [Clerk](https://clerk.com/) for authentication
-- [Google Gemini](https://ai.google.dev/) for AI capabilities
-- [Prisma](https://www.prisma.io/) for database management
-
-## 📞 Support
-
-For support, email support@nextmoveapp.com or join our Discord community.
+MIT — see `LICENSE`.
 
 ---
 
