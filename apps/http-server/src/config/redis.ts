@@ -1,47 +1,77 @@
 import redis, { RedisClientType } from 'redis'
-import {config} from 'dotenv'
+import { config } from 'dotenv'
+import logger from './logger.js'
 
 config()
+
+const BASE_RECONNECT_DELAY = 1000
+const MAX_RECONNECT_DELAY = 32000
+const CONNECT_TIMEOUT = 10000
+const PING_INTERVAL = 30000
+
+const getBackoffDelay = (retries: number) => {
+    const delay = BASE_RECONNECT_DELAY * Math.pow(2, retries)
+    return Math.min(delay, MAX_RECONNECT_DELAY)
+}
 
 const client: RedisClientType = redis.createClient({
     username: process.env.REDIS_USERNAME,
     password: process.env.REDIS_PASSWORD,
+    disableOfflineQueue: true,
+    pingInterval: PING_INTERVAL,
     socket: {
-        host: process.env.REDIS_HOST,
-        port: parseInt(process.env.REDIS_PORT!),
+        host: process.env.REDIS_HOST || '127.0.0.1',
+        port: Number(process.env.REDIS_PORT) || 6379,
+        connectTimeout: CONNECT_TIMEOUT,
         reconnectStrategy(retries) {
-            const delay = Math.min(retries * 100, 5000);
-            console.log(`Redis reconnect attempt #${retries}, next in ${delay}ms`);
-            return delay;
+            const delay = getBackoffDelay(retries)
+            logger.warn(`Redis reconnect attempt #${retries + 1}, next try in ${delay}ms`)
+            return delay
         },
-    }
+    },
 })
 
 client.on('connect', () => {
-    console.log('Redis client connecting...');
-});
+    logger.info('Redis client connecting...')
+})
 
 client.on('ready', () => {
-    console.log('Redis ready');
-});
+    logger.info('Redis ready')
+})
 
-client.on('error', (err) => {
-    console.error('Redis error:', err);
-});
+client.on('error', (err: Error) => {
+    logger.error(`Redis error: ${err?.message || err}`)
+})
 
 client.on('end', () => {
-    console.warn('Redis connection closed');
-});
+    logger.warn('Redis connection closed')
+})
 
-client.on('reconnecting', (delay) => {
-    console.log(`Redis reconnecting in ${delay}ms`);
-});
+client.on('reconnecting', () => {
+    logger.warn('Redis reconnecting...')
+})
 
+let isConnecting = false
 
-client.connect().then(() => {
-    console.log('Redis connected');
-}).catch((err: Error) => {
-    console.error('Redis connection error:', err);
-});
+export const connectRedis = async (attempt = 0): Promise<void> => {
+    if (isConnecting || client.isOpen) return
+    isConnecting = true
+    try {
+        await client.connect()
+        logger.info('Redis connected')
+    } catch (error) {
+        const delay = getBackoffDelay(attempt)
+        logger.error(`Redis connection failed, retrying in ${delay}ms: ${error}`)
+        setTimeout(() => {
+            void connectRedis(attempt + 1)
+        }, delay).unref()
+    } finally {
+        isConnecting = false
+    }
+}
 
-export const redisClient = client;
+export const isRedisReady = () => client.isReady
+
+void connectRedis()
+
+export const redisClient = client
