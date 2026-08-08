@@ -4,14 +4,22 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"no tests in this package\" && exit 0",
+    "lint": "eslint . --max-warnings 0",
+    "check-types": "tsc --noEmit"
   },
   "devDependencies": {
-    "@repo/typescript-config": "workspace:*"
+    "@repo/eslint-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "eslint": "^9.34.0",
+    "typescript": "5.9.2"
   },
   "exports": {
     "./ZodTypes": "./src/zodTypes.ts",
-    "./Types": "./src/Types.ts"
+    "./Types": "./src/Types.ts",
+    "./ExtensionTypes": "./src/extensionTypes.ts",
+    "./AiKeyTypes": "./src/aiKeyTypes.ts",
+    "./ProfileTypes": "./src/profileTypes.ts"
   },
   "keywords": [],
   "author": "",
