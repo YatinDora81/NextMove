@@ -25,10 +25,10 @@ function ShowMessage({ children, message = "", companyName = "", recruiterName =
                     <p><strong>Type:</strong> {type === "MESSAGE" ? "Message" : type}</p>
                     <p><strong>Role:</strong> {role}</p>
                     <p><strong>Message:</strong></p>
-                    <div className="p-3 bg-gray-100 dark:bg-zinc-900/60 rounded-md text-sm max-h-[40vh] overflow-y-auto whitespace-pre-wrap">
+                    <div className="max-h-[40vh] overflow-y-auto rounded-md bg-well p-3 text-sm whitespace-pre-wrap text-fg">
                         {message}
                     </div>
-                    <p className="text-xs text-muted-foreground">Sent on: {new Date(createdAt || new Date()).toLocaleString()}</p>
+                    <p className="text-xs text-fg3">Sent on: {new Date(createdAt || new Date()).toLocaleString()}</p>
                 </DialogDescription>
             </DialogContent>
         </Dialog>

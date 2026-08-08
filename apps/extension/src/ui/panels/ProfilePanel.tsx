@@ -859,7 +859,7 @@ export function ProfilePanel(): ReactElement {
         </Repeater>
       </FieldSet>
 
-      <div className="sticky bottom-0 -mx-1 flex items-center justify-end gap-3 border-t border-[var(--jf-border)] bg-[var(--jf-bg)]/95 px-1 py-3 backdrop-blur">
+      <div className="sticky bottom-0 -mx-1 flex items-center justify-end gap-3 border-t border-[var(--jf-border)] bg-[var(--jf-bg)] px-1 py-3">
         {dirty ? (
           <span className="text-xs text-[var(--jf-fg-muted)]">
             Unsaved changes — ⌘/Ctrl + S also saves.

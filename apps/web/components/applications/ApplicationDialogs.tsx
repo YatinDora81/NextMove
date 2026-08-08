@@ -1,11 +1,5 @@
 "use client"
 
-/**
- * Dialogs behind the SEC 6.7 row actions. They are rendered once by the dashboard and
- * driven by the row currently under edit, so opening one from a dropdown menu (which
- * unmounts on select) is safe.
- */
-
 import { useEffect, useState } from "react"
 import {
     AlertDialog,
@@ -17,7 +11,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/quiet/Button"
 import {
     Dialog,
     DialogContent,
@@ -26,14 +20,9 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
+import { Input, Textarea } from "@/components/quiet/Field"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { JobApplication, JobApplicationDetailsPatch } from "@/components/applications/types"
-
-// ==================
-// Edit company / role / link / ATS
-// ==================
 
 export function EditApplicationDialog({
     row,
@@ -53,7 +42,6 @@ export function EditApplicationDialog({
     const [url, setUrl] = useState("")
     const [ats, setAts] = useState("")
 
-    // Re-seed whenever a different row opens the dialog.
     useEffect(() => {
         if (!open || row === null) return
         setCompany(row.company)
@@ -70,15 +58,15 @@ export function EditApplicationDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Edit application</DialogTitle>
-                    <DialogDescription>
+                    <DialogTitle className="text-[17px] font-semibold tracking-[-0.015em] text-fg">Edit application</DialogTitle>
+                    <DialogDescription className="text-[13px] text-fg2">
                         Company and role are auto-captured from the posting and stay editable (SEC 6.7).
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-2">
-                        <Label htmlFor="application-company">Company</Label>
+                    <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="application-company" className="text-[13px] font-medium text-fg">Company</Label>
                         <Input
                             id="application-company"
                             value={company}
@@ -87,8 +75,8 @@ export function EditApplicationDialog({
                             autoComplete="off"
                         />
                     </div>
-                    <div className="flex flex-col gap-2">
-                        <Label htmlFor="application-role">Role</Label>
+                    <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="application-role" className="text-[13px] font-medium text-fg">Role</Label>
                         <Input
                             id="application-role"
                             value={role}
@@ -97,8 +85,8 @@ export function EditApplicationDialog({
                             autoComplete="off"
                         />
                     </div>
-                    <div className="flex flex-col gap-2">
-                        <Label htmlFor="application-url">Posting link</Label>
+                    <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="application-url" className="text-[13px] font-medium text-fg">Posting link</Label>
                         <Input
                             id="application-url"
                             value={url}
@@ -108,8 +96,8 @@ export function EditApplicationDialog({
                             autoComplete="off"
                         />
                     </div>
-                    <div className="flex flex-col gap-2">
-                        <Label htmlFor="application-ats">ATS</Label>
+                    <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="application-ats" className="text-[13px] font-medium text-fg">ATS</Label>
                         <Input
                             id="application-ats"
                             value={ats}
@@ -121,10 +109,11 @@ export function EditApplicationDialog({
                 </div>
 
                 <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
+                    <Button variant="sec" onClick={() => onOpenChange(false)} disabled={isSaving}>
                         Cancel
                     </Button>
                     <Button
+                        variant="acc"
                         disabled={!canSave}
                         onClick={() =>
                             onSave({
@@ -142,10 +131,6 @@ export function EditApplicationDialog({
         </Dialog>
     )
 }
-
-// ==================
-// Add / edit note
-// ==================
 
 export function NoteDialog({
     row,
@@ -171,8 +156,8 @@ export function NoteDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Note</DialogTitle>
-                    <DialogDescription>
+                    <DialogTitle className="text-[17px] font-semibold tracking-[-0.015em] text-fg">Note</DialogTitle>
+                    <DialogDescription className="text-[13px] text-fg2">
                         {row === null ? "" : `${row.role} at ${row.company}`}
                     </DialogDescription>
                 </DialogHeader>
@@ -183,13 +168,14 @@ export function NoteDialog({
                     placeholder="Recruiter name, referral, salary discussed, follow-up date…"
                     rows={6}
                     aria-label="Application note"
+                    className="resize-none"
                 />
 
                 <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
+                    <Button variant="sec" onClick={() => onOpenChange(false)} disabled={isSaving}>
                         Cancel
                     </Button>
-                    <Button disabled={isSaving} onClick={() => onSave(notes)}>
+                    <Button variant="acc" disabled={isSaving} onClick={() => onSave(notes)}>
                         {isSaving ? "Saving…" : "Save note"}
                     </Button>
                 </DialogFooter>
@@ -197,10 +183,6 @@ export function NoteDialog({
         </Dialog>
     )
 }
-
-// ==================
-// Delete
-// ==================
 
 export function DeleteApplicationDialog({
     row,
@@ -219,19 +201,24 @@ export function DeleteApplicationDialog({
         <AlertDialog open={open} onOpenChange={onOpenChange}>
             <AlertDialogContent>
                 <AlertDialogHeader>
-                    <AlertDialogTitle>Delete this application?</AlertDialogTitle>
-                    <AlertDialogDescription>
+                    <AlertDialogTitle className="text-[17px] font-semibold tracking-[-0.015em] text-fg">Delete this application?</AlertDialogTitle>
+                    <AlertDialogDescription className="text-[13px] text-fg2">
                         {row === null
                             ? "This removes the tracked row from your account."
                             : `“${row.role}” at ${row.company} will be removed from your synced tracker. The copy stored inside the extension on this device is not affected.`}
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                    <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel
+                        disabled={isDeleting}
+                        className="rounded-lg border-hair2 bg-surface text-[13.5px] text-fg shadow-qsm hover:bg-well"
+                    >
+                        Cancel
+                    </AlertDialogCancel>
                     <AlertDialogAction
                         disabled={isDeleting}
                         onClick={onConfirm}
-                        className="bg-destructive text-white hover:bg-destructive/90"
+                        className="rounded-lg border border-dan/40 bg-danbg text-[13.5px] text-dan shadow-none hover:bg-dan/15"
                     >
                         {isDeleting ? "Deleting…" : "Delete"}
                     </AlertDialogAction>

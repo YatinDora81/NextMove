@@ -1,12 +1,13 @@
 "use client"
-import React, { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import {
-    Card,
-    CardContent,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card"
+    CheckIcon,
+    ChevronsUpDownIcon,
+    CopyIcon,
+    EditIcon,
+    RefreshCcwIcon,
+} from "lucide-react"
+import toast from "react-hot-toast"
 import {
     Select,
     SelectContent,
@@ -14,26 +15,67 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { Input } from '@/components/ui/input'
-import { Label } from '@radix-ui/react-label'
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "@/components/ui/command"
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Button } from '@/components/ui/button'
-// import ModalContainer from '@/components/ModalContainer'
-import { Role, TemplateType } from '@/utils/api_types'
-import { Roles_AutoComplete } from '@/components/Roles_AutoComplete'
-import { useTemplates } from '@/hooks/useTemplates'
-import toast from 'react-hot-toast'
-import { useAuth, useUser } from '@/hooks/useAuth'
-import { capitalizeWords } from '@/utils/strings'
-import { GENERATE_MESSAGE } from '@/utils/url'
-import { EditIcon, RefreshCcwIcon } from 'lucide-react'
-import EditName from '@/components/modals/EditName'
-// import PreTemplates from '../public/role-templates-object.json'
-import { useDevice } from '@/hooks/useDevice'
+import { Button } from "@/components/quiet/Button"
+import { Card } from "@/components/quiet/Card"
+import { Chip } from "@/components/quiet/Chip"
+import { Field, Input } from "@/components/quiet/Field"
+import { Kbd } from "@/components/quiet/Kbd"
+import { cn } from "@/lib/utils"
+import { Role, TemplateType } from "@/utils/api_types"
+import { useTemplates } from "@/hooks/useTemplates"
+import { useAuth, useUser } from "@/hooks/useAuth"
+import { capitalizeWords } from "@/utils/strings"
+import { GENERATE_MESSAGE } from "@/utils/url"
+import EditName from "@/components/modals/EditName"
+import { useDevice } from "@/hooks/useDevice"
+
+const controlClass =
+    "h-[38px] w-full rounded-lg border-hair2 bg-surface px-3 text-[13.5px] font-normal text-fg shadow-qsm"
+
+function Block({
+    label,
+    hint,
+    htmlFor,
+    labelId,
+    children,
+}: {
+    label: ReactNode
+    hint?: ReactNode
+    htmlFor?: string
+    labelId?: string
+    children: ReactNode
+}) {
+    return (
+        <div className="mt-3.5">
+            <label
+                id={labelId}
+                htmlFor={htmlFor}
+                className="mb-1.5 flex justify-between text-[13px] font-medium text-fg"
+            >
+                <span>{label}</span>
+                {hint && <span className="font-normal text-fg3">{hint}</span>}
+            </label>
+            {children}
+        </div>
+    )
+}
 
 function GeneratePromt({ allRoles , predefinedTemplates }: { allRoles: Role[], predefinedTemplates: TemplateType[] }) {
 
-    // const [openSearch, setOpenSearch] = useState<boolean>(true)
     const [selectedRole, setSelectedRole] = useState<Role | null>(null)
     const [roleWithTemplate, setRoleWithTemplate] = useState<TemplateType[]>(predefinedTemplates)
     const [selectedTemplate, setSelectedTemplate] = useState<TemplateType | null>(null)
@@ -43,6 +85,8 @@ function GeneratePromt({ allRoles , predefinedTemplates }: { allRoles: Role[], p
     const { getToken } = useAuth()
     const { isLaptop } = useDevice()
     const [isAlreadyFilledForm, setIsAlreadyFilledForm] = useState<boolean>(false);
+    const [roleOpen, setRoleOpen] = useState(false)
+    const [draft, setDraft] = useState<{ text: string; template: string } | null>(null)
 
     useEffect(() => {
         setFirstName(capitalizeWords(user?.firstName || ''))
@@ -87,57 +131,10 @@ function GeneratePromt({ allRoles , predefinedTemplates }: { allRoles: Role[], p
         setSelectedRole(null)
         setSelectedTemplate(null)
         setIsAlreadyFilledForm(false)
+        setDraft(null)
     }
 
-    const submitHandler = () => {
-        try {
-            // if (formDetails.company.trim().length === 0 || formDetails.recruiterName.trim().length === 0) {
-            //     toast.error("Company and Recruiter Name are required")
-            //     return
-            // }
-            if(!selectedRole){
-                toast.error("Role is required")
-                return
-            }
-            if (!selectedTemplate) {
-                toast.error("Template is required")
-                return
-            }
-            let myName = firstName
-            if (lastName) {
-                myName = myName + " " + lastName
-            }
-            
-            let newMessage = selectedTemplate.content
-            if(selectedTemplate.content.includes("[Recruiter Name]") && formDetails.recruiterName.trim().length === 0){
-                toast.error("Recruiter Name is required")
-                return
-            }
-            if(selectedTemplate.content.includes("[Company Name]") && formDetails.company.trim().length === 0){
-                toast.error("Company Name is required")
-                return
-            }
-            // if(selectedTemplate.content.includes("[Role]") && selectedTemplate.roleRelation.name.trim().length === 0){
-            //     toast.error("Role is required")
-            // }
-            // Use global replace (/g flag) to replace ALL occurrences
-            newMessage = newMessage.replace(/\[Recruiter Name\]/g, capitalizeWords(formDetails.recruiterName))
-            newMessage = newMessage.replace(/\[Company Name\]/g, capitalizeWords(formDetails.company))
-            newMessage = newMessage.replace(/\[Role\]/g, capitalizeWords(selectedTemplate.roleRelation.name))
-            newMessage = newMessage.replace(/\[MY NAME\]/g, capitalizeWords(myName))
-
-            console.log("Generated message:", newMessage)
-
-            navigator.clipboard.writeText(newMessage)
-            toast.success("Message copied.")
-            if (!isAlreadyFilledForm) generateMessage(newMessage)
-        } catch (error) {
-            toast.error("Something went wrong")
-            console.log(error)
-        }
-    }
-
-    const generateMessage = async (message: string = "") => {
+    const generateMessage = useCallback(async (message: string = "") => {
         try {
             const token = await getToken()
             if (!token) {
@@ -186,7 +183,59 @@ function GeneratePromt({ allRoles , predefinedTemplates }: { allRoles: Role[], p
         } catch (error) {
             console.log("Error at sending request to generate message", error)
         }
-    }
+    }, [getToken, formDetails, selectedRole, selectedTemplate])
+
+    const submitHandler = useCallback(() => {
+        try {
+            if(!selectedRole){
+                toast.error("Role is required")
+                return
+            }
+            if (!selectedTemplate) {
+                toast.error("Template is required")
+                return
+            }
+            let myName = firstName
+            if (lastName) {
+                myName = myName + " " + lastName
+            }
+
+            let newMessage = selectedTemplate.content
+            if(selectedTemplate.content.includes("[Recruiter Name]") && formDetails.recruiterName.trim().length === 0){
+                toast.error("Recruiter Name is required")
+                return
+            }
+            if(selectedTemplate.content.includes("[Company Name]") && formDetails.company.trim().length === 0){
+                toast.error("Company Name is required")
+                return
+            }
+            newMessage = newMessage.replace(/\[Recruiter Name\]/g, capitalizeWords(formDetails.recruiterName))
+            newMessage = newMessage.replace(/\[Company Name\]/g, capitalizeWords(formDetails.company))
+            newMessage = newMessage.replace(/\[Role\]/g, capitalizeWords(selectedTemplate.roleRelation.name))
+            newMessage = newMessage.replace(/\[MY NAME\]/g, capitalizeWords(myName))
+
+            console.log("Generated message:", newMessage)
+
+            setDraft({ text: newMessage, template: selectedTemplate.name })
+            navigator.clipboard.writeText(newMessage)
+            toast.success("Message copied.")
+            if (!isAlreadyFilledForm) generateMessage(newMessage)
+        } catch (error) {
+            toast.error("Something went wrong")
+            console.log(error)
+        }
+    }, [selectedRole, selectedTemplate, firstName, lastName, formDetails, isAlreadyFilledForm, generateMessage])
+
+    useEffect(() => {
+        const onKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                e.preventDefault()
+                submitHandler()
+            }
+        }
+        window.addEventListener("keydown", onKeyDown)
+        return () => window.removeEventListener("keydown", onKeyDown)
+    }, [submitHandler])
 
     const selectedTemplateName = useMemo(() => {
         if (!selectedTemplate) return undefined
@@ -196,156 +245,237 @@ function GeneratePromt({ allRoles , predefinedTemplates }: { allRoles: Role[], p
         return selectedTemplate.name
     }, [selectedTemplate, isLaptop])
 
+    const wordCount = useMemo(() => {
+        if (!draft) return 0
+        return draft.text.trim().split(/\s+/).filter(Boolean).length
+    }, [draft])
+
+    const copyDraft = () => {
+        if (!draft) return
+        navigator.clipboard.writeText(draft.text)
+        toast.success("Message copied.")
+    }
+
+    const selectedRoleName = allRoles.find((role) => role.id === selectedRole?.id)?.name
+
     return (
-        <div className='  w-full h-screen flex justify-center items-center'>
+        <div className="min-h-[calc(100vh-56px)] bg-bg px-6 pt-6 pb-12">
+            <div className="mx-auto grid max-w-[1040px] items-start gap-4 lg:grid-cols-2">
 
-            {/* {openSearch && <ModalContainer setOpen={setOpenSearch} />} */}
-
-            <Card className=' min-w-[90%]  md:min-w-[70%] lg:min-w-[40%] h-fit '>
-                <CardHeader className='flex items-center justify-between'>
-                    <CardTitle className=' text-2xl font-semibold'>Generate Message</CardTitle>
-                    <Button variant={"ghost"} size="icon" onClick={resetForm} aria-label='Reset form'>
-                        <RefreshCcwIcon className="w-4 h-4" />
-                    </Button>
-                    {/* <CardDescription>Card Description</CardDescription> */}
-                    {/* <CardAction>Card Action</CardAction>  */}
-                </CardHeader>
-                <CardContent>
-                    <div className="mb-4 flex flex-col gap-2">
-                        <Label htmlFor="email">Recruiter Name</Label>
-                        <Input value={formDetails.recruiterName} onChange={(e) => {
-                            setFormDetails({ ...formDetails, recruiterName: e.target.value })
-                            setIsAlreadyFilledForm(false)
-                        }} id="email" placeholder="e.g., John Smith" type="text" />
+                <Card className="p-5">
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-base font-semibold tracking-[-0.01em] text-fg">New message</h1>
+                        <Button
+                            variant="ghost"
+                            onClick={resetForm}
+                            aria-label="Reset form"
+                            className="ml-auto rounded-lg p-1.5"
+                        >
+                            <RefreshCcwIcon className="size-4" strokeWidth={1.5} />
+                        </Button>
                     </div>
 
+                    <Block label="Role" labelId="role-label">
+                        <Popover open={roleOpen} onOpenChange={setRoleOpen}>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="sec"
+                                    role="combobox"
+                                    aria-expanded={roleOpen}
+                                    aria-labelledby="role-label"
+                                    className={cn(controlClass, "justify-between", !selectedRole && "text-fg3")}
+                                >
+                                    {selectedRole
+                                        ? (isLaptop ? selectedRoleName : selectedRoleName?.slice(0, 10) + "...")
+                                        : "Select Role..."}
+                                    <ChevronsUpDownIcon className="size-4 shrink-0 text-fg3" strokeWidth={1.5} />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
+                                <Command>
+                                    <CommandInput placeholder="Search Roles..." />
+                                    <CommandList>
+                                        <CommandEmpty>No Roles found...</CommandEmpty>
+                                        <CommandGroup>
+                                            {allRoles.map((role) => (
+                                                <CommandItem
+                                                    key={role.id}
+                                                    value={role.name}
+                                                    onSelect={(currentValue) => {
+                                                        const selectedRoleData = allRoles.find(
+                                                            (r) => r.name.toLowerCase() === currentValue.toLowerCase()
+                                                        )
+                                                        if (selectedRole?.id === selectedRoleData?.id) {
+                                                            setSelectedRole(null)
+                                                        } else {
+                                                            setSelectedRole(selectedRoleData || null)
+                                                        }
+                                                        setRoleOpen(false)
+                                                    }}
+                                                >
+                                                    <CheckIcon
+                                                        className={cn(
+                                                            "mr-2 size-4",
+                                                            selectedRole?.id === role.id ? "opacity-100" : "opacity-0"
+                                                        )}
+                                                        strokeWidth={1.5}
+                                                    />
+                                                    {role.name}
+                                                </CommandItem>
+                                            ))}
+                                        </CommandGroup>
+                                    </CommandList>
+                                </Command>
+                            </PopoverContent>
+                        </Popover>
+                    </Block>
 
-                    <div className="mb-4 flex items-center justify-between gap-2">
-                        <div className=' w-[47%] self-end'>
-                            <Roles_AutoComplete selectedRole={selectedRole} setSelectedRole={setSelectedRole} allRoles={allRoles} />
-                        </div>
-                        <div className=' w-[47%]'>
-                            <Label htmlFor="roles">Template</Label>
-                            <Select
-                                disabled={!selectedRole}
-                                value={selectedTemplate?.id || ""}
-                                onValueChange={(value) => {
-                                    const template = roleWithTemplate.find(t => t.id === value)
-                                    if (template) {
-                                        setSelectedTemplate(template)
-                                        setIsAlreadyFilledForm(false)
-                                        console.log("Selected template:", template)
-                                    }
-                                }}
+                    <Field label="Company">
+                        <Input
+                            value={formDetails.company}
+                            onChange={(e) => {
+                                setFormDetails({ ...formDetails, company: e.target.value })
+                                setIsAlreadyFilledForm(false)
+                            }}
+                            id="company"
+                            placeholder="e.g., Google, Microsoft"
+                            type="text"
+                        />
+                    </Field>
+
+                    <Field label="Recruiter" hint="optional">
+                        <Input
+                            value={formDetails.recruiterName}
+                            onChange={(e) => {
+                                setFormDetails({ ...formDetails, recruiterName: e.target.value })
+                                setIsAlreadyFilledForm(false)
+                            }}
+                            id="recruiterName"
+                            placeholder="e.g., John Smith"
+                            type="text"
+                        />
+                    </Field>
+
+                    <Block label="Template" labelId="template-label">
+                        <Select
+                            disabled={!selectedRole}
+                            value={selectedTemplate?.id || ""}
+                            onValueChange={(value) => {
+                                const template = roleWithTemplate.find(t => t.id === value)
+                                if (template) {
+                                    setSelectedTemplate(template)
+                                    setIsAlreadyFilledForm(false)
+                                    console.log("Selected template:", template)
+                                }
+                            }}
+                        >
+                            <SelectTrigger
+                                aria-labelledby="template-label"
+                                className={cn(
+                                    controlClass,
+                                    "data-[size=default]:h-[38px] data-[placeholder]:text-fg3 dark:bg-surface dark:hover:bg-well",
+                                    "focus-visible:border-hair2 focus-visible:ring-0 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-acc",
+                                    "[&_svg]:text-fg3"
+                                )}
                             >
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder={selectedRole ? "Select Template" : "Select Role First"}>
-                                        {isLaptop ? selectedTemplateName : selectedTemplate?.name.slice(0, 15) + "..."}
-                                    </SelectValue>
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {roleWithTemplate.map((template) => (
-                                        <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
+                                <SelectValue placeholder={selectedRole ? "Select Template" : "Select Role First"}>
+                                    {isLaptop ? selectedTemplateName : selectedTemplate?.name.slice(0, 15) + "..."}
+                                </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                                {roleWithTemplate.map((template) => (
+                                    <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </Block>
 
-
-                    <div className="mb-2 flex flex-col gap-2">
-                        <Label htmlFor="email">Company Name</Label>
-                        <Input value={formDetails.company} onChange={(e) => {
-                            setFormDetails({ ...formDetails, company: e.target.value })
-                            setIsAlreadyFilledForm(false)
-                        }} id="email" placeholder="e.g., Google, Microsoft" type="text" />
-                    </div>
-
-
-
-
-                    <div className="flex flex-col gap-2">
-
-                        <div className=' w-[47%]  gap-2'>
-                            {selectedTemplate && selectedTemplate.rules.find(rule => rule.rule === "[GENDER]") && <RadioGroup className=' flex ' defaultValue="male">
-                                {/* preselect male */}
-                                <div className="flex items-center space-x-2">
+                    {selectedTemplate && selectedTemplate.rules.find(rule => rule.rule === "[GENDER]") && (
+                        <Block label="Gender">
+                            <RadioGroup className="flex gap-4" defaultValue="male">
+                                <div className="flex items-center gap-2">
                                     <RadioGroupItem value="male" id="male" onChange={() => {
                                         setFormDetails({ ...formDetails, isMale: true })
                                         setIsAlreadyFilledForm(false)
                                     }} />
-                                    <Label htmlFor="option-one">Male</Label>
+                                    <label htmlFor="male" className="text-[13px] text-fg2">Male</label>
                                 </div>
-                                <div className="flex items-center space-x-2">
+                                <div className="flex items-center gap-2">
                                     <RadioGroupItem value="female" id="female" onChange={() => {
                                         setFormDetails({ ...formDetails, isMale: false })
                                         setIsAlreadyFilledForm(false)
                                     }} />
-                                    <Label htmlFor="option-two">Female</Label>
-                                </div>
-                            </RadioGroup>}
-                        </div>
-
-
-
-                        {/* Your Name */}
-
-                        <div className="mb-4 flex flex-col gap-2">
-                            <Label htmlFor="yourName">Your Name</Label>
-                            <div className='flex gap-1'>
-                                <Input className=' ' value={firstName + " " + lastName} disabled id="yourName" placeholder="Your full name" type="text" />
-                                {/* <Button ref={editBtnRef} variant={"secondary"} onClick={() => { }} className=' ' size="icon"><RefreshCcwIcon className="w-4 h-4" /></Button> */}
-                                <EditName><Button variant={"secondary"} className=' ' size="icon">
-                                    <EditIcon className="w-4 h-4" />
-                                </Button></EditName>
-                            </div>
-                        </div>
-
-                        {/* <div>
-                            <RadioGroup defaultValue="message" className=' flex'>
-                                <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="message" id="message" />
-                                    <Label htmlFor="message">Simple Message</Label>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="email" id="email" />
-                                    <Label htmlFor="email">Email Format</Label>
+                                    <label htmlFor="female" className="text-[13px] text-fg2">Female</label>
                                 </div>
                             </RadioGroup>
-                        </div> */}
+                        </Block>
+                    )}
 
+                    <Block label="Your name" htmlFor="yourName">
+                        <div className="flex items-center gap-2">
+                            <Input value={firstName + " " + lastName} disabled id="yourName" placeholder="Your full name" type="text" />
+                            <EditName>
+                                <span className="flex size-[38px] shrink-0 items-center justify-center rounded-lg border border-hair2 bg-surface text-fg2 shadow-qsm transition-colors hover:bg-well hover:text-fg">
+                                    <EditIcon className="size-4" strokeWidth={1.5} />
+                                    <span className="sr-only">Edit your name</span>
+                                </span>
+                            </EditName>
+                        </div>
+                    </Block>
+
+                    <Button variant="acc" onClick={submitHandler} className="mt-4 w-full py-2.5">
+                        Generate
+                        <Kbd className="border-white/30! bg-white/15! text-inherit!">⌘↵</Kbd>
+                    </Button>
+                    <p className="mt-2.5 text-center text-xs text-fg3">
+                        Fills your template · copies to your clipboard
+                    </p>
+                </Card>
+
+                <Card className="overflow-hidden">
+                    <div className="flex items-center gap-2.5 border-b border-hair px-4 py-3">
+                        <span className={cn("size-1.5 rounded-full", draft ? "bg-ok" : "bg-fg3")} />
+                        <span className="text-sm font-semibold text-fg">Draft</span>
+                        {draft && <span className="truncate text-xs text-fg2">{draft.template}</span>}
+                        {isAlreadyFilledForm && (
+                            <Chip tone="ok" className="ml-auto shrink-0">Saved to Applied</Chip>
+                        )}
                     </div>
 
-                    {/* <div className="w-full flex flex-col gap-2 mt-3">
-                        <Label htmlFor="roles">Resume</Label>
-                        <Select>
-                            <SelectTrigger className="w-full py-4 px-3 rounded-md border">
-                                <SelectValue placeholder="Select Resume" />
-                            </SelectTrigger>
+                    {draft ? (
+                        <div className="max-h-[520px] overflow-y-auto px-5 py-4 text-sm leading-[1.75] whitespace-pre-wrap text-fg">
+                            {draft.text}
+                        </div>
+                    ) : (
+                        <div className="px-5 py-4 text-[13.5px] leading-[1.7] text-fg2">
+                            Pick a role and a template, then press Generate. Your message lands here and on your clipboard.
+                        </div>
+                    )}
 
-                            <SelectContent className="rounded-md">
-                                <SelectItem value="frontend" className="px-3 py-2 flex flex-col items-start">
-                                    <span className="font-medium text-sm">Frontend Resume</span>
-                                    <span className="text-xs text-muted-foreground">Uploaded: Jan 15, 2025</span>
-                                </SelectItem>
+                    <div className="flex items-center gap-2 border-t border-hair px-4 py-3">
+                        <Button
+                            variant="sec"
+                            onClick={copyDraft}
+                            disabled={!draft}
+                            className="gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px]"
+                        >
+                            <CopyIcon className="size-[13px]" strokeWidth={1.5} />
+                            Copy
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            onClick={submitHandler}
+                            disabled={!draft}
+                            className="gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px]"
+                        >
+                            <RefreshCcwIcon className="size-[13px]" strokeWidth={1.5} />
+                            Regenerate
+                        </Button>
+                        <span className="tnum ml-auto text-xs text-fg2">{wordCount} words</span>
+                    </div>
+                </Card>
 
-                                <SelectItem value="backend" className="px-3 py-2 flex flex-col items-start">
-                                    <span className="font-medium text-sm">Backend Resume</span>
-                                    <span className="text-xs text-muted-foreground">Uploaded: Feb 2, 2025</span>
-                                </SelectItem>
-
-                                <SelectItem value="fullstack" className="px-3 py-2 flex flex-col items-start">
-                                    <span className="font-medium text-sm">Full Stack Resume</span>
-                                    <span className="text-xs text-muted-foreground">Uploaded: Mar 10, 2025</span>
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div> */}
-                </CardContent>
-                <CardFooter className=' mt-2'>
-                    <Button onClick={submitHandler} className=' w-full'>Generate Message</Button>
-                </CardFooter>
-            </Card>
+            </div>
         </div>
     )
 }

@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 
-import { WEB_APP_URL, WEB_CONNECT_PATH } from '@/shared/constants';
+import {
+  BACKUP_NUDGE_DISMISSED_KEY,
+  MODE_KEY,
+  WEB_APP_URL,
+  WEB_CONNECT_PATH,
+} from '@/shared/constants';
 import type { AppStatus, ApplicationRow, FillReport, TrackerStats } from '@/shared/types';
 
 import { Badge, Button, EmptyState, Select, StatusDot, cx } from '@/ui/components';
@@ -13,6 +18,7 @@ import {
   Briefcase,
   Check,
   ChevronRight,
+  Close,
   CloudCheck,
   CloudOff,
   ExternalLink,
@@ -78,6 +84,8 @@ export function App(): ReactElement {
   const [fill, setFill] = useState<FillState>(IDLE);
   const [tracker, setTracker] = useState<TrackerSlice>({ rows: [], stats: null });
   const [ready, setReady] = useState(false);
+  const [mode, setMode] = useState<string | null>(null);
+  const [nudgeDismissed, setNudgeDismissed] = useState(true);
 
   useEffect(() => {
     const trackerLoad = call('TRACKER_QUERY', { limit: 3 })
@@ -88,6 +96,33 @@ export function App(): ReactElement {
       setReady(true);
     });
   }, [loadProfiles, loadKeys, loadSync]);
+
+  useEffect(() => {
+    void browser.storage.local
+      .get([MODE_KEY, BACKUP_NUDGE_DISMISSED_KEY])
+      .then((bag) => {
+        const stored = bag as Record<string, unknown>;
+        const storedMode = stored[MODE_KEY];
+        setMode(typeof storedMode === 'string' ? storedMode : null);
+        setNudgeDismissed(stored[BACKUP_NUDGE_DISMISSED_KEY] === true);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  const dismissNudge = useCallback(() => {
+    setNudgeDismissed(true);
+    void browser.storage.local
+      .set({ [BACKUP_NUDGE_DISMISSED_KEY]: true })
+      .catch(() => undefined);
+  }, []);
+
+  const paired = syncState?.paired === true;
+  const guest = mode === 'guest' && !paired;
+  const activeProfile = profiles.find((profile) => profile.id === activeProfileId) ?? profiles[0];
+  const guestInitial =
+    (activeProfile?.personal.firstName.trim().charAt(0) ||
+      activeProfile?.label.trim().charAt(0) ||
+      'G').toUpperCase();
 
   const counts = countPool(keys);
   const retryAt = poolRetryAt(keys);
@@ -113,14 +148,32 @@ export function App(): ReactElement {
   return (
     <div className="flex max-h-[var(--jf-popup-max-height)] flex-col bg-[var(--jf-bg)] text-[var(--jf-fg)]">
       <header className="flex shrink-0 items-center gap-2.5 border-b border-[var(--jf-border)] bg-[var(--jf-surface)] px-4 py-2.5">
-        <img
-          src="/icons/128.png"
-          alt=""
-          width={28}
-          height={28}
-          className="h-[28px] w-[28px] shrink-0 rounded-[var(--jf-radius-md)]"
-        />
-        <p className="min-w-0 flex-1 truncate text-[14px] font-semibold">NextMove Autofill</p>
+        {guest ? (
+          <span
+            aria-hidden
+            className="flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-[var(--jf-radius-full)] bg-[var(--jf-surface-sunken-strong)] text-[12px] font-semibold text-[var(--jf-fg-muted)]"
+          >
+            {guestInitial}
+          </span>
+        ) : (
+          <img
+            src="/icons/128.png"
+            alt=""
+            width={28}
+            height={28}
+            className="h-[28px] w-[28px] shrink-0 rounded-[var(--jf-radius-md)]"
+          />
+        )}
+        {guest ? (
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13.5px] font-semibold">Guest on this device</p>
+            <p className="truncate text-[11.5px] leading-snug text-[var(--jf-fg-muted)]">
+              Not backed up
+            </p>
+          </div>
+        ) : (
+          <p className="min-w-0 flex-1 truncate text-[14px] font-semibold">NextMove Autofill</p>
+        )}
         <Button
           variant="ghost"
           size="icon"
@@ -199,11 +252,15 @@ export function App(): ReactElement {
           </div>
 
           <div className="min-h-0 flex-1 divide-y divide-[var(--jf-border)] overflow-x-hidden overflow-y-auto [scrollbar-gutter:stable]">
-            <ConnectionStrip
-              paired={syncState?.paired === true}
-              lastSyncAt={syncState?.lastSyncAt ?? null}
-              deviceName={syncState?.deviceName ?? null}
-            />
+            {guest ? (
+              nudgeDismissed ? null : <BackupNudge onDismiss={dismissNudge} />
+            ) : (
+              <ConnectionStrip
+                paired={paired}
+                lastSyncAt={syncState?.lastSyncAt ?? null}
+                deviceName={syncState?.deviceName ?? null}
+              />
+            )}
 
             <Section
               icon={Key}
@@ -412,6 +469,36 @@ function Kbd({ children }: { children: ReactNode }): ReactElement {
     <kbd className="rounded-[var(--jf-radius-sm)] border border-[var(--jf-border)] bg-[var(--jf-surface)] px-1 py-px font-[var(--jf-font-mono)] text-[11px] text-[var(--jf-fg-muted)]">
       {children}
     </kbd>
+  );
+}
+
+function BackupNudge({ onDismiss }: { onDismiss: () => void }): ReactElement {
+  return (
+    <div className="jf-enter px-4 py-2">
+      <div className="flex items-start gap-2.5 rounded-[var(--jf-radius-inset)] bg-[var(--jf-bg-subtle)] px-3 py-2.5">
+        <ShieldCheck size={13} className="mt-0.5 shrink-0 text-[var(--jf-fg-subtle)]" />
+        <p className="min-w-0 flex-1 text-[12.5px] leading-snug text-[var(--jf-fg-muted)]">
+          Back up your data —{' '}
+          <button
+            type="button"
+            className="text-[var(--jf-accent)] underline-offset-2 hover:underline"
+            onClick={() => {
+              void browser.tabs.create({ url: `${WEB_APP_URL}${WEB_CONNECT_PATH}` });
+            }}
+          >
+            add an account
+          </button>
+        </p>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Dismiss"
+          className="-mt-0.5 -mr-1 h-6 w-6"
+          icon={<Close size={12} />}
+          onClick={onDismiss}
+        />
+      </div>
+    </div>
   );
 }
 

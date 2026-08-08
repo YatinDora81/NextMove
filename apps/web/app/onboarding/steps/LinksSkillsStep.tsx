@@ -1,16 +1,16 @@
 "use client"
 
 import { Trash2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+import { Button } from "@/components/quiet/Button"
+import { Input, Textarea } from "@/components/quiet/Field"
 import {
     AddEntryButton,
     ChipInput,
     StepHeader,
     SubSection,
     TextField,
+    labelClass,
     type StepProps,
 } from "@/app/onboarding/steps/fields"
 
@@ -46,7 +46,7 @@ export function LinksSkillsStep({ draft, errors, patch, onBlurField }: StepProps
     }
 
     return (
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-6">
             <StepHeader
                 title="Links & skills"
                 description="The profile links recruiters ask for by name, plus the keyword list that answers “what technologies have you used?”."
@@ -90,8 +90,8 @@ export function LinksSkillsStep({ draft, errors, patch, onBlurField }: StepProps
                     <ul className="flex flex-col gap-2">
                         {links.other.map((value, index) => (
                             <li key={`other-link-${index}`} className="flex items-end gap-2">
-                                <div className="flex flex-1 flex-col gap-2">
-                                    <Label htmlFor={`other-link-input-${index}`}>
+                                <div className="flex flex-1 flex-col gap-1.5">
+                                    <Label htmlFor={`other-link-input-${index}`} className={labelClass}>
                                         Other link {index + 1}
                                     </Label>
                                     <Input
@@ -107,9 +107,8 @@ export function LinksSkillsStep({ draft, errors, patch, onBlurField }: StepProps
                                 <Button
                                     type="button"
                                     variant="ghost"
-                                    size="icon"
                                     aria-label={`Remove other link ${index + 1}`}
-                                    className="text-muted-foreground hover:text-destructive"
+                                    className="size-9 shrink-0 p-0 hover:bg-danbg hover:text-dan"
                                     onClick={() =>
                                         setLinks({ other: links.other.filter((_, i) => i !== index) })
                                     }
@@ -138,8 +137,10 @@ export function LinksSkillsStep({ draft, errors, patch, onBlurField }: StepProps
                     onChange={(skills) => patch({ skills })}
                 />
 
-                <div className="flex flex-col gap-2">
-                    <Label htmlFor="profile-summary">Short summary</Label>
+                <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="profile-summary" className={labelClass}>
+                        Short summary
+                    </Label>
                     <Textarea
                         id="profile-summary"
                         rows={3}
@@ -148,7 +149,7 @@ export function LinksSkillsStep({ draft, errors, patch, onBlurField }: StepProps
                         value={draft.summary ?? ""}
                         onChange={(event) => patch({ summary: event.target.value })}
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs leading-relaxed text-fg2">
                         Optional. Forms with a “tell us about yourself” box get this, and NextMove’s AI
                         uses it as context when it drafts an answer.
                     </p>

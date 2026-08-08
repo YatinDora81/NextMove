@@ -336,7 +336,7 @@ button {
 }
 .jf-spark:hover { border-color: var(--jf-accent); color: var(--jf-accent); }
 .jf-spark:disabled { opacity: 0.6; cursor: progress; }
-.jf-spark__icon { font-size: 12px; line-height: 1; }
+.jf-spark__icon { flex: none; display: block; }
 
 .jf-answer {
   position: fixed;

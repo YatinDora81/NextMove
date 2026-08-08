@@ -1,10 +1,12 @@
 "use client"
 
 import { useId, useState } from "react"
-import { ArrowDown, ArrowUp, ChevronDown, Plus, Trash2, X } from "lucide-react"
+import type { ComponentProps, ReactNode } from "react"
+import { ArrowDown, ArrowUp, Check, ChevronDown, Plus, Trash2, X } from "lucide-react"
 import type { SharedProfile } from "@repo/types/ProfileTypes"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Button } from "@/components/quiet/Button"
+import { Chip } from "@/components/quiet/Chip"
+import { Input } from "@/components/quiet/Field"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 
@@ -17,11 +19,24 @@ export type StepProps = {
     onBlurField: (field: string, value: string) => void
 }
 
+export const labelClass = "text-[13px] font-medium text-fg"
+
+const linkButtonBase =
+    "inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-[13.5px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+
+export const linkButton = {
+    acc: cn(
+        linkButtonBase,
+        "bg-acc text-on-acc shadow-[inset_0_1px_0_rgba(255,255,255,.14),var(--qp-sh-sm)] hover:bg-acc-strong",
+    ),
+    sec: cn(linkButtonBase, "border border-hair2 bg-surface text-fg shadow-qsm hover:bg-well"),
+}
+
 export function StepHeader({ title, description }: { title: string; description: string }) {
     return (
-        <header className="flex flex-col gap-2">
-            <h1 className="font-mono text-2xl font-semibold tracking-tight">{title}</h1>
-            <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">{description}</p>
+        <header className="flex flex-col gap-1">
+            <h1 className="text-[19px] font-semibold tracking-[-0.015em] text-fg">{title}</h1>
+            <p className="text-[13px] leading-relaxed text-fg2">{description}</p>
         </header>
     )
 }
@@ -34,14 +49,14 @@ export function SubSection({
 }: {
     title: string
     hint?: string
-    children: React.ReactNode
+    children: ReactNode
     className?: string
 }) {
     return (
         <section className={cn("flex flex-col gap-4", className)}>
-            <div className="flex flex-col gap-1 border-b border-border pb-2">
-                <h2 className="font-mono text-sm font-semibold">{title}</h2>
-                {hint ? <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p> : null}
+            <div className="flex flex-col gap-1 border-b border-hair pb-2">
+                <h2 className={labelClass}>{title}</h2>
+                {hint ? <p className="text-xs leading-relaxed text-fg2">{hint}</p> : null}
             </div>
             {children}
         </section>
@@ -61,18 +76,20 @@ export function FieldShell({
     hint?: string
     error?: string
     className?: string
-    children: React.ReactNode
+    children: ReactNode
 }) {
     return (
-        <div className={cn("flex flex-col gap-2", className)}>
-            <Label htmlFor={htmlFor}>{label}</Label>
+        <div className={cn("flex flex-col gap-1.5", className)}>
+            <Label htmlFor={htmlFor} className={labelClass}>
+                {label}
+            </Label>
             {children}
             {error ? (
-                <p id={`${htmlFor}-error`} role="alert" className="text-xs leading-relaxed text-destructive">
+                <p id={`${htmlFor}-error`} role="alert" className="text-xs leading-relaxed text-dan">
                     {error}
                 </p>
             ) : hint ? (
-                <p id={`${htmlFor}-hint`} className="text-xs leading-relaxed text-muted-foreground">
+                <p id={`${htmlFor}-hint`} className="text-xs leading-relaxed text-fg2">
                     {hint}
                 </p>
             ) : null}
@@ -103,7 +120,7 @@ export function TextField({
     placeholder?: string
     type?: string
     autoComplete?: string
-    inputMode?: React.ComponentProps<"input">["inputMode"]
+    inputMode?: ComponentProps<"input">["inputMode"]
     disabled?: boolean
     className?: string
 }) {
@@ -121,6 +138,7 @@ export function TextField({
                 disabled={disabled}
                 aria-invalid={error !== undefined}
                 aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
+                className={cn(error !== undefined && "border-dan")}
                 onChange={(event) => onChange(event.target.value)}
                 onBlur={onBlur}
             />
@@ -161,17 +179,17 @@ export function ChipInput({
                 <ul className="flex flex-wrap gap-2">
                     {values.map((value) => (
                         <li key={value}>
-                            <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/60 py-1 pr-1 pl-3 text-xs">
+                            <Chip tone="mut" dot={false} className="py-1 pr-1">
                                 {value}
                                 <button
                                     type="button"
                                     aria-label={`Remove ${value}`}
                                     onClick={() => onChange(values.filter((item) => item !== value))}
-                                    className="rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
+                                    className="rounded-full p-0.5 text-fg3 transition-colors hover:bg-surface hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-acc"
                                 >
                                     <X className="size-3" />
                                 </button>
-                            </span>
+                            </Chip>
                         </li>
                     ))}
                 </ul>
@@ -216,14 +234,15 @@ export function ToggleChip({
             disabled={disabled}
             onClick={onToggle}
             className={cn(
-                "rounded-full border px-3 py-1 text-xs transition-colors",
-                "focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none",
+                "inline-flex items-center gap-1.5 rounded-full border border-hair2 px-3 py-1 text-xs transition-colors",
+                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc",
                 "disabled:cursor-not-allowed disabled:opacity-50",
                 selected
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-muted/40 text-muted-foreground hover:text-foreground",
+                    ? "bg-well2 font-medium text-fg"
+                    : "bg-surface text-fg2 hover:bg-well hover:text-fg",
             )}
         >
+            {selected ? <Check aria-hidden className="size-3 shrink-0 text-ok" /> : null}
             {label}
         </button>
     )
@@ -248,36 +267,35 @@ export function RepeaterCard({
     onMoveDown?: () => void
     onRemove: () => void
     removeLabel: string
-    children: React.ReactNode
+    children: ReactNode
 }) {
     const bodyId = useId()
 
     return (
-        <li className="rounded-lg border border-border bg-card">
+        <li className="rounded-[10px] bg-well">
             <div className="flex items-center gap-1 p-2 pl-3">
                 <button
                     type="button"
                     onClick={onToggle}
                     aria-expanded={open}
                     aria-controls={bodyId}
-                    className="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1 text-left focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
+                    className="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
                 >
                     <ChevronDown
                         className={cn(
-                            "size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none",
+                            "size-4 shrink-0 text-fg3 transition-transform duration-150 motion-reduce:transition-none",
                             open && "rotate-180",
                         )}
                     />
                     <span className="min-w-0">
-                        <span className="block truncate text-sm font-medium">{title}</span>
-                        <span className="block truncate text-xs text-muted-foreground">{subtitle}</span>
+                        <span className="block truncate text-[13.5px] font-medium text-fg">{title}</span>
+                        <span className="block truncate text-xs text-fg2">{subtitle}</span>
                     </span>
                 </button>
                 <Button
                     type="button"
                     variant="ghost"
-                    size="icon"
-                    className="size-8"
+                    className="size-8 shrink-0 p-0"
                     disabled={onMoveUp === undefined}
                     onClick={onMoveUp}
                     aria-label={`Move ${title} up`}
@@ -287,8 +305,7 @@ export function RepeaterCard({
                 <Button
                     type="button"
                     variant="ghost"
-                    size="icon"
-                    className="size-8"
+                    className="size-8 shrink-0 p-0"
                     disabled={onMoveDown === undefined}
                     onClick={onMoveDown}
                     aria-label={`Move ${title} down`}
@@ -298,8 +315,7 @@ export function RepeaterCard({
                 <Button
                     type="button"
                     variant="ghost"
-                    size="icon"
-                    className="size-8 text-muted-foreground hover:text-destructive"
+                    className="size-8 shrink-0 p-0 hover:bg-danbg hover:text-dan"
                     onClick={onRemove}
                     aria-label={removeLabel}
                 >
@@ -307,7 +323,7 @@ export function RepeaterCard({
                 </Button>
             </div>
             {open ? (
-                <div id={bodyId} className="flex flex-col gap-4 border-t border-border p-4">
+                <div id={bodyId} className="flex flex-col gap-4 border-t border-hair p-4">
                     {children}
                 </div>
             ) : null}
@@ -317,7 +333,12 @@ export function RepeaterCard({
 
 export function AddEntryButton({ label, onClick }: { label: string; onClick: () => void }) {
     return (
-        <Button type="button" variant="outline" size="sm" onClick={onClick} className="self-start">
+        <Button
+            type="button"
+            variant="sec"
+            onClick={onClick}
+            className="self-start px-3 py-1.5 text-[12.5px]"
+        >
             <Plus className="size-3.5" />
             {label}
         </Button>
@@ -326,9 +347,9 @@ export function AddEntryButton({ label, onClick }: { label: string; onClick: () 
 
 export function EmptyRepeaterState({ title, body }: { title: string; body: string }) {
     return (
-        <div className="rounded-lg border border-dashed border-border p-6 text-center">
-            <p className="text-sm font-medium">{title}</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{body}</p>
+        <div className="rounded-[10px] border border-dashed border-hair2 p-6 text-center">
+            <p className="text-[13px] font-medium text-fg">{title}</p>
+            <p className="mt-1 text-xs leading-relaxed text-fg2">{body}</p>
         </div>
     )
 }

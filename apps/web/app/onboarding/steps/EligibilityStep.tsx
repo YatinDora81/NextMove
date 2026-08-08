@@ -2,7 +2,6 @@
 
 import { Info } from "lucide-react"
 import type { ProfileEeo, RemotePreference } from "@repo/types/ProfileTypes"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Switch } from "@/components/ui/switch"
@@ -13,8 +12,17 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import { Well } from "@/components/quiet/Card"
+import { Input } from "@/components/quiet/Field"
 import { cn } from "@/lib/utils"
-import { ChipInput, StepHeader, SubSection, ToggleChip, type StepProps } from "@/app/onboarding/steps/fields"
+import {
+    ChipInput,
+    StepHeader,
+    SubSection,
+    ToggleChip,
+    labelClass,
+    type StepProps,
+} from "@/app/onboarding/steps/fields"
 
 const COMMON_COUNTRIES: readonly string[] = [
     "United States",
@@ -72,10 +80,10 @@ function EeoSelect({
     onChange: (value: string) => void
 }) {
     return (
-        <div className="flex flex-col gap-2">
-            <Label>{label}</Label>
+        <div className="flex flex-col gap-1.5">
+            <Label className={labelClass}>{label}</Label>
             <Select value={value} onValueChange={onChange} disabled={disabled}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full border-hair2 bg-surface text-[13.5px]">
                     <SelectValue placeholder="Not answered" />
                 </SelectTrigger>
                 <SelectContent>
@@ -128,7 +136,7 @@ export function EligibilityStep({ draft, patch }: StepProps) {
     )
 
     return (
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-6">
             <StepHeader
                 title="Work eligibility"
                 description="The compliance questions every form asks. Answer them once here and the extension stops you having to think about them again."
@@ -139,7 +147,7 @@ export function EligibilityStep({ draft, patch }: StepProps) {
                 hint="Two independent lists: authorisation is about today, sponsorship is about what an employer would have to do."
             >
                 <div className="flex flex-col gap-2">
-                    <Label>Where can you work without sponsorship?</Label>
+                    <Label className={labelClass}>Where can you work without sponsorship?</Label>
                     <div className="flex flex-wrap gap-2">
                         {COMMON_COUNTRIES.map((country) => (
                             <ToggleChip
@@ -171,8 +179,8 @@ export function EligibilityStep({ draft, patch }: StepProps) {
                 </div>
 
                 <div className="flex flex-col gap-2">
-                    <Label>Where would you need visa sponsorship?</Label>
-                    <p className="text-xs leading-relaxed text-muted-foreground">
+                    <Label className={labelClass}>Where would you need visa sponsorship?</Label>
+                    <p className="text-xs leading-relaxed text-fg2">
                         Both lists can contain the same country in different circumstances — pick what is
                         true today.
                     </p>
@@ -205,8 +213,10 @@ export function EligibilityStep({ draft, patch }: StepProps) {
 
             <SubSection title="Status and preferences">
                 <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="flex flex-col gap-2">
-                        <Label htmlFor="visa-status">Current visa or work status</Label>
+                    <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="visa-status" className={labelClass}>
+                            Current visa or work status
+                        </Label>
                         <Input
                             id="visa-status"
                             value={authorization.visaStatus}
@@ -217,14 +227,16 @@ export function EligibilityStep({ draft, patch }: StepProps) {
                                 })
                             }
                         />
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs leading-relaxed text-fg2">
                             Free text — forms word this differently everywhere.
                         </p>
                     </div>
 
-                    <div className="flex flex-col gap-2">
-                        <Label htmlFor="relocate">Willing to relocate</Label>
-                        <div className="flex h-9 items-center gap-3">
+                    <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="relocate" className={labelClass}>
+                            Willing to relocate
+                        </Label>
+                        <div className="flex h-[38px] items-center gap-3">
                             <Switch
                                 id="relocate"
                                 checked={authorization.willingToRelocate}
@@ -234,7 +246,7 @@ export function EligibilityStep({ draft, patch }: StepProps) {
                                     })
                                 }
                             />
-                            <span className="text-sm text-muted-foreground">
+                            <span className="text-[13.5px] text-fg2">
                                 {authorization.willingToRelocate ? "Yes, for the right role" : "No"}
                             </span>
                         </div>
@@ -242,7 +254,7 @@ export function EligibilityStep({ draft, patch }: StepProps) {
                 </div>
 
                 <div className="flex flex-col gap-2">
-                    <Label>Where you want to work from</Label>
+                    <Label className={labelClass}>Where you want to work from</Label>
                     <RadioGroup
                         className="grid gap-2 sm:grid-cols-2"
                         value={authorization.remotePreference}
@@ -260,10 +272,10 @@ export function EligibilityStep({ draft, patch }: StepProps) {
                                 key={option.value}
                                 htmlFor={`remote-${option.value}`}
                                 className={cn(
-                                    "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
+                                    "flex cursor-pointer items-start gap-3 rounded-lg border border-hair2 p-3 transition-colors",
                                     authorization.remotePreference === option.value
-                                        ? "border-primary bg-primary/5"
-                                        : "border-border hover:bg-muted/40",
+                                        ? "bg-well2"
+                                        : "bg-surface hover:bg-well",
                                 )}
                             >
                                 <RadioGroupItem
@@ -272,10 +284,10 @@ export function EligibilityStep({ draft, patch }: StepProps) {
                                     className="mt-0.5"
                                 />
                                 <span>
-                                    <span className="block text-sm font-medium">{option.label}</span>
-                                    <span className="block text-xs text-muted-foreground">
-                                        {option.hint}
+                                    <span className="block text-[13.5px] font-medium text-fg">
+                                        {option.label}
                                     </span>
+                                    <span className="block text-xs text-fg2">{option.hint}</span>
                                 </span>
                             </label>
                         ))}
@@ -284,22 +296,24 @@ export function EligibilityStep({ draft, patch }: StepProps) {
             </SubSection>
 
             <SubSection title="Voluntary self-identification">
-                <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-4">
-                    <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                    <p className="text-xs leading-relaxed text-muted-foreground">
+                <Well className="flex items-start gap-3 p-4">
+                    <Info aria-hidden className="mt-0.5 size-4 shrink-0 text-fg2" />
+                    <p className="text-xs leading-relaxed text-fg2">
                         These questions are voluntary. Employers collect them for equal-opportunity
                         reporting, they are kept separate from hiring decisions, and declining costs you
                         nothing. Leave them blank and the extension leaves those form fields alone.
                     </p>
-                </div>
+                </Well>
 
                 <label
                     htmlFor="eeo-decline"
-                    className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-border p-4"
+                    className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-hair2 p-4 transition-colors hover:bg-well"
                 >
                     <span>
-                        <span className="block text-sm font-medium">Decline to state on every form</span>
-                        <span className="block text-xs text-muted-foreground">
+                        <span className="block text-[13.5px] font-medium text-fg">
+                            Decline to state on every form
+                        </span>
+                        <span className="block text-xs text-fg2">
                             The extension will pick “I don’t wish to answer” wherever a form offers it.
                         </span>
                     </span>

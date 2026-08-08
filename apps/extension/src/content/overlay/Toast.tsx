@@ -120,7 +120,7 @@ export function toastFromBusError(error: BusError, options: ToastFromErrorOption
         id: nextToastId('gesture'),
         kind: 'info',
         title: 'That confirmation expired',
-        message: 'Click ✨ again — AI runs only on a fresh click, never in the background.',
+        message: 'Click Answer again — AI runs only on a fresh click, never in the background.',
         timeoutMs: 6_000,
       };
 

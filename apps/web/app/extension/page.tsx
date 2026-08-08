@@ -4,10 +4,9 @@ import {
     AlarmClock,
     ArrowRight,
     Ban,
-    Chrome,
+    CheckCircle2,
     CircleSlash,
     Cpu,
-    Download,
     Eye,
     FileText,
     Globe,
@@ -21,20 +20,9 @@ import {
     WifiOff,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
-
-/**
- * JF-001 SEC 8.5 — `/extension`, the public install page. Ships with the Chrome Web Store
- * launch (V1), so it must render for a signed-out visitor: nothing on this page reads a
- * token, and `/extension` is deliberately absent from the protected list in middleware.ts.
- *
- * Its job is to tell the SEC 09 privacy story and to justify, in plain English, every
- * permission in the SEC 10 manifest — above all the content script's `<all_urls>` match,
- * which is the one thing that makes a careful person hesitate. The Chrome Web Store review
- * narrative and this page say the same sentence: "fill job application forms you are
- * viewing" — no auto-submit, no scraping at scale, no remote code.
- */
+import { Card, Well } from "@/components/quiet/Card"
+import { Chip } from "@/components/quiet/Chip"
+import { Field, Input } from "@/components/quiet/Field"
 
 export const metadata: Metadata = {
     title: "NextMove Autofill for Chrome | NextMoveApp",
@@ -48,18 +36,20 @@ export const metadata: Metadata = {
     },
 }
 
-/**
- * The store listing URL. Overridable per-environment so the staging build can point at an
- * unlisted item; the fallback is the store's own search for the published listing name,
- * which resolves for a visitor even before the direct item id is minted.
- */
 const CHROME_STORE_URL =
     process.env.NEXT_PUBLIC_CHROME_STORE_URL ?? "https://chromewebstore.google.com/search/NextMove%20Autofill"
 
-const HERO_CHIPS: string[] = [
-    "Works on any career page",
-    "Never auto-submits",
-    "Your data stays on your device",
+const BTN =
+    "inline-flex items-center justify-center gap-2 rounded-lg border border-transparent text-[13.5px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+const BTN_ACC = `${BTN} bg-acc text-on-acc shadow-[inset_0_1px_0_rgba(255,255,255,.14),var(--qp-sh-sm)] hover:bg-acc-strong`
+const BTN_SEC = `${BTN} border-hair2 bg-surface text-fg shadow-qsm hover:bg-well`
+const OV = "text-[11px] font-medium uppercase tracking-[.09em] text-fg3"
+const H2 = "text-[clamp(22px,2.6vw,30px)] font-[650] leading-[1.15] tracking-[-0.022em]"
+
+const CLAIMS: { lead: string; tail: string }[] = [
+    { lead: "Never auto-submits.", tail: "You always press the button." },
+    { lead: "Keys stay on-device.", tail: "Encrypted locally, never sent to us." },
+    { lead: "Works offline.", tail: "Guest mode is fully local." },
 ]
 
 const STEPS: { icon: LucideIcon; title: string; body: string }[] = [
@@ -159,318 +149,267 @@ const PRIVACY_POINTS: { icon: LucideIcon; title: string; body: string }[] = [
     },
 ]
 
-function SectionHeading({
-    eyebrow,
-    title,
-    body,
-}: {
-    eyebrow: string
-    title: string
-    body: string
-}) {
+function SectionHeading({ eyebrow, title, body }: { eyebrow: string; title: string; body: string }) {
     return (
-        <div className="flex flex-col items-center gap-3 text-center">
-            <span className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-medium tracking-wide text-zinc-500 uppercase dark:border-zinc-800 dark:text-zinc-400">
-                {eyebrow}
-            </span>
-            <h2 className="max-w-3xl text-2xl font-bold md:text-4xl">{title}</h2>
-            <p className="max-w-2xl text-sm text-zinc-600 md:text-base dark:text-zinc-400">{body}</p>
+        <div className="mx-auto max-w-[560px] text-center">
+            <div className={OV}>{eyebrow}</div>
+            <h2 className={`mt-2.5 ${H2}`}>{title}</h2>
+            <p className="mt-2.5 text-sm leading-[1.65] text-fg2">{body}</p>
         </div>
     )
 }
 
 export default function ExtensionPage() {
     return (
-        <div className="flex w-full flex-col items-center gap-20 pb-24">
-            {/* ---------------- Hero ---------------- */}
-            <section className="relative flex w-full flex-col items-center overflow-hidden px-4 pt-[12vh] pb-12">
-                <div
-                    className={cn(
-                        "absolute inset-0 z-0",
-                        "[background-size:40px_40px]",
-                        "[background-image:linear-gradient(to_right,#e4e4e7_1px,transparent_1px),linear-gradient(to_bottom,#e4e4e7_1px,transparent_1px)]",
-                        "dark:[background-image:linear-gradient(to_right,#262626_1px,transparent_1px),linear-gradient(to_bottom,#262626_1px,transparent_1px)]",
-                    )}
-                    aria-hidden="true"
-                />
-                <div
-                    className="pointer-events-none absolute inset-0 z-0 bg-background [mask-image:radial-gradient(ellipse_at_center,transparent_5%,black_80%)]"
-                    aria-hidden="true"
-                />
-
-                <div className="z-10 flex max-w-3xl flex-col items-center gap-6 text-center">
-                    <div className="flex items-center gap-2 rounded-3xl border border-zinc-200 bg-zinc-100/70 px-4 py-1.5 dark:border-zinc-800 dark:bg-zinc-800/50">
-                        <Chrome className="h-4 w-4" aria-hidden="true" />
-                        <span className="text-xs font-medium sm:text-sm">Chrome extension &middot; NextMove Autofill</span>
-                    </div>
-
-                    <h1 className="text-4xl font-bold poppins-bold md:text-6xl">
-                        Fill any job application in one click
+        <main className="min-h-screen bg-bg px-6 pb-[76px] font-sans text-fg">
+            <section className="mx-auto grid max-w-[1020px] items-center gap-11 pt-[60px] md:grid-cols-[1fr_1.15fr]">
+                <div>
+                    <div className={OV}>NextMove Autofill &middot; v3.0.1</div>
+                    <h1 className="mt-3 text-[clamp(32px,4vw,44px)] font-[650] leading-[1.08] tracking-[-0.028em]">
+                        The last job form you&apos;ll fill by hand.
                     </h1>
-
-                    <p className="max-w-2xl text-base text-zinc-600 md:text-xl dark:text-zinc-300">
-                        Greenhouse, Lever, Workday, Ashby, iCIMS &mdash; and the long tail of career pages that use
-                        none of them. Your data stays on your device, and nothing is ever submitted for you.
+                    <p className="mt-4 max-w-[420px] text-[15px] leading-[1.6] text-fg2">
+                        Greenhouse, Lever, Workday and more &mdash; filled in about a second, signed in or not.
                     </p>
-
-                    <div className="flex flex-wrap items-center justify-center gap-2">
-                        {HERO_CHIPS.map((chip) => (
-                            <span
-                                key={chip}
-                                className="rounded-3xl border border-black/40 bg-white px-3 py-1.5 text-xs font-medium dark:border-gray-200/30 dark:bg-zinc-950/60"
-                            >
-                                {chip}
-                            </span>
+                    <div className="mt-[22px] flex flex-wrap gap-2.5">
+                        <a
+                            href={CHROME_STORE_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`${BTN_ACC} px-[17px] py-2.5`}
+                        >
+                            Add to Chrome &mdash; free
+                        </a>
+                        <a href="#permissions" className={`${BTN_SEC} px-[17px] py-2.5`}>
+                            What it can access
+                            <ArrowRight className="size-3.5" strokeWidth={1.5} />
+                        </a>
+                    </div>
+                    <div className="mt-6 flex flex-col gap-2.5">
+                        {CLAIMS.map((claim) => (
+                            <div key={claim.lead} className="flex items-center gap-2.5 text-[13.5px]">
+                                <CheckCircle2 className="size-4 flex-none text-ok" strokeWidth={1.5} />
+                                <b className="font-semibold">{claim.lead}</b>
+                                <span className="text-[13px] text-fg2">{claim.tail}</span>
+                            </div>
                         ))}
                     </div>
-
-                    <div className="flex w-full flex-col items-center gap-3 sm:w-auto sm:flex-row">
-                        <Button asChild size="lg" className="w-full gap-2 sm:w-auto">
-                            <a href={CHROME_STORE_URL} target="_blank" rel="noopener noreferrer">
-                                <Download className="h-4 w-4" />
-                                Add to Chrome &mdash; free
-                            </a>
-                        </Button>
-                        <Button asChild size="lg" variant="outline" className="w-full gap-2 sm:w-auto">
-                            <a href="#permissions">
-                                What it can access
-                                <ArrowRight className="h-4 w-4" />
-                            </a>
-                        </Button>
-                    </div>
-
-                    <p className="text-xs text-zinc-500 dark:text-zinc-500">
+                    <p className="mt-4 text-[13px] text-fg3">
                         Chrome 116+. No account required to use it &mdash; sign in only if you want your tracker to
                         follow you between machines.
                     </p>
                 </div>
-            </section>
 
-            {/* ---------------- Demo ---------------- */}
-            <section className="w-full max-w-5xl px-4">
-                <div className="rounded-2xl border border-zinc-200 shadow-2xl shadow-zinc-500/10 dark:border-zinc-800">
-                    <div className="flex h-9 items-center gap-2 rounded-t-2xl bg-zinc-100 pl-4 dark:bg-zinc-900">
-                        <span className="h-3 w-3 rounded-full bg-red-500" aria-hidden="true" />
-                        <span className="h-3 w-3 rounded-full bg-yellow-500" aria-hidden="true" />
-                        <span className="h-3 w-3 rounded-full bg-green-500" aria-hidden="true" />
-                        <span className="ml-3 truncate text-xs text-zinc-500">boards.greenhouse.io/acme/jobs/…</span>
+                <Card className="px-5 py-[18px] shadow-qmd">
+                    <div className="flex items-center gap-2">
+                        <span className={`${OV} text-[10.5px]`}>jobs.lever.co/razorpay</span>
+                        <span className="tnum ml-auto text-xs text-fg2">19 of 21 filled</span>
                     </div>
-
-                    {/*
-                        Demo GIF slot. When the recording exists, drop it at
-                        `apps/web/public/extension/demo.gif` and replace this placeholder with a
-                        next/image <Image src="/extension/demo.gif" … unoptimized /> — the surrounding
-                        aspect box is already sized for a 16:9 capture. No asset is invented here on
-                        purpose: a fabricated screenshot on an install page is a store-policy problem.
-                    */}
-                    <div className="flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-b-2xl bg-[linear-gradient(45deg,transparent_46%,rgba(113,113,122,0.18)_46%,rgba(113,113,122,0.18)_54%,transparent_54%)] bg-[length:14px_14px] px-6 text-center">
-                        <div className="rounded-xl bg-white/85 p-3 shadow-sm dark:bg-zinc-900/85">
-                            <MousePointerClick className="h-6 w-6" aria-hidden="true" />
+                    <Well className="mt-2.5 h-[5px] overflow-hidden rounded-full">
+                        <div className="h-full w-[90%] rounded-full bg-acc" />
+                    </Well>
+                    <Field label="Full name">
+                        <div className="relative">
+                            <Input defaultValue="Yatin Dora" readOnly />
+                            <CheckCircle2 className="absolute top-[11px] right-2.5 size-4 text-ok" strokeWidth={1.5} />
                         </div>
-                        <p className="max-w-md rounded-lg bg-white/85 px-4 py-2 text-sm font-medium backdrop-blur dark:bg-zinc-900/85">
-                            Demo: 26 fields on a Greenhouse application, filled and highlighted in about two
-                            seconds &mdash; then handed back to you to submit.
-                        </p>
+                    </Field>
+                    <Field label="Notice period">
+                        <div className="relative">
+                            <Input defaultValue="30 days" readOnly />
+                            <CheckCircle2 className="absolute top-[11px] right-2.5 size-4 text-ok" strokeWidth={1.5} />
+                        </div>
+                    </Field>
+                    <div className="mt-4 flex gap-2">
+                        <span className={`${BTN_ACC} flex-1 py-2.5`}>Review 2 suggestions</span>
+                        <span className={`${BTN_SEC} px-3.5 py-2.5`}>Undo all</span>
                     </div>
-                </div>
+                </Card>
             </section>
 
-            {/* ---------------- How it works ---------------- */}
-            <section className="flex w-full max-w-5xl flex-col items-center gap-10 px-4">
+            <section className="mx-auto mt-[84px] max-w-[1020px]">
                 <SectionHeading
                     eyebrow="How it works"
                     title="Three steps, and the last one is still yours"
                     body="The extension does the typing. The decision to apply stays where it belongs."
                 />
-
-                <ol className="grid w-full gap-5 md:grid-cols-3">
+                <ol className="mt-[26px] grid gap-3.5 md:grid-cols-3">
                     {STEPS.map((step, index) => (
-                        <li
-                            key={step.title}
-                            className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900/60"
-                        >
-                            <div className="flex items-center gap-3">
-                                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 text-sm font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900">
-                                    {index + 1}
-                                </span>
-                                <step.icon className="h-5 w-5 text-zinc-500" aria-hidden="true" />
-                            </div>
-                            <h3 className="text-lg font-semibold">{step.title}</h3>
-                            <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">{step.body}</p>
+                        <li key={step.title}>
+                            <Card className="h-full p-[18px]">
+                                <div className="flex items-center gap-2.5">
+                                    <span className="tnum text-[11px] font-medium tracking-[.09em] text-fg3">
+                                        {`0${index + 1}`}
+                                    </span>
+                                    <step.icon className="size-4 text-fg2" strokeWidth={1.5} />
+                                </div>
+                                <h3 className="mt-2.5 text-base leading-[1.3] font-semibold tracking-[-0.012em]">
+                                    {step.title}
+                                </h3>
+                                <p className="mt-[5px] text-[13px] leading-[1.65] text-fg2">{step.body}</p>
+                            </Card>
                         </li>
                     ))}
                 </ol>
             </section>
 
-            {/* ---------------- Privacy ---------------- */}
-            <section className="flex w-full max-w-5xl flex-col items-center gap-10 px-4">
+            <section className="mx-auto mt-[84px] max-w-[1020px]">
                 <SectionHeading
                     eyebrow="Local-first"
                     title="The data never has to go anywhere"
                     body="Autofill tools usually work by uploading your life to a server. This one does not need to, so it does not."
                 />
-
-                <div className="grid w-full gap-5 md:grid-cols-2">
+                <div className="mt-[26px] grid gap-3.5 md:grid-cols-2">
                     {PRIVACY_POINTS.map((point) => (
-                        <div
-                            key={point.title}
-                            className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900/60"
-                        >
-                            <div className="flex items-center gap-3">
-                                <span className="rounded-lg bg-zinc-100 p-2 dark:bg-zinc-800">
-                                    <point.icon className="h-4 w-4" aria-hidden="true" />
-                                </span>
-                                <h3 className="text-base font-semibold">{point.title}</h3>
-                            </div>
-                            <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">{point.body}</p>
-                        </div>
+                        <Card key={point.title} className="p-[18px]">
+                            <point.icon className="size-4 text-fg2" strokeWidth={1.5} />
+                            <h3 className="mt-2.5 text-base leading-[1.3] font-semibold tracking-[-0.012em]">
+                                {point.title}
+                            </h3>
+                            <p className="mt-[5px] text-[13px] leading-[1.65] text-fg2">{point.body}</p>
+                        </Card>
                     ))}
                 </div>
 
-                <div className="w-full rounded-2xl border border-amber-300 bg-amber-50/70 p-6 dark:border-amber-900 dark:bg-amber-950/30">
-                    <h3 className="mb-2 text-base font-semibold text-amber-900 dark:text-amber-200">
-                        The honest limit of &ldquo;encrypted at rest&rdquo;
-                    </h3>
-                    <p className="text-sm leading-relaxed text-amber-900/90 dark:text-amber-200/90">
+                <Well className="mt-3.5 px-[18px] py-4">
+                    <div className="flex items-center gap-2.5">
+                        <Chip tone="warn" dot={false} className="text-[11.5px]">
+                            Worth knowing
+                        </Chip>
+                        <h3 className="text-sm font-semibold">
+                            The honest limit of &ldquo;encrypted at rest&rdquo;
+                        </h3>
+                    </div>
+                    <p className="mt-2.5 text-[13px] leading-[1.65] text-fg2">
                         The encryption key is derived from a secret that lives on the same device as the data. That
-                        genuinely protects you from someone reading files off the disk or lifting an unencrypted
-                        browser backup. It does <strong>not</strong> protect you from malware already running as you
-                        &mdash; nothing that runs in your own browser can. If you want the stronger guarantee, turn on
-                        passphrase mode: the vault is then locked with something only you know, and it is what
-                        cross-device sync uses so that our servers hold ciphertext they cannot read.
+                        genuinely protects you from someone reading files off the disk or lifting an unencrypted browser
+                        backup. It does <strong className="font-semibold text-fg">not</strong> protect you from malware
+                        already running as you &mdash; nothing that runs in your own browser can. If you want the
+                        stronger guarantee, turn on passphrase mode: the vault is then locked with something only you
+                        know, and it is what cross-device sync uses so that our servers hold ciphertext they cannot
+                        read.
                     </p>
-                </div>
+                </Well>
             </section>
 
-            {/* ---------------- Permissions ---------------- */}
-            <section id="permissions" className="flex w-full max-w-5xl scroll-mt-24 flex-col items-center gap-10 px-4">
+            <section id="permissions" className="mx-auto mt-[84px] max-w-[1020px] scroll-mt-20">
                 <SectionHeading
                     eyebrow="Permissions"
                     title="Every permission, in plain English"
                     body="Chrome shows you a list at install time. Here is what each item on that list is actually for."
                 />
-
-                <div className="grid w-full gap-4 md:grid-cols-2">
+                <div className="mt-[26px] grid gap-3.5 md:grid-cols-2">
                     {PERMISSIONS.map((permission) => (
-                        <div
-                            key={permission.name}
-                            className="flex flex-col gap-2 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900/60"
-                        >
+                        <Card key={permission.name} className="p-[18px]">
                             <div className="flex flex-wrap items-center gap-2">
-                                <permission.icon className="h-4 w-4 text-zinc-500" aria-hidden="true" />
-                                <code className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-xs dark:bg-zinc-800">
+                                <permission.icon className="size-4 flex-none text-fg2" strokeWidth={1.5} />
+                                <code className="rounded-sm bg-well px-1.5 py-0.5 font-mono text-[11.5px] text-fg2">
                                     {permission.name}
                                 </code>
-                                <span className="text-sm font-semibold">{permission.label}</span>
+                                <span className="text-[13.5px] font-semibold">{permission.label}</span>
                             </div>
-                            <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
-                                {permission.body}
-                            </p>
-                        </div>
+                            <p className="mt-2.5 text-[13px] leading-[1.65] text-fg2">{permission.body}</p>
+                        </Card>
                     ))}
                 </div>
 
-                {/* The single scary permission gets its own, unhurried explanation. */}
-                <div className="w-full rounded-2xl border-2 border-zinc-300 bg-white p-6 md:p-8 dark:border-zinc-700 dark:bg-zinc-900/60">
-                    <div className="mb-3 flex flex-wrap items-center gap-2">
-                        <Globe className="h-5 w-5" aria-hidden="true" />
-                        <code className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-sm dark:bg-zinc-800">
+                <Card className="mt-3.5 p-[18px] md:p-6">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Globe className="size-4 flex-none text-fg2" strokeWidth={1.5} />
+                        <code className="rounded-sm bg-well px-1.5 py-0.5 font-mono text-[11.5px] text-fg2">
                             {"<all_urls>"}
                         </code>
-                        <h3 className="text-lg font-semibold">
+                        <h3 className="text-base leading-[1.3] font-semibold tracking-[-0.012em]">
                             &ldquo;Read and change all your data on all websites&rdquo;
                         </h3>
                     </div>
 
-                    <div className="flex flex-col gap-3 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+                    <div className="mt-2.5 flex flex-col gap-2.5 text-[13px] leading-[1.65] text-fg2">
                         <p>
                             This is the scary one, and it is worth being precise about. A job application can live on
                             literally any domain: a Greenhouse board, a Lever page, a company&rsquo;s own Workday
-                            tenant, or a twelve-person startup&rsquo;s hand-built <code>/careers</code> form. Chrome
-                            has no &ldquo;run on career pages&rdquo; permission, so an extension that works everywhere
-                            has to ask for everywhere.
+                            tenant, or a twelve-person startup&rsquo;s hand-built <code className="font-mono">/careers</code>{" "}
+                            form. Chrome has no &ldquo;run on career pages&rdquo; permission, so an extension that works
+                            everywhere has to ask for everywhere.
                         </p>
                         <p>
-                            <strong className="text-zinc-900 dark:text-zinc-100">What it actually does:</strong> on
-                            each page the script starts, looks for application-shaped fields, and if it finds none it
-                            stops and stores nothing. No page content, URL, or browsing history is recorded or
-                            transmitted for pages that are not applications &mdash; and none of it is transmitted for
-                            the ones that are, either, unless you turn on sync.
+                            <strong className="font-semibold text-fg">What it actually does:</strong> on each page the
+                            script starts, looks for application-shaped fields, and if it finds none it stops and stores
+                            nothing. No page content, URL, or browsing history is recorded or transmitted for pages that
+                            are not applications &mdash; and none of it is transmitted for the ones that are, either,
+                            unless you turn on sync.
                         </p>
                         <p>
-                            <strong className="text-zinc-900 dark:text-zinc-100">
-                                What it never does:
-                            </strong>{" "}
-                            no analytics on your browsing, no injected affiliate links, no scraping listings in bulk,
-                            no remotely loaded code. The store listing declares a single purpose &mdash; fill job
-                            application forms you are viewing &mdash; and everything in the build conforms to that
-                            sentence.
+                            <strong className="font-semibold text-fg">What it never does:</strong> no analytics on your
+                            browsing, no injected affiliate links, no scraping listings in bulk, no remotely loaded
+                            code. The store listing declares a single purpose &mdash; fill job application forms you are
+                            viewing &mdash; and everything in the build conforms to that sentence.
                         </p>
                     </div>
 
-                    <div className="mt-5 border-t border-zinc-200 pt-5 dark:border-zinc-800">
-                        <p className="mb-3 text-sm font-semibold">And here is what it deliberately does not ask for:</p>
-                        <ul className="flex flex-wrap gap-2">
+                    <div className="mt-4 border-t border-hair pt-4">
+                        <p className="text-[13px] font-semibold">
+                            And here is what it deliberately does not ask for:
+                        </p>
+                        <ul className="mt-2.5 flex flex-wrap gap-2">
                             {NOT_REQUESTED.map((item) => (
                                 <li
                                     key={item.name}
-                                    className="flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs dark:border-zinc-800"
+                                    className="flex items-center gap-2 rounded-lg bg-well px-2.5 py-1.5 text-xs text-fg2"
                                 >
-                                    <Ban className="h-3.5 w-3.5 text-rose-500" aria-hidden="true" />
-                                    <code className="font-mono">{item.name}</code>
-                                    <span className="text-zinc-500 dark:text-zinc-400">&mdash; {item.why}</span>
+                                    <Ban className="size-3.5 flex-none text-dan" strokeWidth={1.5} />
+                                    <code className="font-mono text-fg">{item.name}</code>
+                                    <span>&mdash; {item.why}</span>
                                 </li>
                             ))}
                         </ul>
                     </div>
-                </div>
+                </Card>
             </section>
 
-            {/* ---------------- Sync (optional) ---------------- */}
-            <section className="w-full max-w-5xl px-4">
-                <div className="flex flex-col items-start gap-4 rounded-2xl border border-zinc-200 bg-white p-6 md:flex-row md:items-center md:justify-between md:p-8 dark:border-zinc-800 dark:bg-zinc-900/60">
-                    <div className="flex flex-col gap-2">
-                        <h3 className="text-lg font-semibold">Optional: connect it to your NextMove account</h3>
-                        <p className="max-w-2xl text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+            <section className="mx-auto mt-[84px] max-w-[1020px]">
+                <Card className="flex flex-col items-start gap-4 p-[18px] md:flex-row md:items-center md:justify-between md:p-6">
+                    <div>
+                        <h3 className="text-base leading-[1.3] font-semibold tracking-[-0.012em]">
+                            Optional: connect it to your NextMove account
+                        </h3>
+                        <p className="mt-2.5 max-w-[620px] text-[13px] leading-[1.65] text-fg2">
                             Pairing takes one 8-character code, valid for five minutes and usable once. The extension
                             never sees your password and never touches your browser cookies. Once paired, the
                             applications it fills show up in your Applied dashboard alongside the outreach you write
                             here &mdash; and you can revoke any device from{" "}
-                            <Link
-                                href="/settings/devices"
-                                className="font-medium text-blue-600 underline-offset-4 hover:underline dark:text-blue-400"
-                            >
+                            <Link href="/settings/devices" className="text-acc hover:underline">
                                 Settings &rarr; Connected devices
                             </Link>{" "}
                             at any time.
                         </p>
                     </div>
-                    <Button asChild variant="outline" className="w-full gap-2 md:w-auto">
-                        <Link href="/applied?tab=applications">
-                            See the dashboard
-                            <ArrowRight className="h-4 w-4" />
-                        </Link>
-                    </Button>
-                </div>
+                    <Link href="/applied?tab=applications" className={`${BTN_SEC} flex-none px-3.5 py-2`}>
+                        See the dashboard
+                        <ArrowRight className="size-3.5" strokeWidth={1.5} />
+                    </Link>
+                </Card>
             </section>
 
-            {/* ---------------- Final CTA ---------------- */}
-            <section className="flex w-full max-w-3xl flex-col items-center gap-5 px-4 text-center">
-                <h2 className="text-2xl font-bold md:text-4xl">Stop retyping your own name</h2>
-                <p className="text-sm text-zinc-600 md:text-base dark:text-zinc-400">
+            <section className="mx-auto mt-[84px] max-w-[560px] text-center">
+                <h2 className={H2}>Stop retyping your own name.</h2>
+                <p className="mt-2.5 text-sm leading-[1.65] text-fg2">
                     Install it, spend two minutes on your profile, and get the rest of your applications back.
                 </p>
-                <Button asChild size="lg" className="gap-2">
-                    <a href={CHROME_STORE_URL} target="_blank" rel="noopener noreferrer">
-                        <Chrome className="h-4 w-4" />
-                        Add NextMove Autofill to Chrome
-                    </a>
-                </Button>
-                <p className="text-xs text-zinc-500 dark:text-zinc-500">
+                <a
+                    href={CHROME_STORE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`${BTN_ACC} mt-[26px] px-[18px] py-2.5 text-sm`}
+                >
+                    Add NextMove Autofill to Chrome
+                    <ArrowRight className="size-3.5" strokeWidth={1.5} />
+                </a>
+                <p className="mt-3 text-[13px] text-fg3">
                     Free. Bring your own Gemini key for AI answers, or skip AI entirely &mdash; everything else works
                     without it.
                 </p>
             </section>
-        </div>
+        </main>
     )
 }

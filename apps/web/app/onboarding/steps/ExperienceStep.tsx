@@ -3,8 +3,8 @@
 import { useState } from "react"
 import type { EducationEntry, SharedProfile, WorkEntry } from "@repo/types/ProfileTypes"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/quiet/Field"
 import {
     AddEntryButton,
     EmptyRepeaterState,
@@ -12,6 +12,7 @@ import {
     StepHeader,
     SubSection,
     TextField,
+    labelClass,
     moveItem,
     type StepProps,
 } from "@/app/onboarding/steps/fields"
@@ -60,7 +61,7 @@ export function ExperienceStep({ draft, patch }: StepProps) {
     }
 
     return (
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-6">
             <StepHeader
                 title="Experience"
                 description="Your work history and education, most recent first. Add as much or as little as you like — every field here is optional, and you can edit all of it later."
@@ -147,7 +148,7 @@ export function ExperienceStep({ draft, patch }: StepProps) {
                                     />
                                 </div>
 
-                                <label className="flex items-center gap-2 text-sm">
+                                <label className="flex items-center gap-2 text-[13.5px] text-fg">
                                     <Checkbox
                                         checked={entry.current}
                                         onCheckedChange={(checked) => {
@@ -158,8 +159,10 @@ export function ExperienceStep({ draft, patch }: StepProps) {
                                     I still work here
                                 </label>
 
-                                <div className="flex flex-col gap-2">
-                                    <Label htmlFor={`work-bullets-${index}`}>What you did</Label>
+                                <div className="flex flex-col gap-1.5">
+                                    <Label htmlFor={`work-bullets-${index}`} className={labelClass}>
+                                        What you did
+                                    </Label>
                                     <Textarea
                                         id={`work-bullets-${index}`}
                                         rows={4}
@@ -174,7 +177,7 @@ export function ExperienceStep({ draft, patch }: StepProps) {
                                             })
                                         }
                                     />
-                                    <p className="text-xs text-muted-foreground">One bullet per line.</p>
+                                    <p className="text-xs text-fg2">One bullet per line.</p>
                                 </div>
                             </RepeaterCard>
                         ))}

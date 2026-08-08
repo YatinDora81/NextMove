@@ -5,10 +5,10 @@ import { COMMAND_FILL_PAGE, MENU_FILL_PAGE } from '@/shared/constants';
 import { installAlarmListener, registerAlarms } from '@/background/alarms';
 import { refreshKeyBadge } from '@/background/badge';
 import { primeRuntimeConfig } from '@/background/config-sync';
-import { connectUrl, handleExternalMessage } from '@/background/handoff';
+import { handleExternalMessage } from '@/background/handoff';
 import { dispatchLocal, installRouter } from '@/background/router';
 import { getSlot } from '@/platform/storage';
-import { WEB_UNINSTALL_URL } from '@/shared/constants';
+import { ONBOARDED_KEY, ONBOARDING_PAGE, WEB_UNINSTALL_URL } from '@/shared/constants';
 
 const log = createLogger('bg');
 
@@ -38,17 +38,30 @@ async function createContextMenus(): Promise<void> {
   }
 }
 
+async function alreadyOnboarded(): Promise<boolean> {
+  const bag = await browser.storage.local.get(ONBOARDED_KEY);
+  return (bag as Record<string, unknown>)[ONBOARDED_KEY] === true;
+}
+
+async function markOnboarded(): Promise<void> {
+  await browser.storage.local.set({ [ONBOARDED_KEY]: true });
+}
+
 async function maybeOpenOnboarding(reason: string): Promise<void> {
   if (reason !== 'install') return;
   try {
+    if (await alreadyOnboarded()) {
+      log.info('nm:onboarded is set — skipping onboarding');
+      return;
+    }
     const [profiles, sync] = await Promise.all([getSlot('profiles'), getSlot('sync')]);
     if (profiles.length > 0 || sync.paired) {
+      await markOnboarded();
       log.info('install with existing data — skipping onboarding');
       return;
     }
-    const url = await connectUrl();
-    await browser.tabs.create({ url });
-    log.info('opened web onboarding for a fresh install');
+    await browser.tabs.create({ url: browser.runtime.getURL(ONBOARDING_PAGE) });
+    log.info('opened the first-run fork for a fresh install');
   } catch (error) {
     log.warn('could not open the onboarding tab; the extension works without it', error);
   }

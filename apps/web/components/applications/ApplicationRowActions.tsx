@@ -1,18 +1,9 @@
 "use client"
 
-/**
- * JF-001 SEC 6.7 "Row actions": open posting · copy link · edit company/role · add note ·
- * move lane · delete. "View answers used" is deliberately absent — the Answer Bank has no
- * web surface at all and stays on the device (SEC 8.5 / SEC 7.4 note).
- *
- * This component only raises intent; the dashboard owns the dialogs, so a Radix menu
- * unmounting on select can never take a half-open dialog with it.
- */
-
 import { useCallback } from "react"
 import toast from "react-hot-toast"
 import { Copy, ExternalLink, MoreHorizontal, PencilLine, StickyNote, Trash2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -41,7 +32,7 @@ export type ApplicationRowActionsProps = {
     onEdit: () => void
     onAddNote: () => void
     onDelete: () => void
-    /** Compact trigger for the kanban cards. */
+
     compact?: boolean
 }
 
@@ -78,14 +69,17 @@ export function ApplicationRowActions({
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className={compact ? "h-7 w-7" : "h-8 w-8"}
+                <button
+                    type="button"
+                    className={cn(
+                        "inline-flex items-center justify-center rounded-lg text-fg2 transition-colors hover:bg-well hover:text-fg",
+                        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc",
+                        compact ? "h-7 w-7" : "h-8 w-8",
+                    )}
                     aria-label={`Actions for ${row.role} at ${row.company}`}
                 >
                     <MoreHorizontal className="h-4 w-4" />
-                </Button>
+                </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel className="truncate">{row.company}</DropdownMenuLabel>

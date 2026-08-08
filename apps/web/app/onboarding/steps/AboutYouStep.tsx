@@ -14,7 +14,7 @@ export function AboutYouStep({ draft, errors, patch, onBlurField }: StepProps) {
     }
 
     return (
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-6">
             <StepHeader
                 title="About you"
                 description="The block at the top of every application form. Filled in once here, typed never again."

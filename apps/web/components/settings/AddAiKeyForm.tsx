@@ -1,28 +1,13 @@
 "use client"
 
-/**
- * JF-001 SEC 15.7 — the paste-and-test field, shared by Settings → AI Keys and onboarding.
- *
- * One action, not two: "Test & Save" validates the key live against Google (cheapest possible
- * `models.list` call) and only stores it if Google accepts, so a broken key can never sit in the
- * vault pretending to be fine. The verdict is rendered inline, verbatim from the server, because
- * "API key not valid" and "this key is not restricted to the Gemini API" need completely
- * different fixes from the user.
- *
- * The input is `type="password"` and there is deliberately **no reveal control** — the vault is
- * write-only end to end (SEC 15.8), and a reveal button here would be the one place in the
- * product where a key is rendered back to a screen.
- */
-
+import type { FormEvent } from "react"
 import { useState } from "react"
 import { CheckCircle2, Loader2, XCircle } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Button } from "@/components/quiet/Button"
+import { Field, Input } from "@/components/quiet/Field"
 import { useAiKeys, type AiKeyVerdict } from "@/hooks/useAiKeys"
 import { cn } from "@/lib/utils"
 
-/** Matches `addAiKeySchema` in @repo/types/AiKeyTypes so the client rejects before the round-trip. */
 const MIN_KEY_LENGTH = 20
 const MAX_KEY_LENGTH = 200
 const MAX_LABEL_LENGTH = 40
@@ -45,7 +30,7 @@ export function AddAiKeyForm({
     const trimmedKey = keyValue.trim()
     const effectiveLabel = label.trim() || `Key ${keys.length + 1}`
 
-    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault()
         if (submitting) return
 
@@ -62,7 +47,6 @@ export function AddAiKeyForm({
         const result = await addKey(trimmedKey, effectiveLabel.slice(0, MAX_LABEL_LENGTH))
         setVerdict(result)
         if (result.ok) {
-            // Plaintext lives exactly as long as the request. Clear it the moment it is sealed.
             setKeyValue("")
             setLabel("")
             onSaved?.(result)
@@ -73,10 +57,9 @@ export function AddAiKeyForm({
     const busy = submitting || isMutating
 
     return (
-        <form onSubmit={handleSubmit} className={cn("flex flex-col gap-4", className)}>
+        <form onSubmit={handleSubmit} className={cn("flex flex-col", className)}>
             <div className="grid gap-4 sm:grid-cols-[1fr_2fr]">
-                <div className="flex flex-col gap-2">
-                    <Label htmlFor="ai-key-label">Label</Label>
+                <Field label="Label" className="mt-0">
                     <Input
                         id="ai-key-label"
                         value={label}
@@ -86,10 +69,8 @@ export function AddAiKeyForm({
                         autoComplete="off"
                         disabled={busy}
                     />
-                </div>
-                <div className="flex flex-col gap-2">
-                    <Label htmlFor="ai-key-value">Gemini API key</Label>
-                    {/* type=password: the key is never echoed, and there is no reveal toggle. */}
+                </Field>
+                <Field label="Gemini API key" className="mt-0">
                     <Input
                         id="ai-key-value"
                         type="password"
@@ -104,16 +85,17 @@ export function AddAiKeyForm({
                         maxLength={MAX_KEY_LENGTH}
                         disabled={busy}
                         aria-invalid={verdict !== null && !verdict.ok}
+                        className="font-mono aria-invalid:border-dan"
                     />
-                </div>
+                </Field>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-                <Button type="submit" disabled={busy || trimmedKey.length === 0}>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+                <Button type="submit" variant="acc" disabled={busy || trimmedKey.length === 0}>
                     {busy ? <Loader2 className="size-4 animate-spin" /> : null}
                     {busy ? "Checking with Google…" : submitLabel}
                 </Button>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-fg2">
                     We call Google once to confirm the key works before storing it.
                 </p>
             </div>
@@ -122,18 +104,16 @@ export function AddAiKeyForm({
                 <div
                     role="status"
                     className={cn(
-                        "flex items-start gap-2 rounded-lg border p-3 text-sm",
-                        verdict.ok
-                            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200"
-                            : "border-red-500/40 bg-red-500/10 text-red-800 dark:text-red-200",
+                        "mt-4 flex items-start gap-2 rounded-[10px] px-3 py-2.5 text-[13px] leading-relaxed text-fg",
+                        verdict.ok ? "bg-okbg" : "bg-danbg",
                     )}
                 >
                     {verdict.ok ? (
-                        <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+                        <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-ok" strokeWidth={1.5} />
                     ) : (
-                        <XCircle className="mt-0.5 size-4 shrink-0" />
+                        <XCircle className="mt-0.5 size-4 shrink-0 text-dan" strokeWidth={1.5} />
                     )}
-                    <span className="leading-relaxed">{verdict.message}</span>
+                    <span>{verdict.message}</span>
                 </div>
             ) : null}
         </form>

@@ -1,4 +1,4 @@
-export const BASE_API = process.env.NEXT_PUBLIC_BASE_URL;
+export const BASE_API = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:8080";
 
 export const AUTH_SIGNUP = `${BASE_API}/api/auth/signup`;
 export const AUTH_LOGIN = `${BASE_API}/api/auth/login`;

@@ -22,7 +22,7 @@ function AlertModal({ children = 'Open', alertMode = 1, onConfirm }: { children:
             button1: 'Cancel',
             button1Variant: '',
             button2: 'Delete Permanent',
-            button2Variant: ' bg-red-500 hover:bg-red-600 text-white',
+            button2Variant: 'rounded-lg border border-dan/40 bg-danbg text-[13.5px] font-medium text-dan shadow-none hover:bg-dan/15',
         }
     ]
 

@@ -1,0 +1,125 @@
+:root {
+  --qp-bg: #fcfcfd;
+  --qp-surface: #ffffff;
+  --qp-well: #f4f4f6;
+  --qp-well2: #ececef;
+  --qp-fg: #17171b;
+  --qp-fg2: #5f5f68;
+  --qp-fg3: #9a9aa2;
+  --qp-hair: rgba(23, 23, 27, 0.08);
+  --qp-hair2: rgba(23, 23, 27, 0.14);
+  --qp-acc: #4353e8;
+  --qp-acc-strong: #3a49d6;
+  --qp-acc-soft: #eef0ff;
+  --qp-on-acc: #ffffff;
+  --qp-ok: #177a4c;
+  --qp-okbg: #e8f5ee;
+  --qp-warn: #8a5a00;
+  --qp-warnbg: #f7efdc;
+  --qp-dan: #b32e3c;
+  --qp-danbg: #fbeaec;
+  --qp-gridline: #e4e4e7;
+  --qp-kbd: #ffffff;
+  --qp-kbd-b: rgba(23, 23, 27, 0.16);
+  --qp-sh-sm: 0 1px 2px rgba(9, 9, 11, 0.05);
+  --qp-sh-md: 0 1px 2px rgba(9, 9, 11, 0.05), 0 10px 28px -10px rgba(9, 9, 11, 0.1);
+}
+
+.dark {
+  --qp-bg: #0c0c0f;
+  --qp-surface: #141417;
+  --qp-well: #1b1b20;
+  --qp-well2: #232329;
+  --qp-fg: #f1f1f3;
+  --qp-fg2: #a2a2ab;
+  --qp-fg3: #63636d;
+  --qp-hair: rgba(244, 244, 246, 0.08);
+  --qp-hair2: rgba(244, 244, 246, 0.14);
+  --qp-acc: #8492ff;
+  --qp-acc-strong: #98a4ff;
+  --qp-acc-soft: rgba(122, 136, 255, 0.13);
+  --qp-on-acc: #0c0c0f;
+  --qp-ok: #5cc98c;
+  --qp-okbg: rgba(92, 201, 140, 0.12);
+  --qp-warn: #e0b45c;
+  --qp-warnbg: rgba(224, 180, 92, 0.12);
+  --qp-dan: #ee8b95;
+  --qp-danbg: rgba(238, 139, 149, 0.12);
+  --qp-gridline: #262626;
+  --qp-kbd: #1b1b20;
+  --qp-kbd-b: rgba(244, 244, 246, 0.18);
+  --qp-sh-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --qp-sh-md: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -12px rgba(0, 0, 0, 0.55);
+}
+
+@theme inline {
+  --color-bg: var(--qp-bg);
+  --color-surface: var(--qp-surface);
+  --color-well: var(--qp-well);
+  --color-well2: var(--qp-well2);
+  --color-fg: var(--qp-fg);
+  --color-fg2: var(--qp-fg2);
+  --color-fg3: var(--qp-fg3);
+  --color-hair: var(--qp-hair);
+  --color-hair2: var(--qp-hair2);
+  --color-acc: var(--qp-acc);
+  --color-acc-strong: var(--qp-acc-strong);
+  --color-acc-soft: var(--qp-acc-soft);
+  --color-on-acc: var(--qp-on-acc);
+  --color-ok: var(--qp-ok);
+  --color-okbg: var(--qp-okbg);
+  --color-warn: var(--qp-warn);
+  --color-warnbg: var(--qp-warnbg);
+  --color-dan: var(--qp-dan);
+  --color-danbg: var(--qp-danbg);
+  --shadow-qsm: var(--qp-sh-sm);
+  --shadow-qmd: var(--qp-sh-md);
+}
+
+@layer base {
+  body {
+    --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+    font-family: var(--font-sans);
+  }
+}
+
+.qp-gridbg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--qp-gridline) 1px, transparent 1px),
+    linear-gradient(90deg, var(--qp-gridline) 1px, transparent 1px);
+  background-size: 40px 40px;
+  -webkit-mask-image: radial-gradient(ellipse 85% 70% at 50% 32%, black 28%, transparent 74%);
+  mask-image: radial-gradient(ellipse 85% 70% at 50% 32%, black 28%, transparent 74%);
+}
+
+.qp-logochip {
+  background: #fff url('/logo.png') center / 86% no-repeat;
+  border: 1px solid rgba(23, 23, 27, 0.14);
+  border-radius: 22%;
+  display: inline-block;
+  flex: none;
+}
+
+.dark .qp-logochip {
+  border-color: rgba(244, 244, 246, 0.2);
+}
+
+.qp-kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--qp-kbd);
+  border: 1px solid var(--qp-kbd-b);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 2px 6px;
+  color: var(--qp-fg2);
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}

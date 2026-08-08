@@ -24,16 +24,14 @@ function EditName({ children }: { children: ReactNode }) {
     const [open, setOpen] = useState(false)
     const [loading, setLoading] = useState(false)
 
-
     const changeHandler = async () => {
-        // First name is required
+
         if(!user) return;
         if (firstName.trim().length === 0) {
             toast.error("First name is required")
             return
         }
 
-        // Check if name has changed
         const currentFirstName = capitalizeWords(user?.firstName || '')
         const currentLastName = capitalizeWords(user?.lastName || '')
         if (firstName.trim() === currentFirstName && lastName.trim() === currentLastName) {
@@ -41,13 +39,11 @@ function EditName({ children }: { children: ReactNode }) {
             return
         }
 
-        // First name length validation
         if (firstName.trim().length > 50) {
             toast.error("First name is too long")
             return
         }
 
-        // Last name length validation (if provided)
         if (lastName.trim().length > 50) {
             toast.error("Last name is too long")
             return
@@ -75,11 +71,11 @@ function EditName({ children }: { children: ReactNode }) {
                     "Authorization": `Bearer ${token}`,
                 },
             })
-            
+
             if(res.ok){
                 toast.success("Name updated successfully")
                 toast("Please refresh the page to see the changes.")
-                // Close dialog
+
                 setOpen(false)
             } else {
                 const errorData = await res.json()
@@ -91,7 +87,6 @@ function EditName({ children }: { children: ReactNode }) {
             setLoading(false)
         }
     }
-
 
     useEffect(()=>{
         setFirstName(capitalizeWords(user?.firstName || ''))
@@ -118,12 +113,10 @@ function EditName({ children }: { children: ReactNode }) {
                         </div>
                     </div>
 
-
-                    <div className="bg-muted/50 border border-border rounded-lg p-3 text-sm">
-                        <span className="font-semibold text-foreground">Note:</span>{" "}
-                        <span className="text-muted-foreground">Changing your name will take 1-2 minutes to update.</span>
+                    <div className="rounded-lg bg-well p-3 text-sm">
+                        <span className="font-medium text-fg">Note:</span>{" "}
+                        <span className="text-fg2">Changing your name will take 1-2 minutes to update.</span>
                     </div>
-
 
                     <div className=' flex gap-2 '>
                         <Button className='  w-[48%]' variant={"outline"} size="icon" onClick={() => setOpen(false)} disabled={loading}>Cancel</Button>

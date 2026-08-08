@@ -1,17 +1,8 @@
 "use client"
 
-/**
- * JF-001 SEC 8.5 — the "Applications" half of the unified Applied dashboard: the SEC 6.7
- * tracker ported to the web. Stats strip · filters · table ⇄ kanban · row actions · CSV.
- *
- * These rows come from `GET /api/job-applications`, i.e. what the extension chose to log.
- * The device list is read only to decide which empty state is honest — a user with no
- * paired device needs the pairing story (SEC 8.2), not "0 results".
- */
-
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { AlertTriangle, Download, KanbanSquare, RefreshCw, Rows3 } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/quiet/Button"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/hooks/useAuth"
 import { DEVICES } from "@/utils/url"
@@ -27,13 +18,30 @@ import {
     NoteDialog,
 } from "@/components/applications/ApplicationDialogs"
 import { computeApplicationStats } from "@/components/applications/stats"
-import { JobAppStatus, JobApplication, JobApplicationDetailsPatch } from "@/components/applications/types"
+import {
+    JobAppStatus,
+    JobApplication,
+    JobApplicationDetailsPatch,
+    formatTimeAgo,
+} from "@/components/applications/types"
 
 type BoardOrTable = "table" | "board"
 type DialogKind = "edit" | "note" | "delete" | null
 
-/** `null` = we could not find out (API down); the UI then avoids claiming "no devices". */
 type DeviceState = { count: number } | null
+
+function lastSyncedAt(rows: readonly JobApplication[]): string | null {
+    let bestIso: string | null = null
+    let bestMs = Number.NEGATIVE_INFINITY
+    for (const row of rows) {
+        if (row.updatedAt === null) continue
+        const parsed = Date.parse(row.updatedAt)
+        if (Number.isNaN(parsed) || parsed <= bestMs) continue
+        bestMs = parsed
+        bestIso = row.updatedAt
+    }
+    return bestIso
+}
 
 export function ApplicationsDashboard() {
     const { getToken, isSignedIn, isLoaded } = useAuth()
@@ -65,7 +73,6 @@ export function ApplicationsDashboard() {
     const [activeRow, setActiveRow] = useState<JobApplication | null>(null)
     const [dialog, setDialog] = useState<DialogKind>(null)
 
-    // Device count drives the empty state only — never gates the table.
     useEffect(() => {
         if (!isLoaded) return
         if (!isSignedIn) {
@@ -106,6 +113,7 @@ export function ApplicationsDashboard() {
     }, [getToken, isLoaded, isSignedIn])
 
     const stats = useMemo(() => computeApplicationStats(applications), [applications])
+    const syncedLabel = useMemo(() => formatTimeAgo(lastSyncedAt(allApplications)), [allApplications])
 
     const closeDialog = useCallback(() => {
         setDialog(null)
@@ -153,12 +161,9 @@ export function ApplicationsDashboard() {
         })
     }, [activeRow, closeDialog, deleteApplication])
 
-    // A failed list call must not be reported as "you have no applications" — the error
-    // banner owns that case, and the dashboard chrome stays up so Retry is reachable.
     const isEmpty =
         hasLoaded && error === null && allApplications.length === 0 && isDefaultFilters(filters)
-    // Hold the skeleton until the device lookup settles, so the empty state cannot flash the
-    // wrong story (pair-your-extension vs. nothing-synced-yet) and then swap.
+
     const showSkeleton = (!hasLoaded && isLoading) || (isEmpty && !devicesLoaded)
     const hasPairedDevice = devices !== null && devices.count > 0
 
@@ -171,13 +176,13 @@ export function ApplicationsDashboard() {
     }
 
     return (
-        <div className="flex w-full flex-col gap-5">
+        <div className="flex w-full flex-col gap-4">
             {error !== null && (
-                <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                <div className="flex items-start gap-2 rounded-xl border border-dan/40 bg-danbg px-4 py-3 text-[13.5px] text-dan">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                     <div className="flex flex-col gap-2">
                         <span>{error}</span>
-                        <Button size="sm" variant="outline" onClick={() => void refresh()} className="w-fit">
+                        <Button variant="sec" onClick={() => void refresh()} className="w-fit px-3 py-1.5 text-[13px]">
                             Try again
                         </Button>
                     </div>
@@ -186,15 +191,8 @@ export function ApplicationsDashboard() {
 
             {showSkeleton ? (
                 <div className="flex flex-col gap-4" aria-busy="true" aria-live="polite">
-                    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-                        {[0, 1, 2, 3, 4].map((key) => (
-                            <div
-                                key={key}
-                                className="h-[5.5rem] animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-900"
-                            />
-                        ))}
-                    </div>
-                    <div className="h-64 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-900" />
+                    <div className="h-4 w-64 max-w-full animate-pulse rounded-md bg-well" />
+                    <div className="h-64 animate-pulse rounded-xl bg-well" />
                     <span className="sr-only">Loading your applications…</span>
                 </div>
             ) : isEmpty ? (
@@ -205,7 +203,15 @@ export function ApplicationsDashboard() {
                 />
             ) : (
                 <>
-                    <ApplicationsStats stats={stats} />
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                        <ApplicationsStats stats={stats} className="min-w-0" />
+                        {syncedLabel !== null && (
+                            <span className="ml-auto flex items-center gap-1.5 text-[12.5px] whitespace-nowrap text-fg2">
+                                <span className="size-1.5 rounded-full bg-ok" aria-hidden="true" />
+                                Synced {syncedLabel}
+                            </span>
+                        )}
+                    </div>
 
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div className="flex-1">
@@ -221,7 +227,7 @@ export function ApplicationsDashboard() {
 
                         <div className="flex shrink-0 items-center gap-2">
                             <div
-                                className="inline-flex rounded-lg border border-zinc-200 p-0.5 dark:border-zinc-800"
+                                className="inline-flex gap-0.5 rounded-[9px] bg-well p-[3px]"
                                 role="group"
                                 aria-label="Switch view"
                             >
@@ -230,10 +236,11 @@ export function ApplicationsDashboard() {
                                     onClick={() => setView("table")}
                                     aria-pressed={view === "table"}
                                     className={cn(
-                                        "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                                        "inline-flex items-center gap-1.5 rounded-[7px] px-2.5 py-1.5 text-[13px] font-medium transition-colors",
+                                        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc",
                                         view === "table"
-                                            ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                                            : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800",
+                                            ? "bg-surface text-fg shadow-qsm"
+                                            : "text-fg2 hover:text-fg",
                                     )}
                                 >
                                     <Rows3 className="h-3.5 w-3.5" />
@@ -244,10 +251,11 @@ export function ApplicationsDashboard() {
                                     onClick={() => setView("board")}
                                     aria-pressed={view === "board"}
                                     className={cn(
-                                        "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                                        "inline-flex items-center gap-1.5 rounded-[7px] px-2.5 py-1.5 text-[13px] font-medium transition-colors",
+                                        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc",
                                         view === "board"
-                                            ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                                            : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800",
+                                            ? "bg-surface text-fg shadow-qsm"
+                                            : "text-fg2 hover:text-fg",
                                     )}
                                 >
                                     <KanbanSquare className="h-3.5 w-3.5" />
@@ -256,17 +264,16 @@ export function ApplicationsDashboard() {
                             </div>
 
                             <Button
-                                variant="outline"
-                                size="sm"
+                                variant="sec"
                                 onClick={() => void refresh()}
                                 disabled={isLoading}
-                                className="gap-1.5"
+                                className="px-3 py-1.5 text-[13px]"
                             >
                                 <RefreshCw className={isLoading ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
                                 Refresh
                             </Button>
 
-                            <Button size="sm" onClick={() => exportCsv()} className="gap-1.5">
+                            <Button variant="acc" onClick={() => exportCsv()} className="px-3 py-1.5 text-[13px]">
                                 <Download className="h-3.5 w-3.5" />
                                 Export CSV
                             </Button>
@@ -281,11 +288,7 @@ export function ApplicationsDashboard() {
 
                     {hasMore && (
                         <div className="flex justify-center">
-                            <Button
-                                variant="outline"
-                                onClick={() => void loadMore()}
-                                disabled={isLoadingMore}
-                            >
+                            <Button variant="sec" onClick={() => void loadMore()} disabled={isLoadingMore}>
                                 {isLoadingMore ? "Loading…" : "Load more"}
                             </Button>
                         </div>

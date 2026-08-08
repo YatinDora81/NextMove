@@ -5,6 +5,19 @@ export default defineConfig({
   srcDir: 'src',
   outDir: 'build',
   modules: ['@wxt-dev/module-react'],
+  hooks: {
+    'vite:build:extendConfig': (entrypoints, viteConfig) => {
+      if (!entrypoints.every((entrypoint) => entrypoint.inputPath.endsWith('.html'))) return;
+      const output = viteConfig.build?.rollupOptions?.output;
+      if (!output || Array.isArray(output)) return;
+      output.codeSplitting = {
+        groups: [
+          { name: 'react', test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
+          { name: 'dexie', test: /[\\/]node_modules[\\/]dexie[\\/]/ },
+        ],
+      };
+    },
+  },
   vite: () => ({
     plugins: [tailwindcss()],
   }),

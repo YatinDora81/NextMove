@@ -4,21 +4,23 @@ import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import toast from "react-hot-toast"
 import {
-    ArrowRight,
     Check,
-    Chrome,
+    CheckCircle2,
+    Circle,
     Copy,
     Download,
     KeyRound,
     Loader2,
-    Puzzle,
     RotateCw,
     ShieldAlert,
     Sparkles,
 } from "lucide-react"
 import type { SharedProfile } from "@repo/types/ProfileTypes"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/quiet/Button"
+import { Chip } from "@/components/quiet/Chip"
+import { Well } from "@/components/quiet/Card"
 import { cn } from "@/lib/utils"
+import { linkButton } from "@/app/onboarding/steps/fields"
 
 const EXTENSION_ID = process.env.NEXT_PUBLIC_EXTENSION_ID ?? ""
 
@@ -128,13 +130,13 @@ export function ConnectStep({
     const skills = draft.skills.length
 
     return (
-        <div className="flex flex-col gap-8">
-            <header className="flex flex-col gap-3">
-                <p className="font-mono text-xs tracking-wide text-muted-foreground uppercase">
-                    Last step
-                </p>
-                <h1 className="font-mono text-3xl font-semibold tracking-tight">Your profile is saved</h1>
-                <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+        <div className="flex flex-col gap-6">
+            <header className="flex flex-col gap-1">
+                <p className="text-[11px] font-medium tracking-[0.09em] text-fg3 uppercase">Last step</p>
+                <h1 className="text-[19px] font-semibold tracking-[-0.015em] text-fg">
+                    Your profile is saved
+                </h1>
+                <p className="text-[13px] leading-relaxed text-fg2">
                     {[
                         `${roles} ${roles === 1 ? "role" : "roles"}`,
                         `${schools} ${schools === 1 ? "school" : "schools"}`,
@@ -145,14 +147,23 @@ export function ConnectStep({
             </header>
 
             {saveFailed ? (
-                <div className="flex flex-wrap items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/5 p-4">
-                    <ShieldAlert className="size-4 shrink-0 text-destructive" />
-                    <p className="flex-1 text-sm leading-relaxed">
+                <div className="flex flex-wrap items-center gap-3 rounded-[10px] border border-dan/40 bg-danbg p-4">
+                    <ShieldAlert aria-hidden className="size-4 shrink-0 text-dan" />
+                    <p className="flex-1 text-[13px] leading-relaxed text-fg">
                         The last save didn’t reach the server. Your answers are still in this tab — try
                         again before you leave.
                     </p>
-                    <Button variant="outline" size="sm" onClick={onSaveAgain} disabled={saving}>
-                        {saving ? <Loader2 className="size-3.5 animate-spin" /> : <RotateCw className="size-3.5" />}
+                    <Button
+                        variant="sec"
+                        className="px-3 py-1.5 text-[12.5px]"
+                        onClick={onSaveAgain}
+                        disabled={saving}
+                    >
+                        {saving ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                            <RotateCw className="size-3.5" />
+                        )}
                         Save again
                     </Button>
                 </div>
@@ -160,15 +171,15 @@ export function ConnectStep({
 
             <section
                 className={cn(
-                    "flex flex-col gap-4 rounded-lg border p-5",
-                    exported ? "border-border bg-muted/30" : "border-amber-500/40 bg-amber-500/5",
+                    "flex flex-col gap-4 rounded-[10px] border p-5",
+                    exported ? "border-hair bg-well" : "border-warn/40 bg-warnbg",
                 )}
             >
                 <div className="flex items-start gap-3">
-                    <KeyRound className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <KeyRound aria-hidden className="mt-0.5 size-4 shrink-0 text-fg2" />
                     <div className="flex flex-col gap-1">
-                        <h2 className="font-mono text-sm font-semibold">Save your recovery key</h2>
-                        <p className="text-xs leading-relaxed text-muted-foreground">
+                        <h2 className="text-[13.5px] font-medium text-fg">Save your recovery key</h2>
+                        <p className="text-xs leading-relaxed text-fg2">
                             Your profile is encrypted with this key before it leaves the browser, and we
                             never receive a copy. It lives in this browser’s storage — clear that, or
                             switch to another machine, and this key is the only way back into your vault.
@@ -177,14 +188,15 @@ export function ConnectStep({
                 </div>
 
                 {vaultKey === null ? (
-                    <p className="font-mono text-xs text-muted-foreground">Preparing your key…</p>
+                    <p className="font-mono text-xs text-fg2">Preparing your key…</p>
                 ) : (
                     <>
-                        <code className="rounded-md border border-border bg-background px-3 py-2 font-mono text-xs break-all">
+                        <code className="rounded-lg border border-hair2 bg-surface px-3 py-2 font-mono text-xs break-all text-fg2">
                             {maskKey(vaultKey)}
                         </code>
                         <div className="flex flex-wrap items-center gap-3">
                             <Button
+                                variant="acc"
                                 onClick={() => {
                                     onExportRecoveryKey()
                                     setExported(true)
@@ -193,13 +205,13 @@ export function ConnectStep({
                                 <Download className="size-4" />
                                 Download recovery key
                             </Button>
-                            <Button variant="outline" onClick={() => void handleCopy()}>
+                            <Button variant="ghost" onClick={() => void handleCopy()}>
                                 {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
                                 {copied ? "Copied" : "Copy to clipboard"}
                             </Button>
                         </div>
                         {!exported ? (
-                            <p className="text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+                            <p className="text-xs leading-relaxed text-warn">
                                 Do this before you close the tab. There is no reset link — that is the
                                 point of end-to-end encryption.
                             </p>
@@ -208,76 +220,97 @@ export function ConnectStep({
                 )}
             </section>
 
-            <section className="flex flex-col gap-4 rounded-lg border border-border p-5">
-                <div className="flex items-start gap-3">
-                    <Puzzle className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                    <div className="flex flex-col gap-1">
-                        <h2 className="font-mono text-sm font-semibold">
-                            {paired ? "Extension connected" : "Connect the extension"}
-                        </h2>
-                        <p className="text-xs leading-relaxed text-muted-foreground">
-                            {paired
-                                ? "This browser is already paired. Your profile syncs to it automatically — you can manage or revoke the pairing from Settings → Devices."
-                                : "Pairing hands the extension your vault key so it can fill forms offline. It finds the submit button and highlights it; it never presses it."}
-                        </p>
-                    </div>
-                </div>
+            <section className="rounded-[10px] border border-hair p-5">
+                <h2 className="text-[13.5px] font-medium text-fg">
+                    {paired ? "Extension connected" : "Connect the extension"}
+                </h2>
+                <p className="mt-1 text-xs leading-relaxed text-fg2">
+                    {paired
+                        ? "This browser is already paired. Your profile syncs to it automatically — you can manage or revoke the pairing from Settings → Devices."
+                        : "Pairing hands the extension your vault key so it can fill forms offline. It finds the submit button and highlights it; it never presses it."}
+                </p>
 
-                <div className="flex flex-wrap items-center gap-3">
+                <ul className="mt-4 flex flex-col">
+                    <li className="flex items-center gap-2.5 border-b border-hair px-0.5 py-3 text-[13.5px] text-fg">
+                        {probe === "checking" ? (
+                            <Loader2 aria-hidden className="size-4 shrink-0 animate-spin text-fg3" />
+                        ) : probe === "installed" ? (
+                            <CheckCircle2 aria-hidden className="size-4 shrink-0 text-ok" />
+                        ) : (
+                            <Circle aria-hidden className="size-4 shrink-0 text-fg3" />
+                        )}
+                        Extension detected
+                        <span className="ml-auto text-xs text-fg2">
+                            {probe === "checking"
+                                ? "Checking…"
+                                : probe === "installed"
+                                  ? "Ready"
+                                  : "Not found"}
+                        </span>
+                    </li>
+                    <li className="flex items-center gap-2.5 px-0.5 py-3 text-[13.5px] text-fg">
+                        {paired ? (
+                            <CheckCircle2 aria-hidden className="size-4 shrink-0 text-ok" />
+                        ) : (
+                            <Circle aria-hidden className="size-4 shrink-0 text-fg3" />
+                        )}
+                        Paired with this browser
+                        {paired ? (
+                            <Chip tone="ok" className="ml-auto">
+                                Live
+                            </Chip>
+                        ) : (
+                            <span className="ml-auto text-xs text-fg2">Not paired yet</span>
+                        )}
+                    </li>
+                </ul>
+
+                <div className="mt-5 flex flex-wrap items-center gap-3">
                     {probe === "checking" ? (
-                        <Button disabled>
+                        <Button variant="sec" disabled>
                             <Loader2 className="size-4 animate-spin" />
                             Looking for the extension…
                         </Button>
                     ) : probe === "missing" ? (
                         <>
-                            <Button asChild>
-                                <Link href="/extension">
-                                    <Chrome className="size-4" />
-                                    Install NextMove Autofill
-                                </Link>
-                            </Button>
-                            <p className="text-xs text-muted-foreground">
+                            <Link href="/extension" className={linkButton.sec}>
+                                Install NextMove Autofill
+                            </Link>
+                            <p className="text-xs text-fg2">
                                 Already installed? Reload this page and we’ll spot it.
                             </p>
                         </>
                     ) : paired ? (
-                        <Button variant="outline" asChild>
-                            <Link href="/settings/devices">Manage paired devices</Link>
-                        </Button>
+                        <Link href="/settings/devices" className={linkButton.sec}>
+                            Manage paired devices
+                        </Link>
                     ) : (
-                        <Button asChild>
-                            <Link href="/extension/connect">
-                                Connect this browser
-                                <ArrowRight className="size-4" />
-                            </Link>
-                        </Button>
+                        <Link href="/extension/connect" className={linkButton.sec}>
+                            Connect this browser
+                        </Link>
                     )}
                 </div>
             </section>
 
             {skippedAi ? (
-                <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-4">
-                    <Sparkles className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                    <p className="text-xs leading-relaxed text-muted-foreground">
+                <Well className="flex items-start gap-3 p-4">
+                    <Sparkles aria-hidden className="mt-0.5 size-4 shrink-0 text-fg2" />
+                    <p className="text-xs leading-relaxed text-fg2">
                         You skipped the AI key, which is fine — autofill, templates and tracking all work
                         without one. Add a free Gemini key from{" "}
-                        <Link href="/settings/ai-keys" className="underline underline-offset-4">
+                        <Link href="/settings/ai-keys" className="text-fg underline underline-offset-4">
                             Settings → AI Keys
                         </Link>{" "}
                         whenever you want the drafting features switched on.
                     </p>
-                </div>
+                </Well>
             ) : null}
 
-            <div className="flex flex-wrap items-center gap-3 border-t border-border pt-6">
-                <Button variant="outline" asChild>
-                    <Link href="/generate">
-                        Start using NextMove
-                        <ArrowRight className="size-4" />
-                    </Link>
-                </Button>
-                <p className="text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-3 border-t border-hair pt-6">
+                <Link href="/generate" className={cn(linkButton.acc, "px-5 py-2.5")}>
+                    Start using NextMove
+                </Link>
+                <p className="text-xs text-fg2">
                     Everything here is editable later from your profile.
                 </p>
             </div>

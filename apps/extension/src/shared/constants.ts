@@ -210,3 +210,16 @@ export const HANDOFF_NONCE_KEY = 'jf.handoff.nonce';
 export const SYNC_ALARM_PERIOD_MINUTES = 5;
 
 export const SYNC_DIRTY_KEY = 'jf.sync.dirty';
+
+export const ONBOARDING_PAGE = '/onboarding.html';
+
+export const ONBOARDED_KEY = 'nm:onboarded';
+export const MODE_KEY = 'nm:mode';
+export const ONBOARDING_DRAFT_KEY = 'nm:onboarding:draft';
+export const BACKUP_NUDGE_DISMISSED_KEY = 'nm:nudge:backup:dismissed';
+
+export const ONBOARDING_AUTOSAVE_MS = 400;
+
+export const WEB_AUTH_REDIRECT_PATH = '/onboarding';
+
+export const AI_STUDIO_KEY_URL = 'https://aistudio.google.com/apikey';

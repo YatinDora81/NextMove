@@ -1,81 +1,88 @@
 "use client"
 
-/**
- * JF-001 SEC 6.7 stats strip, ported to the web: applied this week · total ·
- * active interviews · response rate · median days-to-response.
- */
-
-import { CalendarClock, CheckCircle2, Send, Timer, TrendingUp } from "lucide-react"
+import { Fragment } from "react"
 import { ApplicationStats } from "@/components/applications/stats"
 import { cn } from "@/lib/utils"
 
-type Tile = {
-    label: string
+type Count = {
+    key: string
     value: string
-    hint: string
-    icon: typeof Send
+    label: string
+    title?: string
 }
 
-function buildTiles(stats: ApplicationStats): Tile[] {
-    return [
+function plural(count: number, one: string, many: string): string {
+    return count === 1 ? one : many
+}
+
+function buildCounts(stats: ApplicationStats): Count[] {
+    const closed = stats.byStatus.REJECTED + stats.byStatus.GHOSTED
+    const counts: Count[] = [
+        { key: "total", value: String(stats.total), label: "total" },
+        { key: "applied", value: String(stats.byStatus.APPLIED), label: "applied" },
+        { key: "interviewing", value: String(stats.byStatus.INTERVIEW), label: "interviewing" },
         {
-            label: "Applied this week",
-            value: String(stats.appliedThisWeek),
-            hint: "Sent in the last 7 days",
-            icon: Send,
+            key: "offers",
+            value: String(stats.byStatus.OFFER),
+            label: plural(stats.byStatus.OFFER, "offer", "offers"),
         },
-        {
-            label: "Total tracked",
-            value: String(stats.total),
-            hint: stats.total === stats.sentCount ? "All sent" : `${stats.sentCount} sent, rest drafts`,
-            icon: CheckCircle2,
-        },
-        {
-            label: "Active interviews",
-            value: String(stats.activeInterviews),
-            hint: "Sitting in the interview lane",
-            icon: CalendarClock,
-        },
-        {
-            label: "Response rate",
-            value: stats.responseRatePct === null ? "—" : `${stats.responseRatePct}%`,
-            hint:
-                stats.sentCount === 0
-                    ? "No applications sent yet"
-                    : `Reached interview or offer, of ${stats.sentCount} sent`,
-            icon: TrendingUp,
-        },
-        {
-            label: "Median days to reply",
-            value: stats.medianDaysToResponse === null ? "—" : String(stats.medianDaysToResponse),
-            hint:
-                stats.respondedCount === 0
-                    ? "No replies recorded yet"
-                    : `Across ${stats.respondedCount} replied application${stats.respondedCount === 1 ? "" : "s"}`,
-            icon: Timer,
-        },
+        { key: "closed", value: String(closed), label: "closed" },
     ]
+
+    if (stats.byStatus.DRAFT > 0) {
+        counts.push({
+            key: "drafts",
+            value: String(stats.byStatus.DRAFT),
+            label: plural(stats.byStatus.DRAFT, "draft", "drafts"),
+        })
+    }
+
+    counts.push({
+        key: "week",
+        value: String(stats.appliedThisWeek),
+        label: "this week",
+        title: "Sent in the last 7 days",
+    })
+
+    if (stats.responseRatePct !== null) {
+        counts.push({
+            key: "response",
+            value: `${stats.responseRatePct}%`,
+            label: "reached interview",
+            title: `Reached interview or offer, of ${stats.sentCount} sent`,
+        })
+    }
+
+    if (stats.medianDaysToResponse !== null) {
+        counts.push({
+            key: "median",
+            value: String(stats.medianDaysToResponse),
+            label: plural(stats.medianDaysToResponse, "day to first reply", "days to first reply"),
+            title: `Median across ${stats.respondedCount} replied application${stats.respondedCount === 1 ? "" : "s"}`,
+        })
+    }
+
+    return counts
 }
 
 export function ApplicationsStats({ stats, className }: { stats: ApplicationStats; className?: string }) {
-    const tiles = buildTiles(stats)
+    const counts = buildCounts(stats)
 
     return (
-        <div className={cn("grid w-full grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5", className)}>
-            {tiles.map((tile) => (
-                <div
-                    key={tile.label}
-                    className="flex flex-col gap-1 rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/60"
-                >
-                    <div className="flex items-center gap-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                        <tile.icon className="h-3.5 w-3.5" aria-hidden="true" />
-                        <span>{tile.label}</span>
-                    </div>
-                    <div className="text-2xl font-semibold tabular-nums">{tile.value}</div>
-                    <div className="text-[11px] leading-tight text-zinc-500 dark:text-zinc-500">{tile.hint}</div>
-                </div>
+        <p className={cn("tnum flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-fg2", className)}>
+            {counts.map((count, index) => (
+                <Fragment key={count.key}>
+                    {index > 0 && (
+                        <span className="text-fg3" aria-hidden="true">
+                            ·
+                        </span>
+                    )}
+                    <span title={count.title}>
+                        <b className="font-semibold text-fg">{count.value}</b> {count.label}
+                    </span>
+                </Fragment>
             ))}
-        </div>
+        </p>
     )
 }
 

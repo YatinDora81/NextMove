@@ -8,11 +8,11 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog"
-import { Input } from '@/components/ui/input'
 import { Label } from '@radix-ui/react-label'
-import { Textarea } from '../ui/textarea'
 import { Switch } from "@/components/ui/switch"
-import { Button } from '../ui/button'
+import { Button } from '@/components/quiet/Button'
+import { Input, Textarea } from '@/components/quiet/Field'
+import { Well } from '@/components/quiet/Card'
 import toast from 'react-hot-toast'
 import { Copy, CheckCircle2, Info } from 'lucide-react'
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group'
@@ -24,11 +24,6 @@ import { useAuth } from '@/hooks/useAuth'
 import { useTemplates } from '@/hooks/useTemplates'
 import Gen_AI_Template from './Gen_AI_Template'
 
-/**
- * The placeholder toggles offered by the form. Static configuration, so it lives at module scope:
- * as a value recreated on every render it could never be an honest `useEffect` dependency — the
- * effects below read it *and* call `setTemplateData`, so a fresh array each render would loop.
- */
 const rules = [
     {
         name: "[Recruiter Name]",
@@ -43,6 +38,9 @@ const rules = [
     //     defaultValue: false
     // }
 ]
+
+const labelClass = "text-[13px] font-medium text-fg"
+const codeClass = "font-mono rounded-sm bg-well px-1.5 py-0.5 text-fg"
 
 function TemplateOpeartion({ children, isUpdate = false, currData = null, allRoles }: { children: ReactNode, isUpdate?: boolean, currData?: TemplateType | null, allRoles: Role[] }) {
 
@@ -61,7 +59,7 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
     })
     const [selectedRole, setSelectedRole] = useState<Role | null>(null)
     const [exampleIndex, setExampleIndex] = useState(0)
-    
+
     const exampleMessages = [
         "Hi [Recruiter Name], I'm [MY NAME], a Frontend Developer. Any openings at [Company Name] you could refer me for?",
         "Hey [Recruiter Name]! I'm [MY NAME], looking for Backend roles. Would love a referral if there's an opening at [Company Name].",
@@ -70,7 +68,6 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
         "Hi [Recruiter Name]! I'm [MY NAME], interested in Data Science roles at [Company Name]. Could you refer me if there's an opening?"
     ]
 
-    // Load data when dialog opens in update mode
     useEffect(() => {
         if (open && isUpdate && currData) {
             setTemplateData({
@@ -82,7 +79,7 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
                 rules: currData.rules && rules.filter((r) => r.defaultValue).map((r) => r.name)
                     || []
             })
-            // Find and set the selected role from allRoles
+
             if (currData.role) {
                 const role = allRoles.find(r => r.id === currData.role)
                 if (role) {
@@ -92,7 +89,6 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
         }
     }, [open, isUpdate, currData, allRoles])
 
-    // Update templateData when selectedRole changes
     useEffect(() => {
         if (selectedRole) {
             setTemplateData(prev => ({ ...prev, role: selectedRole.id }))
@@ -126,10 +122,7 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
                 toast.error("Type is required")
                 return
             }
-            // Update mode is always handed the row being edited; create mode never reads an id.
-            // Guarding keeps the id out of the type system's "possibly null" hole without changing
-            // what a caller sees: previously this threw a TypeError that the catch below turned
-            // into exactly this toast.
+
             if (isUpdate && !currData) {
                 toast.error("Something went wrong")
                 return
@@ -162,7 +155,7 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
             if (!isUpdate) {
                 setTemplates([newTemplate, ...templates])
             } else {
-                // Preserve roleRelation from existing template if new template doesn't have it
+
                 const existingTemplate = templates.find((t) => t.id === updateTargetId)
                 const updatedTemplate = existingTemplate && !newTemplate.roleRelation
                     ? { ...newTemplate, roleRelation: existingTemplate.roleRelation }
@@ -171,7 +164,6 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
             }
             toast.success(data.message || (isUpdate ? "Template updated successfully" : "Template added successfully"))
 
-            // Close main dialog and open success dialog
             setOpen(false)
             setCreatedTemplate(newTemplate)
             setSuccessDialogOpen(true)
@@ -202,7 +194,6 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
         })
     }, [])
 
-    // Reset form when dialog closes (only for create mode)
     useEffect(() => {
         if (!open && !isUpdate) {
             setTemplateData({
@@ -217,7 +208,6 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
         }
     }, [open, isUpdate])
 
-    // Cycle through example messages
     useEffect(() => {
         const interval = setInterval(() => {
             setExampleIndex((prev) => (prev + 1) % exampleMessages.length)
@@ -236,85 +226,86 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
         <>
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogTrigger>{children}</DialogTrigger>
-                <DialogContent>
+                <DialogContent className="rounded-xl border-hair bg-surface shadow-qmd">
                     <DialogHeader>
-                        <DialogTitle>{!isUpdate ? 'Create New Template' : 'Update Template'}</DialogTitle>
-                        <DialogDescription>
+                        <DialogTitle className="text-[17px] font-semibold tracking-[-0.015em] text-fg">{!isUpdate ? 'Create New Template' : 'Update Template'}</DialogTitle>
+                        <DialogDescription className="text-fg2">
 
-
-                            <div className="my-4 flex flex-col items-start gap-2 overflow-auto">
-                                <Label htmlFor="name" className="text-black dark:text-white">Template Name</Label>
-                                <Input id="name" value={templateData.name} onChange={(e) => setTemplateData({ ...templateData, name: e.target.value })} placeholder="e.g., Friend Referral - Full Stack" type='text' className="text-black dark:text-white" />
+                            <div className="my-4 flex flex-col items-start gap-1.5 overflow-auto">
+                                <Label htmlFor="name" className={labelClass}>Template Name</Label>
+                                <Input id="name" value={templateData.name} onChange={(e) => setTemplateData({ ...templateData, name: e.target.value })} placeholder="e.g., Friend Referral - Full Stack" type='text' />
                             </div>
 
-                            <div className="my-4 relative flex flex-col items-start gap-2 overflow-auto max-w-[100%]">
-                                <div className="flex items-center gap-2">
-                                    <Label htmlFor="tempp" className="text-black dark:text-white">Template Content</Label>
+                            <div className="my-4 flex max-w-[100%] flex-col items-start gap-1.5 overflow-auto">
+                                <div className="flex w-full items-center gap-2">
+                                    <Label htmlFor="tempp" className={labelClass}>Template Content</Label>
                                     <Popover>
                                         <PopoverTrigger asChild>
-                                            <button className="p-1 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
-                                                <Info className="w-4 h-4 text-muted-foreground" />
+                                            <button className="rounded-md p-1 text-fg3 transition-colors hover:bg-well hover:text-fg2" aria-label="How to write a template">
+                                                <Info className="size-4" strokeWidth={1.5} />
                                             </button>
                                         </PopoverTrigger>
-                                        <PopoverContent className="w-72 max-w-[90vw]" side="bottom" align="start">
+                                        <PopoverContent className="w-72 max-w-[90vw] rounded-xl border-hair bg-surface shadow-qmd" side="bottom" align="start">
                                             <div className="space-y-3">
-                                                <div className="font-medium text-sm">How to write template</div>
-                                                <p className="text-xs text-muted-foreground">
+                                                <div className="text-[13px] font-medium text-fg">How to write template</div>
+                                                <p className="text-xs leading-[1.6] text-fg2">
                                                     Use placeholders in your template. These will be replaced with actual values when you send the message.
                                                 </p>
                                                 <div className="space-y-2 text-xs">
                                                     <div className="flex items-center gap-2">
-                                                        <code className="font-mono bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded">[Recruiter Name]</code>
-                                                        <span className="text-muted-foreground">→ Recipient&apos;s name</span>
+                                                        <code className={codeClass}>[Recruiter Name]</code>
+                                                        <span className="text-fg2">→ Recipient&apos;s name</span>
                                                     </div>
                                                     <div className="flex items-center gap-2">
-                                                        <code className="font-mono bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded">[MY NAME]</code>
-                                                        <span className="text-muted-foreground">→ Your name</span>
+                                                        <code className={codeClass}>[MY NAME]</code>
+                                                        <span className="text-fg2">→ Your name</span>
                                                     </div>
                                                     <div className="flex items-center gap-2">
-                                                        <code className="font-mono bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded">[Company Name]</code>
-                                                        <span className="text-muted-foreground">→ Company name</span>
+                                                        <code className={codeClass}>[Company Name]</code>
+                                                        <span className="text-fg2">→ Company name</span>
                                                     </div>
                                                 </div>
-                                                <div className="pt-2 border-t">
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <span className="font-medium text-xs">Examples:</span>
+                                                <div className="border-t border-hair pt-2">
+                                                    <div className="mb-2 flex items-center justify-between">
+                                                        <span className="text-xs font-medium text-fg">Examples</span>
                                                         <div className="flex gap-1">
                                                             {exampleMessages.map((_, i) => (
-                                                                <div 
-                                                                    key={i} 
-                                                                    className={`w-1.5 h-1.5 rounded-full transition-colors ${i === exampleIndex ? 'bg-primary' : 'bg-zinc-300 dark:bg-zinc-600'}`} 
+                                                                <div
+                                                                    key={i}
+                                                                    className={`size-1.5 rounded-full transition-colors ${i === exampleIndex ? 'bg-fg2' : 'bg-hair2'}`}
                                                                 />
                                                             ))}
                                                         </div>
                                                     </div>
-                                                    <div className="text-xs text-muted-foreground bg-zinc-50 dark:bg-zinc-800/50 p-2 rounded-md min-h-[50px] transition-all duration-300">
+                                                    <Well className="min-h-[50px] p-2 text-xs leading-[1.6] text-fg2">
                                                         {exampleMessages[exampleIndex]}
-                                                    </div>
+                                                    </Well>
                                                 </div>
                                             </div>
                                         </PopoverContent>
                                     </Popover>
+                                    <div className="ml-auto">
+                                        <Gen_AI_Template selectedRole={selectedRole} setSelectedRole={setSelectedRole} allRoles={allRoles} templateData={templateData} setTemplateData={setTemplateData} />
+                                    </div>
                                 </div>
-                                <div className=' absolute right-1 top-8'> <Gen_AI_Template selectedRole={selectedRole} setSelectedRole={setSelectedRole} allRoles={allRoles} templateData={templateData} setTemplateData={setTemplateData} /> </div>
-                                <Textarea id="tempp" value={templateData.content} onChange={(e) => setTemplateData({ ...templateData, content: e.target.value })} placeholder="Hi [Recruiter Name], I'm [MY NAME] looking for opportunities at [Company Name]..." wrap="soft" className=' resize-none h-[25vh] overflow-y-auto whitespace-normal break-words text-black dark:text-white w-full' style={{ wordWrap: 'break-word', wordBreak: 'break-word', overflowWrap: 'break-word' }} />
-                                
+                                <Textarea id="tempp" value={templateData.content} onChange={(e) => setTemplateData({ ...templateData, content: e.target.value })} placeholder="Hi [Recruiter Name], I'm [MY NAME] looking for opportunities at [Company Name]..." wrap="soft" className='h-[25vh] w-full resize-none overflow-y-auto leading-[1.6] break-words whitespace-normal' style={{ wordWrap: 'break-word', wordBreak: 'break-word', overflowWrap: 'break-word' }} />
+
                                 {/* Rotating example messages */}
                                 <div className="w-full">
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <span className="text-xs text-muted-foreground">💡 Example:</span>
+                                    <div className="mb-1.5 flex items-center justify-between">
+                                        <span className="text-xs text-fg2">Example</span>
                                         <div className="flex gap-1">
                                             {exampleMessages.map((_, i) => (
-                                                <div 
-                                                    key={i} 
-                                                    className={`w-1.5 h-1.5 rounded-full transition-colors ${i === exampleIndex ? 'bg-primary' : 'bg-zinc-300 dark:bg-zinc-600'}`} 
+                                                <div
+                                                    key={i}
+                                                    className={`size-1.5 rounded-full transition-colors ${i === exampleIndex ? 'bg-fg2' : 'bg-hair2'}`}
                                                 />
                                             ))}
                                         </div>
                                     </div>
-                                    <div className="text-xs text-muted-foreground bg-zinc-100 dark:bg-zinc-800/50 px-3 py-2 rounded-md transition-all duration-300">
+                                    <Well className="px-3 py-2 text-xs leading-[1.6] text-fg2">
                                         {exampleMessages[exampleIndex]}
-                                    </div>
+                                    </Well>
                                 </div>
                             </div>
 
@@ -324,40 +315,25 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
 
                                 </div>
 
-                                {/* <div className=' w-[47%] flex flex-col gap-1'>
-                                <Label htmlFor="genderr ">Gender</Label>
-                                <Select defaultValue='NotDependant'>
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="Gender" />
-                                    </SelectTrigger>
-                                    <SelectContent >
-                                        <SelectItem value="Male">Male</SelectItem>
-                                        <SelectItem value="Female">Female</SelectItem>
-                                        <SelectItem value="NotDependant" >Not Dependent</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div> */}
-
                                 {/* Message or Email radio btn */}
                                 <div className=' w-[47%] flex flex-col gap-1'>
-                                    <Label className="text-black dark:text-white">Type</Label>
+                                    <Label className={labelClass}>Type</Label>
                                     <RadioGroup value={templateData.type} onValueChange={(value) => setTemplateData({ ...templateData, type: value as "MESSAGE" | "EMAIL" })} className=' flex'>
                                         <div className="flex items-center space-x-2">
                                             <RadioGroupItem value="MESSAGE" id="message" />
-                                            <Label htmlFor="message" className="text-black dark:text-white">Message</Label>
+                                            <Label htmlFor="message" className="text-[13px] text-fg">Message</Label>
                                         </div>
                                         <div className="flex items-center space-x-2">
                                             <RadioGroupItem value="EMAIL" id="email" />
-                                            <Label htmlFor="email" className="text-black dark:text-white">Email</Label>
+                                            <Label htmlFor="email" className="text-[13px] text-fg">Email</Label>
                                         </div>
                                     </RadioGroup>
                                 </div>
 
                             </div>
 
-
                             <div className="my-4 flex flex-col items-start gap-2 overflow-auto">
-                                <div className="text-black dark:text-white">Rules</div>
+                                <div className={labelClass}>Rules</div>
                                 {
                                     rules.map((r, i) => <div key={i} className=' flex  justify-start items-start  gap-2'>
                                         <Switch id='rule-1' checked={templateData.rules.includes(r.name)} onCheckedChange={(checked) => {
@@ -367,14 +343,14 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
                                                 setTemplateData({ ...templateData, rules: templateData.rules.filter((rule) => rule !== r.name) })
                                             }
                                         }}></Switch>
-                                        <Label htmlFor='rule-1' className="text-black dark:text-white">{r.name}</Label>
+                                        <Label htmlFor='rule-1' className="text-[13px] text-fg">{r.name}</Label>
                                     </div>)
                                 }
                             </div>
 
-                            <div className='flex w-full justify-evenly items-center'>
-                                {isUpdate && <Button onClick={() => setOpen(false)} className='w-[48%] hover:text-red-500 ' variant={'outline'}>Cancel</Button>}
-                                <Button onClick={submitHandler} className={`${isUpdate ? 'w-[48%] ' : 'w-full'}`}>{isUpdate ? 'Update Template' : 'Save Template'}</Button>
+                            <div className='flex w-full justify-evenly items-center gap-3'>
+                                {isUpdate && <Button onClick={() => setOpen(false)} className='w-[48%]' variant="sec">Cancel</Button>}
+                                <Button variant="acc" onClick={submitHandler} className={`${isUpdate ? 'w-[48%] ' : 'w-full'}`}>{isUpdate ? 'Update Template' : 'Save Template'}</Button>
                             </div>
 
                         </DialogDescription>
@@ -384,45 +360,47 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
 
             {/* Success Dialog */}
             <Dialog open={successDialogOpen} onOpenChange={setSuccessDialogOpen}>
-                <DialogContent>
+                <DialogContent className="rounded-xl border-hair bg-surface shadow-qmd">
                     <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <CheckCircle2 className="h-5 w-5 text-green-500" />
+                        <DialogTitle className="flex items-center gap-2 text-[17px] font-semibold tracking-[-0.015em] text-fg">
+                            <CheckCircle2 className="size-4 text-ok" strokeWidth={1.5} />
                             Template {isUpdate ? 'Updated' : 'Created'} Successfully!
                         </DialogTitle>
-                        <DialogDescription>
+                        <DialogDescription className="text-fg2">
                             {createdTemplate && (
                                 <div className="mt-4 space-y-4">
                                     <div>
-                                        <Label className="font-semibold">Template Name:</Label>
-                                        <div className='mt-2 p-3 bg-gray-100/50 dark:bg-zinc-800/30 rounded-md font-semibold text-lg capitalize text-black dark:text-white'>{createdTemplate.name}</div>
+                                        <Label className={labelClass}>Template Name</Label>
+                                        <Well className='mt-2 p-3 text-[15px] font-semibold capitalize text-fg'>{createdTemplate.name}</Well>
                                     </div>
                                     <div>
                                         <div className="flex items-center justify-between gap-2">
-                                            <Label className="font-semibold text-black dark:text-white">Template Content:</Label>
-                                            <button
+                                            <Label className={labelClass}>Template Content</Label>
+                                            <Button
+                                                variant="ghost"
                                                 onClick={copyToClipboard}
-                                                className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-md transition-colors"
+                                                className="px-2 py-[5px]"
+                                                aria-label="Copy to clipboard"
                                                 title="Copy to clipboard"
                                             >
-                                                <Copy className="h-4 w-4" />
-                                            </button>
+                                                <Copy className="size-[13px]" strokeWidth={1.5} />
+                                            </Button>
                                         </div>
-                                        <p className="mt-2 p-3 bg-gray-100/50 dark:bg-zinc-800/30 rounded-md whitespace-pre-wrap text-black dark:text-white">{createdTemplate.content}</p>
+                                        <p className="mt-2 rounded-[10px] bg-well p-3 text-[13.5px] leading-[1.6] whitespace-pre-wrap text-fg">{createdTemplate.content}</p>
                                     </div>
-                                    
+
                                     {/* How to use section */}
-                                    <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-md">
-                                        <div className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">💡 How to use</div>
-                                        <div className="text-xs text-blue-700 dark:text-blue-400 space-y-1">
+                                    <Well className="mt-4 p-3">
+                                        <div className="mb-2 text-[13px] font-medium text-fg">How to use</div>
+                                        <div className="space-y-1 text-xs leading-[1.6] text-fg2">
                                             <p>Replace the placeholders before sending:</p>
-                                            <ul className="list-disc list-inside space-y-0.5 mt-1">
-                                                <li><span className="font-mono bg-blue-100 dark:bg-blue-900/50 px-1 rounded">[Recruiter Name]</span> → Actual name (e.g., John)</li>
-                                                <li><span className="font-mono bg-blue-100 dark:bg-blue-900/50 px-1 rounded">[MY NAME]</span> → Your name</li>
-                                                <li><span className="font-mono bg-blue-100 dark:bg-blue-900/50 px-1 rounded">[Company Name]</span> → Company name (e.g., Google)</li>
+                                            <ul className="mt-1 list-inside list-disc space-y-0.5">
+                                                <li><span className="font-mono rounded-sm border border-hair bg-surface px-1 text-fg">[Recruiter Name]</span> → Actual name (e.g., John)</li>
+                                                <li><span className="font-mono rounded-sm border border-hair bg-surface px-1 text-fg">[MY NAME]</span> → Your name</li>
+                                                <li><span className="font-mono rounded-sm border border-hair bg-surface px-1 text-fg">[Company Name]</span> → Company name (e.g., Google)</li>
                                             </ul>
                                         </div>
-                                    </div>
+                                    </Well>
                                 </div>
                             )}
                         </DialogDescription>

@@ -3,16 +3,15 @@
 import { cookies } from "next/headers"
 import { AUTH_LOGIN, AUTH_SIGNUP, AUTH_FORGOT_PASSWORD, AUTH_VERIFY_OTP, AUTH_CHANGE_PASSWORD, BASE_API } from "@/utils/url"
 
-// Debug: Log the base URL at startup
 console.log("[AUTH] BASE_API:", BASE_API)
-console.log("[AUTH] NEXT_PUBLIC_BASE_URL:", process.env.NEXT_PUBLIC_BASE_URL)
+console.log("[AUTH] NEXT_PUBLIC_BASE_URL:", process.env.NEXT_PUBLIC_BASE_URL ?? "(unset)")
 
 const AUTH_COOKIE_NAME = "nextmove_auth_token"
 const USER_COOKIE_NAME = "nextmove_user"
 
-type AuthResult = { 
+type AuthResult = {
     success: boolean
-    error?: string 
+    error?: string
 }
 
 type OTPResult = {
@@ -21,13 +20,10 @@ type OTPResult = {
     resetToken?: string
 }
 
-/**
- * Server action: Sign in user
- */
 export async function signInAction(email: string, password: string): Promise<AuthResult> {
     try {
         console.log("[AUTH] Login URL:", AUTH_LOGIN)
-        
+
         const res = await fetch(AUTH_LOGIN, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -41,9 +37,8 @@ export async function signInAction(email: string, password: string): Promise<Aut
             return { success: false, error: data.message }
         }
 
-        // Set cookies
         const cookieStore = await cookies()
-        
+
         cookieStore.set(AUTH_COOKIE_NAME, data.data.token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
@@ -66,13 +61,10 @@ export async function signInAction(email: string, password: string): Promise<Aut
     }
 }
 
-/**
- * Server action: Sign up user
- */
 export async function signUpAction(name: string, email: string, password: string): Promise<AuthResult> {
     try {
         console.log("[AUTH] Signup URL:", AUTH_SIGNUP)
-        
+
         const nameParts = name.trim().split(" ")
         const firstName = nameParts[0]
         const lastName = nameParts.slice(1).join(" ") || ""
@@ -90,9 +82,8 @@ export async function signUpAction(name: string, email: string, password: string
             return { success: false, error: data.message }
         }
 
-        // Set cookies
         const cookieStore = await cookies()
-        
+
         cookieStore.set(AUTH_COOKIE_NAME, data.data.token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
@@ -115,21 +106,15 @@ export async function signUpAction(name: string, email: string, password: string
     }
 }
 
-/**
- * Server action: Sign out user
- */
 export async function signOutAction(): Promise<void> {
     const cookieStore = await cookies()
     cookieStore.delete(AUTH_COOKIE_NAME)
     cookieStore.delete(USER_COOKIE_NAME)
 }
 
-/**
- * Server action: Set auth cookies (called from client after successful login/signup)
- */
 export async function setAuthCookiesAction(token: string, user: { id: string; email: string; firstName: string; lastName: string | null }): Promise<void> {
     const cookieStore = await cookies()
-    
+
     cookieStore.set(AUTH_COOKIE_NAME, token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -147,17 +132,11 @@ export async function setAuthCookiesAction(token: string, user: { id: string; em
     })
 }
 
-/**
- * Server action: Get token (for API calls from client)
- */
 export async function getTokenAction(): Promise<string | null> {
     const cookieStore = await cookies()
     return cookieStore.get(AUTH_COOKIE_NAME)?.value || null
 }
 
-/**
- * Server action: Send forgot password OTP
- */
 export async function forgotPasswordAction(email: string): Promise<AuthResult> {
     try {
         const res = await fetch(AUTH_FORGOT_PASSWORD, {
@@ -178,9 +157,6 @@ export async function forgotPasswordAction(email: string): Promise<AuthResult> {
     }
 }
 
-/**
- * Server action: Verify OTP
- */
 export async function verifyOTPAction(email: string, otp: string): Promise<OTPResult> {
     try {
         const res = await fetch(AUTH_VERIFY_OTP, {
@@ -201,9 +177,6 @@ export async function verifyOTPAction(email: string, otp: string): Promise<OTPRe
     }
 }
 
-/**
- * Server action: Change password (after OTP verification)
- */
 export async function changePasswordAction(email: string, resetToken: string, newPassword: string): Promise<AuthResult> {
     try {
         const res = await fetch(AUTH_CHANGE_PASSWORD, {

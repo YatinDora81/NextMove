@@ -1,431 +1,462 @@
-import type { Metadata } from "next";
-import { CheckCircle2, Sparkles, MessageSquare, BarChart3, Zap, Users, RefreshCw, GraduationCap, Briefcase, Star, Github, Linkedin, Twitter } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { LucideIcon } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import GetStartedButton from "@/components/GetStartedButton";
-import Image from "next/image";
-import DarkImage from '../public/dark.gif';
-import LightImage from '../public/light.gif';
-import { BASE_API } from "../utils/url";
+import type { Metadata } from "next"
+import Image from "next/image"
+import Link from "next/link"
+import {
+    ArrowRight,
+    BarChart3,
+    Briefcase,
+    CheckCircle2,
+    Copy,
+    Filter,
+    Github,
+    KeyRound,
+    Linkedin,
+    MessageSquare,
+    Plus,
+    ShieldCheck,
+    Twitter,
+    WifiOff,
+} from "lucide-react"
+import type { LucideIcon } from "lucide-react"
+import { GridHero } from "@/components/quiet/GridHero"
+import { Logo } from "@/components/quiet/Logo"
+import { Chip } from "@/components/quiet/Chip"
+import { Kbd } from "@/components/quiet/Kbd"
+import { Card, Well } from "@/components/quiet/Card"
+import { Field, Input } from "@/components/quiet/Field"
+import GetStartedButton from "@/components/GetStartedButton"
+import DarkImage from "../public/dark.gif"
+import LightImage from "../public/light.gif"
+import { BASE_API } from "../utils/url"
 
 export const metadata: Metadata = {
     title: "NextMoveApp | AI Job Application Assistant",
-    description: "NextMoveApp helps job seekers craft personalized applications, track progress, and collaborate with AI to land their next role faster.",
-};
+    description:
+        "NextMoveApp helps job seekers craft personalized applications, track progress, and collaborate with AI to land their next role faster.",
+}
+
+const CHROME_STORE_URL =
+    process.env.NEXT_PUBLIC_CHROME_STORE_URL ?? "https://chromewebstore.google.com/search/NextMove%20Autofill"
+
+const BTN =
+    "inline-flex items-center justify-center gap-2 rounded-lg border border-transparent text-[13.5px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+const BTN_ACC = `${BTN} bg-acc text-on-acc shadow-[inset_0_1px_0_rgba(255,255,255,.14),var(--qp-sh-sm)] hover:bg-acc-strong`
+const BTN_SEC = `${BTN} border-hair2 bg-surface text-fg shadow-qsm hover:bg-well`
+const OV = "text-[11px] font-medium uppercase tracking-[.09em] text-fg3"
+const H2 = "text-[clamp(22px,2.6vw,30px)] font-[650] leading-[1.15] tracking-[-0.022em]"
+
+const views: { label: string; icon: LucideIcon }[] = [
+    { label: "All applications", icon: Briefcase },
+    { label: "Outreach", icon: MessageSquare },
+    { label: "This week", icon: BarChart3 },
+]
+
+const filters: { label: string; icon: LucideIcon }[] = [
+    { label: "Interviewing", icon: Filter },
+    { label: "Awaiting reply", icon: Filter },
+]
+
+const rows: {
+    company: string
+    role: string
+    tone: "warn" | "acc" | "ok" | "mut"
+    status: string
+    ats: string
+    updated: string
+}[] = [
+    { company: "Stripe", role: "Frontend Developer", tone: "warn", status: "Interview", ats: "Greenhouse", updated: "Today, 9:14" },
+    { company: "Razorpay", role: "SDE II", tone: "acc", status: "Applied", ats: "Lever", updated: "Yesterday" },
+    { company: "Zerodha", role: "Full Stack Developer", tone: "ok", status: "Offer", ats: "Workday", updated: "Aug 4" },
+    { company: "Atlassian", role: "Frontend Engineer", tone: "mut", status: "Closed", ats: "Workday", updated: "Jul 30" },
+]
+
+const boards = ["Greenhouse", "Lever", "Workday", "Ashby", "SmartRecruiters", "iCIMS"]
+
+const autofillClaims = [
+    "22 fields on a Greenhouse form, filled in 1.2s",
+    "Learned answers reused across every ATS",
+    "The submit button is never pressed for you",
+]
+
+const privacyPoints: { icon: LucideIcon; title: string; body: string }[] = [
+    {
+        icon: ShieldCheck,
+        title: "Never auto-submits",
+        body: "It fills and highlights. You review. You press submit. Every time.",
+    },
+    {
+        icon: KeyRound,
+        title: "Keys stay local",
+        body: "Your Gemini key is encrypted on-device and never reaches our servers.",
+    },
+    {
+        icon: WifiOff,
+        title: "Works offline",
+        body: "Guest mode is fully local. Sync to an account only if you want it.",
+    },
+]
 
 export default function LandingPage() {
-
-    fetch(BASE_API!);
-
-    const imageCards: { title: string, desc: string }[] = [
-        {
-            title: '95%',
-            desc: 'User Satisfaction'
-        },
-        {
-            title: '2 min',
-            desc: 'Average Setup Time'
-        },
-        {
-            title: '10x',
-            desc: 'Faster Applications'
-        },
-        {
-            title: '24/7',
-            desc: 'AI Availability'
-        }
-    ]
-
-    const featuresCard: { icon: LucideIcon, title: string, description: string }[] = [
-        {
-            icon: Sparkles,
-            title: "AI-Powered Messages",
-            description: "Generate personalized cover letters and messages tailored to each job posting in seconds."
-        },
-        {
-            icon: MessageSquare,
-            title: "Smart Templates",
-            description: "Pre-built templates optimized for different industries and job types."
-        },
-        {
-            icon: BarChart3,
-            title: "Application Tracking",
-            description: "Keep track of all your applications in one place with status updates."
-        },
-        {
-            icon: Zap,
-            title: "Instant Generation",
-            description: "Create professional applications 10x faster than traditional methods.",
-        },
-    ]
-
-    const appSteps: { step: number, icon: LucideIcon, title: string, description: string }[] = [
-        {
-            step: 1,
-            icon: Users,
-            title: "Create Your Profile",
-            description: "Add your experience, skills, and career goals to help our AI understand your background.",
-        },
-        {
-            step: 2,
-            icon: MessageSquare,
-            title: "Paste Job Details",
-            description: "Simply paste the job description and let our AI analyze the requirements.",
-        },
-        {
-            step: 3,
-            icon: Sparkles,
-            title: "Generate Message",
-            description: "AI creates a personalized, professional message highlighting your relevant skills.",
-        },
-        {
-            step: 4,
-            icon: BarChart3,
-            title: "Track & Apply",
-            description: "Send your application and track its status all in one place.",
-        },
-    ];
-
-    const useCases = [
-        {
-            icon: Users,
-            title: "Active Job Seekers",
-            description: "Apply to multiple positions efficiently while maintaining quality and personalization in every application.",
-        },
-        {
-            icon: RefreshCw,
-            title: "Career Changers",
-            description: "Navigate career transitions with professional messaging that highlights transferable skills.",
-        },
-        {
-            icon: GraduationCap,
-            title: "Recent Graduates",
-            description: "Enter the job market with confidence using professionally crafted messages that showcase your potential.",
-        },
-        {
-            icon: Briefcase,
-            title: "Professionals",
-            description: "Manage multiple opportunities while advancing your career with consistent, polished communication.",
-        },
-    ];
-
-    const testimonials = [
-        {
-            name: "Sarah Johnson",
-            role: "Software Engineer",
-            content: "NextMoveApp helped me land my dream job. The AI-generated messages were professional and saved me hours of writing time.",
-            rating: 5,
-        },
-        {
-            name: "Michael Chen",
-            role: "Product Manager",
-            content: "Managing multiple applications was overwhelming until I found NextMoveApp. The tracking feature alone is worth it.",
-            rating: 5,
-        },
-        {
-            name: "Emily Rodriguez",
-            role: "Marketing Specialist",
-            content: "As a career changer, I needed help crafting the right message. This tool gave me the confidence I needed.",
-            rating: 4,
-        },
-    ];
-
+    void fetch(BASE_API).catch(() => {})
 
     return (
-        <div className='w-full h-fit min-h-screen flex flex-col justify-center gap-6'>
-
-            {/* hero section */}
-            <div className=" relative flex flex-col justify-evenly items-center h-[45rem] sm:h-[50rem] md:h-[42rem] px-4">
-
-                <div
-                    className={cn(
-                        "absolute inset-0 z-0",
-                        "[background-size:40px_40px]",
-                        "[background-image:linear-gradient(to_right,#e4e4e7_1px,transparent_1px),linear-gradient(to_bottom,#e4e4e7_1px,transparent_1px)]",
-                        "dark:[background-image:linear-gradient(to_right,#262626_1px,transparent_1px),linear-gradient(to_bottom,#262626_1px,transparent_1px)]"
-                    )}
-                />
-                <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center bg-background [mask-image:radial-gradient(ellipse_at_center,transparent_10%,black)]"></div>
-
-                <div className=" z-[11] flex flex-col gap-4 sm:gap-6 md:gap-8 items-center justify-evenly w-full">
-                    {/* badge */}
-                    <div className="flex gap-2 bg-gray-200/50 dark:bg-zinc-700/50 mt-12 sm:mt-16 md:mt-20 justify-center items-center border-2 border-gray-200 dark:border-zinc-700/10 rounded-3xl p-1.5 sm:p-2 px-3 sm:px-4">
-                        <Sparkles className="w-3 h-3 sm:w-4 sm:h-4"></Sparkles>
-                        <div className=" font-[500] text-xs sm:text-sm">AI-Powered Job Application Platform</div>
-                    </div>
-
-                    <div className=" flex flex-col items-center gap-6 sm:gap-8 md:gap-12 px-4">
-
-                        <div className=" flex flex-col items-center gap-2 sm:gap-4">
-                            <div className=" text-3xl sm:text-5xl md:text-7xl font-bold poppins-bold text-center">
-                                Land Your Dream Job
-                            </div>
-                            <div className=" text-3xl sm:text-5xl md:text-7xl font-bold poppins-bold text-center" style={{
-                                // maskImage: 'linear-gradient(to right, black 90%, transparent 100%)',
-                                // WebkitMaskImage: 'linear-gradient(to right, black 90%, transparent 100%)'
-                            }}>
-                                10x Faster
-                            </div>
-                        </div>
-
-                        <div className=" flex flex-col items-center gap-1 sm:gap-2">
-                            <div className=" dark:text-gray-300 text-gray-500 poppins-medium text-base sm:text-xl md:text-2xl text-center px-4" >AI-powered messaging that gets you noticed by recruiters.</div>
-                            <div className=" dark:text-gray-300 text-gray-500 poppins-medium text-base sm:text-xl md:text-2xl text-center px-4" >Create professional applications in seconds.</div>
-                        </div>
-
-                        <div className=" flex flex-wrap justify-center items-center gap-2 sm:gap-[1.5rem] px-4">
-                            {
-                                ["Instant AI Generation",
-                                    "Smart Templates",
-                                    "Application Tracking"].map((item, index) => (
-                                        <div className="border-[1px] p-1.5 sm:p-2 px-2 sm:px-3 rounded-3xl dark:bg-zinc-950/60 bg-white dark:border-gray-200/30 border-black/40 flex items-center gap-1.5 sm:gap-2" key={index}>
-                                            <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4" />
-                                            <div className=" poppins-medium text-xs sm:text-sm whitespace-nowrap" >{item}</div>
-                                        </div>
-                                    ))
-                            }
-                        </div>
-
-
-                        <div className=" flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 w-full px-4">
-                            <GetStartedButton className=" py-2 px-4 w-full sm:w-auto">Get Started Free</GetStartedButton>
-                            <GetStartedButton variant='outline' className=" border border-gray-400/50 w-full sm:w-auto">Learn More</GetStartedButton>
-                        </div>
-
-                        {/* <div className=" text-gray-500 poppins-medium text-sm">No credit card required • Free forever</div> */}
-
-                    </div>
-
-
-                </div>
-
-            </div>
-
-
-            <div className="w-full md:w-[74rem] mx-auto h-fit flex flex-col justify-center gap-6 sm:gap-8 md:gap-10 px-4 sm:px-6">
-                <div className=" relative w-full h-[20rem] sm:h-[30rem] md:h-[40rem] min-h-[20rem] sm:min-h-[30rem] md:min-h-[40rem] border border-zinc-700/30 dark:border-zinc-800/30 shadow-2xl shadow-zinc-500/20 rounded-2xl">
-                    <div className=" absolute top-0 left-0 w-full h-[7%] rounded-t-2xl dark:bg-zinc-900 bg-zinc-100 flex justify-start items-center pl-4 sm:pl-6 gap-2 sm:gap-3">
-                        <div className=" bg-red-600 w-2 h-2 sm:w-3 sm:h-3 rounded-full "></div>
-                        <div className=" bg-yellow-500 w-2 h-2 sm:w-3 sm:h-3 rounded-full "></div>
-                        <div className=" bg-green-600 w-2 h-2 sm:w-3 sm:h-3 rounded-full "></div>
-                    </div>
-
-
-                    {/* Actual image */}
-                    <div className=" rounded-b-2xl h-[93%] w-full absolute left-0 bottom-0">
-                        <Image src={DarkImage} className="rounded-b-2xl w-full h-full object-cover hidden dark:block" alt="Dark Image"></Image>
-                        <Image src={LightImage} className=" rounded-b-2xl w-full h-full object-cover block dark:hidden" alt="Light Image"></Image>
-                    </div>
-
-                </div>
-
-                <div className=" grid grid-cols-2 sm:grid-cols-4 items-center justify-center gap-3 sm:gap-4 md:gap-5 w-full">
-                    {
-                        imageCards.map((item, index) => (
-                            <div key={index} className=" w-full rounded-2xl flex flex-col items-center justify-center gap-1 sm:gap-2 dark:bg-zinc-900/60 border dark:border-gray-200/30 border-zinc-700/30 px-3 sm:px-6 md:px-8 py-4 sm:py-6">
-                                <div className=" text-2xl sm:text-3xl md:text-4xl font-bold">{item.title}</div>
-                                <div className=" text-xs sm:text-sm text-black/80 dark:text-zinc-200/50 text-center">{item.desc}</div>
-                            </div>
-                        ))
-                    }
-                </div>
-
-            </div>
-
-
-            {/* Featues */}
-            <div className="w-full md:w-[70rem] gap-8 sm:gap-10 md:gap-12 mx-auto h-fit min-h-[35rem] mt-[6rem] sm:mt-[4rem] md:mt-[5rem] flex flex-col justify-center items-start px-4 sm:px-6" >
-                <div className="flex flex-col items-center w-full justify-center gap-3 sm:gap-4 md:gap-5">
-                    <div className=" w-full text-center text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold px-4">Everything You Need to Land Your Next Role</div>
-                    <div className=" dark:text-zinc-200/50 poppins-medium text-base sm:text-lg md:text-xl text-center px-4">Powerful features designed to streamline your job search process</div>
-                </div>
-
-                <div className=" grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 items-center justify-center mx-auto gap-4 sm:gap-5 w-full">
-                    {
-                        featuresCard.map((item, index) => (
-                            <div key={index} className=" w-full rounded-2xl flex flex-col items-center justify-between gap-3 dark:bg-[#171717] border dark:border-gray-700/30 min-h-[10rem] sm:h-[15rem] border-zinc-700/30 px-4 sm:px-6 md:px-8 py-4 sm:py-6">
-                                <div className=" text-4xl font-bold bg-black/10 dark:bg-zinc-700/50 rounded-lg p-3">
-                                    <item.icon className="w-5 h-5 " />
-                                </div>
-                                <div className=" text-center text-lg sm:text-xl font-bold">{item.title}</div>
-                                <div className=" text-xs sm:text-sm text-center dark:text-zinc-100/70">{item.description}</div>
-                            </div>
-                        ))
-                    }
-                </div>
-
-            </div>
-
-
-            {/* How It Works */}
-            <div className="w-full md:w-[70rem] gap-8 sm:gap-10 md:gap-12 mx-auto h-fit min-h-[45rem] flex flex-col justify-center items-start mt-[4rem] sm:mt-0 px-4 sm:px-6" >
-                <div className="flex flex-col items-center w-full justify-center gap-3 sm:gap-4 md:gap-5">
-                    <div className=" w-full text-center text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold px-4">How It Works</div>
-                    <div className=" dark:text-zinc-200/50 poppins-medium text-base sm:text-lg md:text-xl text-center px-4">Get started in minutes and land your dream job faster</div>
-                </div>
-
-                <div className=" grid grid-cols-1 sm:grid-cols-2 items-center justify-center mx-auto gap-4 sm:gap-5 w-full">
-                    {
-                        appSteps.map((item, index) => (
-                            <div key={index} className=" relative w-full rounded-2xl flex flex-col items-start justify-between gap-3 dark:bg-[#171717] border dark:border-gray-700/30 min-h-[9rem] sm:h-[12rem] border-zinc-700/30 px-4 sm:px-6 md:px-8 py-4 sm:py-6">
-                                <div className="  text-4xl font-bold bg-black/10 dark:bg-zinc-700/50 rounded-lg p-3">
-                                    <item.icon className="w-5 h-5 " />
-                                </div>
-                                <div className=" text-xs sm:text-sm w-6 h-6 sm:w-7 sm:h-7 flex justify-center items-center bg-black/10 dark:bg-zinc-700/50 rounded-full absolute right-4 sm:right-6 top-3">
-                                    <div className=" p-1">{item.step}</div>
-                                </div>
-                                <div className=" flex gap-2 flex-col">
-                                    <div className=" text-lg sm:text-xl font-bold">{item.title}</div>
-                                    <div className=" text-xs sm:text-sm dark:text-zinc-100/70">{item.description}</div>
-                                </div>
-                            </div>
-                        ))
-                    }
-                </div>
-
-            </div>
-
-            <div className="w-full md:w-[70rem] gap-8 sm:gap-10 md:gap-12 mx-auto h-fit min-h-[45rem] flex flex-col justify-center items-start px-4 sm:px-6 mt-[4rem] sm:mt-0" >
-                <div className="flex flex-col items-center w-full justify-center gap-3 sm:gap-4 md:gap-5">
-                    <div className=" w-full text-center text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold px-4">Built For Every Job Seeker</div>
-                    <div className=" dark:text-zinc-200/50 poppins-medium text-base sm:text-lg md:text-xl w-full sm:w-[90%] md:w-[60%] mx-auto text-center px-4">Whether you&apos;re starting out or advancing your career, NextMoveApp adapts to your needs</div>
-                </div>
-
-                <div className=" grid grid-cols-1 sm:grid-cols-2 items-center justify-center mx-auto gap-4 sm:gap-5 w-full">
-                    {
-                        useCases.map((item, index) => (
-                            <div key={index} className=" relative w-full rounded-2xl flex items-start gap-3 dark:bg-[#171717] border dark:border-gray-700/30 min-h-[8rem] border-zinc-700/30 px-4 sm:px-6 py-5 sm:py-7">
-                                <div className="  text-4xl font-bold bg-black/10 dark:bg-zinc-700/50 rounded-lg p-3 flex-shrink-0">
-                                    <item.icon className="w-5 h-5 " />
-                                </div>
-
-                                <div className=" flex gap-2 flex-col">
-                                    <div className=" text-lg sm:text-xl font-bold">{item.title}</div>
-                                    <div className=" text-xs sm:text-sm dark:text-zinc-100/70">{item.description}</div>
-                                </div>
-                            </div>
-                        ))
-                    }
-                </div>
-
-            </div>
-
-            <div className=" dark:bg-zinc-900/60 gap-8 sm:gap-10 md:gap-12 mx-auto h-fit min-h-[48rem] sm:-mt-[1rem] w-full mt-[4rem] " >
-                <div className=" w-full md:w-[70rem] flex flex-col justify-center gap-8 sm:gap-10 md:gap-12 items-center h-fit min-h-[48rem] mx-auto px-4 sm:px-6">
-                    <div className="flex flex-col items-center w-full justify-center gap-3 sm:gap-4 md:gap-5">
-                        <div className=" w-full text-center text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold px-4">Loved by Job Seekers</div>
-                        <div className=" dark:text-zinc-200/50 poppins-medium text-base sm:text-lg md:text-xl text-center px-4">See what our users have to say about their experience</div>
-                    </div>
-
-                    <div className=" grid grid-cols-1 md:grid-cols-3 items-center justify-center mx-auto gap-4 sm:gap-5 w-full">
-                        {testimonials.map((testimonial, index) => (
-                            <Card
-                                key={index}
-                                className="p-6 sm:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.12)] min-h-[15rem] md:min-h-[21.5rem] space-y-4 border-border bg-card w-full"
-                            >
-                                <div className="flex gap-1">
-                                    {[...Array(testimonial.rating)].map((_, i) => (
-                                        <Star key={i} className="w-4 h-4 sm:w-5 sm:h-5 fill-yellow-500 text-yellow-500" />
-                                    ))}
-                                </div>
-                                <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
-                                    &ldquo;{testimonial.content}&rdquo;
-                                </p>
-                                <div className="pt-4 border-t border-border">
-                                    <div className="font-semibold text-sm sm:text-base">{testimonial.name}</div>
-                                    <div className="text-xs sm:text-sm text-muted-foreground">{testimonial.role}</div>
-                                </div>
-                            </Card>
-                        ))}
-                    </div>
-
-                </div>
-            </div>
-
-            {/* CTA */}
-            <section className="py-12 sm:py-16 md:py-0">
-                <div className="container mx-auto px-4">
-                    <div className="max-w-4xl mx-auto">
-                        <div className="relative overflow-hidden rounded-3xl bg-primary text-primary-foreground p-6 sm:p-8 md:p-12 lg:p-16">
-                            <div className="absolute inset-0 opacity-10">
-                                <div className="absolute top-0 right-0 w-64 h-64 bg-primary-foreground rounded-full blur-3xl" />
-                                <div className="absolute bottom-0 left-0 w-96 h-96 bg-primary-foreground rounded-full blur-3xl" />
-                            </div>
-                            <div className="relative text-center space-y-6 sm:space-y-8">
-                                <div className="space-y-3 sm:space-y-4">
-                                    <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold px-2">
-                                        Ready to Transform Your Job Search?
-                                    </h2>
-                                    <p className="text-base sm:text-lg md:text-xl opacity-90 max-w-2xl mx-auto px-2">
-                                        Join thousands of job seekers who are landing their dream roles with AI-powered applications
-                                    </p>
-                                </div>
-                                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                                    <GetStartedButton className="w-full sm:w-auto" />
-                                </div>
-                                <p className="text-xs sm:text-sm opacity-75">
-                                    No credit card required • Start in minutes
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* footer */}
-            <footer className="border-t border-border bg-muted/30">
-                <div className="container mx-auto px-4 py-12 md:py-16">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
-                        <div className="col-span-2 md:col-span-1">
-                            <h3 className="font-bold text-xl mb-4">NextMoveApp</h3>
-                            <p className="text-sm text-muted-foreground">
-                                AI-powered job application platform helping thousands land their dream roles.
-                            </p>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold mb-4">Product</h4>
-                            <ul className="space-y-2 text-sm text-muted-foreground">
-                                <li><a href="#features" className="hover:text-primary">Features</a></li>
-                                <li><a href="#how-it-works" className="hover:text-primary">How It Works</a></li>
-                            </ul>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold mb-4">Company</h4>
-                            <ul className="space-y-2 text-sm text-muted-foreground">
-                                <li><a href="#about" className="hover:text-primary transition-colors">About</a></li>
-                                <li><a href="#blog" className="hover:text-primary transition-colors">Blog</a></li>
-                                <li><a href="#careers" className="hover:text-primary transition-colors">Careers</a></li>
-                            </ul>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold mb-4">Legal</h4>
-                            <ul className="space-y-2 text-sm text-muted-foreground">
-                                <li><a href="#privacy" className="hover:text-primary transition-colors">Privacy</a></li>
-                                <li><a href="#terms" className="hover:text-primary transition-colors">Terms</a></li>
-                                <li><a href="#security" className="hover:text-primary transition-colors">Security</a></li>
-                            </ul>
-                        </div>
-                    </div>
-                    <div className="pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center gap-4">
-                        <p className="text-sm text-muted-foreground">
-                            © {new Date().getFullYear()} NextMoveApp. All rights reserved.
+        <main className="min-h-screen bg-bg font-sans text-fg">
+            <GridHero gridHeight={700}>
+                <div className="px-6">
+                    <section className="mx-auto max-w-[660px] pt-[72px] text-center">
+                        <div className={OV}>Job applications, automated</div>
+                        <h1 className="mt-3.5 text-[clamp(34px,4.6vw,52px)] font-[650] leading-[1.08] tracking-[-0.028em] max-md:text-[34px]">
+                            Apply to every job.
+                            <br />
+                            Type your name once.
+                        </h1>
+                        <p className="mx-auto mt-[18px] max-w-[520px] text-base leading-[1.6] text-fg2">
+                            NextMove fills any application form in one click, drafts outreach recruiters answer, and
+                            keeps every application tracked &mdash; encrypted in your browser.
                         </p>
-                        <div className="flex gap-4">
-                            <a target="_blank" rel="noreferrer" href="https://x.com/YatinDora" className="text-muted-foreground hover:text-primary">
-                                <Twitter className="w-5 h-5" />
+                        <div className="mt-[26px] flex flex-wrap justify-center gap-2.5">
+                            <a
+                                href={CHROME_STORE_URL}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`${BTN_ACC} px-[18px] py-2.5 text-sm`}
+                            >
+                                Add to Chrome
+                                <span className="font-normal opacity-[.55]">&mdash; it&apos;s free</span>
                             </a>
-                            <a target="_blank" rel="noreferrer" href="https://www.linkedin.com/in/yatin-dora/" className="text-muted-foreground hover:text-primary">
-                                <Linkedin className="w-5 h-5" />
-                            </a>
-                            <a target="_blank" rel="noreferrer" href="https://github.com/YatinDora81" className="text-muted-foreground hover:text-primary">
-                                <Github className="w-5 h-5" />
-                            </a>
+                            <GetStartedButton variant="outline" className={`${BTN_SEC} h-auto px-[18px] py-2.5 text-sm`}>
+                                <span>Try the web app</span>
+                            </GetStartedButton>
                         </div>
+                        <div className="mt-3.5 text-[13px] text-fg3">
+                            Free forever &middot; No card &middot; Nothing auto-submits
+                        </div>
+                    </section>
+
+                    <section className="mx-auto mt-[52px] max-w-[1120px]">
+                        <Card className="overflow-hidden border-hair2 shadow-qmd">
+                            <div className="flex items-center gap-2.5 border-b border-hair bg-surface px-4 py-2.5">
+                                <Logo size={24} />
+                                <span className="text-sm font-semibold tracking-[-0.01em]">NextMove</span>
+                                <nav className="ml-3.5 flex gap-0.5 max-md:hidden">
+                                    {["Generate", "Templates", "Applied", "AI Chat"].map((label) => (
+                                        <span
+                                            key={label}
+                                            className={
+                                                label === "Applied"
+                                                    ? "rounded-lg bg-well px-2.5 py-1.5 text-[13px] font-medium text-fg"
+                                                    : "rounded-lg px-2.5 py-1.5 text-[13px] font-medium text-fg2"
+                                            }
+                                        >
+                                            {label}
+                                        </span>
+                                    ))}
+                                </nav>
+                                <span className="ml-auto flex min-w-[180px] items-center gap-2 rounded-lg bg-well px-2.5 py-1.5 text-[13px] text-fg3 max-md:hidden">
+                                    Search
+                                    <span className="ml-auto">
+                                        <Kbd>&#8984;K</Kbd>
+                                    </span>
+                                </span>
+                                <span className="flex size-7 flex-none items-center justify-center rounded-full bg-well2 text-xs font-semibold text-fg2 max-md:ml-auto">
+                                    Y
+                                </span>
+                            </div>
+
+                            <div className="flex min-h-[330px]">
+                                <aside className="flex w-[190px] flex-none flex-col gap-0.5 bg-well px-2.5 py-3.5 max-md:hidden">
+                                    <div className="px-3 pb-2 text-[11px] font-medium tracking-[.08em] text-fg3 uppercase">
+                                        Views
+                                    </div>
+                                    {views.map((view, index) => (
+                                        <span
+                                            key={view.label}
+                                            className={
+                                                index === 0
+                                                    ? "flex items-center gap-2.5 rounded-lg bg-surface px-3 py-1.5 text-[13.5px] font-medium text-fg shadow-qsm"
+                                                    : "flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-[13.5px] font-medium text-fg2"
+                                            }
+                                        >
+                                            <view.icon
+                                                className={index === 0 ? "size-4 flex-none text-acc" : "size-4 flex-none"}
+                                                strokeWidth={1.5}
+                                            />
+                                            {view.label}
+                                        </span>
+                                    ))}
+                                    <div className="mt-3.5 px-3 pb-2 text-[11px] font-medium tracking-[.08em] text-fg3 uppercase">
+                                        Filters
+                                    </div>
+                                    {filters.map((filter) => (
+                                        <span
+                                            key={filter.label}
+                                            className="flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-[13.5px] font-medium text-fg2"
+                                        >
+                                            <filter.icon className="size-4 flex-none" strokeWidth={1.5} />
+                                            {filter.label}
+                                        </span>
+                                    ))}
+                                </aside>
+
+                                <div className="min-w-0 flex-1 bg-surface">
+                                    <div className="flex items-center gap-2.5 border-b border-hair px-4 py-3">
+                                        <span className="text-[15px] font-semibold">Applications</span>
+                                        <Chip dot={false} className="tnum">
+                                            26
+                                        </Chip>
+                                        <span className="ml-auto flex items-center gap-1.5 text-[13px] text-fg2 max-lg:hidden">
+                                            <span className="size-1.5 rounded-full bg-ok" />
+                                            Synced from Chrome &middot; MacBook &middot; 2m ago
+                                        </span>
+                                        <span
+                                            className={`${BTN_ACC} px-2.5 py-1.5 text-[12.5px] max-lg:ml-auto`}
+                                        >
+                                            <Plus className="size-[13px]" strokeWidth={1.5} />
+                                            Add
+                                        </span>
+                                    </div>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full min-w-[620px] border-collapse text-[13.5px]">
+                                            <thead>
+                                                <tr>
+                                                    {["Company", "Role", "Status", "ATS", "Updated"].map((head) => (
+                                                        <th
+                                                            key={head}
+                                                            className="border-b border-hair px-3.5 py-2.5 text-left text-xs font-medium text-fg3"
+                                                        >
+                                                            {head}
+                                                        </th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {rows.map((row) => (
+                                                    <tr key={row.company} className="hover:bg-well">
+                                                        <td className="border-t border-hair px-3.5 py-2.5 font-semibold">
+                                                            {row.company}
+                                                        </td>
+                                                        <td className="border-t border-hair px-3.5 py-2.5">{row.role}</td>
+                                                        <td className="border-t border-hair px-3.5 py-2.5">
+                                                            <Chip tone={row.tone}>{row.status}</Chip>
+                                                        </td>
+                                                        <td className="border-t border-hair px-3.5 py-2.5 text-[13px] text-fg2">
+                                                            {row.ats}
+                                                        </td>
+                                                        <td className="tnum border-t border-hair px-3.5 py-2.5 text-[13px] text-fg2">
+                                                            {row.updated}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </Card>
+
+                        <div className="mt-11 flex flex-wrap items-center justify-center gap-x-[34px] gap-y-3 text-[13.5px] font-semibold tracking-[.01em] text-fg3">
+                            <span className="text-[13px] font-normal">Fills applications on</span>
+                            {boards.map((board) => (
+                                <span key={board} className={board === "iCIMS" ? "max-md:hidden" : undefined}>
+                                    {board}
+                                </span>
+                            ))}
+                        </div>
+                    </section>
+
+                    <section className="mx-auto mt-[84px] max-w-[960px]">
+                        <div className={`${OV} text-center`}>Recorded in the app</div>
+                        <Card className="mt-3.5 overflow-hidden border-hair2 shadow-qmd">
+                            <div className="flex items-center gap-2 border-b border-hair bg-well px-3.5 py-2.5">
+                                <span className="size-2.5 rounded-full bg-[#ff5f57]" />
+                                <span className="size-2.5 rounded-full bg-[#febc2e]" />
+                                <span className="size-2.5 rounded-full bg-[#28c840]" />
+                                <span className="ml-3 truncate rounded-lg border border-hair bg-surface px-2.5 py-[3px] font-mono text-[11.5px] text-fg3">
+                                    nextmove-yatin.vercel.app/generate
+                                </span>
+                            </div>
+                            <Image
+                                src={DarkImage}
+                                alt="NextMove generating an outreach message"
+                                className="hidden h-auto w-full dark:block"
+                            />
+                            <Image
+                                src={LightImage}
+                                alt="NextMove generating an outreach message"
+                                className="block h-auto w-full dark:hidden"
+                            />
+                        </Card>
+                    </section>
+
+                    <div className="mx-auto max-w-[1020px] pb-[76px]">
+                        <section id="product" className="mt-[84px] scroll-mt-20">
+                            <div className="grid items-center gap-11 md:grid-cols-[1fr_1.15fr]">
+                                <div>
+                                    <div className={OV}>01 &middot; Autofill</div>
+                                    <h2 className={`mt-2.5 ${H2}`}>One click fills the whole form.</h2>
+                                    <p className="mt-2.5 text-sm leading-[1.65] text-fg2">
+                                        Confident answers fill instantly. Uncertain ones become suggestions you approve.
+                                        Personal questions are left for you &mdash; always. Press <Kbd>&#8984;</Kbd>{" "}
+                                        <Kbd>&#8629;</Kbd> on any job page.
+                                    </p>
+                                    <div className="mt-4 flex flex-col gap-2.5">
+                                        {autofillClaims.map((claim) => (
+                                            <div key={claim} className="flex items-center gap-2.5 text-[13.5px]">
+                                                <CheckCircle2 className="size-4 flex-none text-ok" strokeWidth={1.5} />
+                                                {claim}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <Card className="px-5 py-[18px]">
+                                    <div className="flex items-center gap-2">
+                                        <span className={`${OV} text-[10.5px]`}>boards.greenhouse.io</span>
+                                        <Chip dot={false} className="ml-auto text-[11.5px]">
+                                            22 fields found
+                                        </Chip>
+                                    </div>
+                                    <Field label="First name">
+                                        <div className="relative">
+                                            <Input defaultValue="Yatin" readOnly />
+                                            <CheckCircle2
+                                                className="absolute top-[11px] right-2.5 size-4 text-ok"
+                                                strokeWidth={1.5}
+                                            />
+                                        </div>
+                                    </Field>
+                                    <Field label="Years of React experience">
+                                        <Input readOnly />
+                                        <Well className="mt-2 flex flex-wrap items-center gap-2.5 px-2.5 py-2 text-[13px]">
+                                            <Chip tone="warn" dot={false} className="text-[11.5px]">
+                                                Suggested
+                                            </Chip>
+                                            <b>5</b>
+                                            <span className={`${BTN_ACC} ml-auto px-2.5 py-1 text-xs`}>Accept</span>
+                                            <span className={`${BTN} px-2 py-1 text-xs text-fg2`}>Edit</span>
+                                        </Well>
+                                    </Field>
+                                    <Field label="Why do you want to work here?" hint="left for you">
+                                        <textarea
+                                            rows={2}
+                                            readOnly
+                                            className="w-full resize-none rounded-lg border border-dashed border-hair2 bg-surface px-3 py-2 text-[13.5px] text-fg"
+                                        />
+                                    </Field>
+                                </Card>
+                            </div>
+                        </section>
+
+                        <section className="mt-[76px]">
+                            <div className="grid items-center gap-11 md:grid-cols-[1.15fr_1fr]">
+                                <Card className="overflow-hidden">
+                                    <div className="flex items-center gap-2 border-b border-hair px-4 py-[11px]">
+                                        <span className="text-sm font-semibold">Outreach</span>
+                                        <Chip dot={false} className="ml-auto text-[11.5px]">
+                                            Draft &middot; Gemini &middot; 0.8s
+                                        </Chip>
+                                    </div>
+                                    <div className="px-[18px] py-4 text-[13.5px] leading-[1.75] text-fg">
+                                        <p>Hi Sarah,</p>
+                                        <p className="mt-4">
+                                            I came across the Frontend Developer opening at Stripe and it lines up
+                                            closely with what I&apos;ve been building &mdash; five years of React and
+                                            TypeScript, most recently leading a design-system migration across three
+                                            product teams.
+                                        </p>
+                                        <p className="mt-4">I&apos;d love to be considered.</p>
+                                    </div>
+                                    <div className="flex items-center gap-2 border-t border-hair px-4 py-3">
+                                        <span className={`${BTN_SEC} px-3 py-1.5 text-[12.5px]`}>
+                                            <Copy className="size-[13px]" strokeWidth={1.5} />
+                                            Copy
+                                        </span>
+                                        <span className={`${BTN} px-3 py-1.5 text-[12.5px] text-fg2`}>Regenerate</span>
+                                        <span className="tnum ml-auto text-xs text-fg2">184 words</span>
+                                    </div>
+                                </Card>
+
+                                <div>
+                                    <div className={OV}>02 &middot; Outreach</div>
+                                    <h2 className={`mt-2.5 ${H2}`}>Messages that sound like you wrote them.</h2>
+                                    <p className="mt-2.5 text-sm leading-[1.65] text-fg2">
+                                        Templates plus your profile plus the job details. Generated on your own Gemini
+                                        key, saved to your history, one tap to copy. No credits, no middleman.
+                                    </p>
+                                    <Link
+                                        href="/templates"
+                                        className="mt-3 inline-block text-[13.5px] text-acc hover:underline"
+                                    >
+                                        Browse the template library &rarr;
+                                    </Link>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section id="privacy" className="mt-[84px] scroll-mt-20">
+                            <div className="mx-auto max-w-[520px] text-center">
+                                <div className={OV}>03 &middot; Private by default</div>
+                                <h2 className={`mt-2.5 ${H2}`}>Your data has one home: your device.</h2>
+                            </div>
+                            <div className="mx-auto mt-[26px] grid max-w-[960px] gap-3.5 md:grid-cols-3">
+                                {privacyPoints.map((point) => (
+                                    <Card key={point.title} className="p-[18px]">
+                                        <point.icon className="size-4 text-fg2" strokeWidth={1.5} />
+                                        <h3 className="mt-2.5 text-base leading-[1.3] font-semibold tracking-[-0.012em]">
+                                            {point.title}
+                                        </h3>
+                                        <p className="mt-[5px] text-[13px] text-fg2">{point.body}</p>
+                                    </Card>
+                                ))}
+                            </div>
+                            <div className="mt-14 text-center">
+                                <a
+                                    href={CHROME_STORE_URL}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={`${BTN_ACC} px-[18px] py-2.5 text-sm`}
+                                >
+                                    Add to Chrome
+                                    <ArrowRight className="size-3.5" strokeWidth={1.5} />
+                                </a>
+                                <div className="mt-3 text-[13px] text-fg3">
+                                    Set up in 2 minutes &middot; works signed out
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            </GridHero>
+
+            <footer className="border-t border-hair px-6 py-8">
+                <div className="mx-auto flex max-w-[1120px] flex-wrap items-center gap-x-6 gap-y-4">
+                    <Logo size={22} />
+                    <span className="text-[13px] text-fg2">
+                        &copy; {new Date().getFullYear()} NextMoveApp
+                    </span>
+                    <Link href="/extension" className="text-[13px] text-fg2 hover:text-fg">
+                        Extension
+                    </Link>
+                    <div className="ml-auto flex items-center gap-1">
+                        {[
+                            { href: "https://x.com/YatinDora", label: "X", icon: Twitter },
+                            { href: "https://www.linkedin.com/in/yatin-dora/", label: "LinkedIn", icon: Linkedin },
+                            { href: "https://github.com/YatinDora81", label: "GitHub", icon: Github },
+                        ].map((social) => (
+                            <a
+                                key={social.href}
+                                href={social.href}
+                                target="_blank"
+                                rel="noreferrer"
+                                aria-label={social.label}
+                                className="rounded-lg p-1.5 text-fg3 transition-colors hover:bg-well hover:text-fg"
+                            >
+                                <social.icon className="size-4" strokeWidth={1.5} />
+                            </a>
+                        ))}
                     </div>
                 </div>
             </footer>
-
-        </div>
+        </main>
     )
 }

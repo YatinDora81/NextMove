@@ -1,13 +1,7 @@
 "use client"
 
-/**
- * JF-001 SEC 6.7 "Quick filters: status, ATS, date range". The `profile` filter from the
- * extension spec has no web analogue — the cloud `JobApplication` model deliberately does
- * not carry `profileId` (profiles never leave the device, SEC 7.4).
- */
-
 import { Search, X } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/quiet/Button"
 import { Input } from "@/components/ui/input"
 import {
     Select,
@@ -16,6 +10,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import { cn } from "@/lib/utils"
 import {
     JOB_APP_STATUSES,
     STATUS_LABEL,
@@ -24,12 +19,21 @@ import {
 } from "@/components/applications/types"
 import { JobApplicationFilters, isDefaultFilters } from "@/hooks/useJobApplications"
 
+const CONTROL = cn(
+    "h-[38px] rounded-lg border-hair2 bg-surface text-[13.5px] text-fg shadow-none md:text-[13.5px]",
+    "dark:bg-surface dark:hover:bg-surface",
+    "placeholder:text-fg3",
+    "focus-visible:border-hair2 focus-visible:ring-0 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-acc",
+)
+
+const SELECT_CONTROL = cn(CONTROL, "data-[size=default]:h-[38px] data-[placeholder]:text-fg3")
+
 type Props = {
     filters: JobApplicationFilters
     onChange: (next: JobApplicationFilters) => void
     onReset: () => void
     atsOptions: readonly string[]
-    /** Rows currently visible / rows loaded, for the "showing x of y" line. */
+
     shownCount: number
     totalCount: number
 }
@@ -45,11 +49,11 @@ export function ApplicationsFilters({
     const isPristine = isDefaultFilters(filters)
 
     return (
-        <div className="flex w-full flex-col gap-3">
+        <div className="flex w-full flex-col gap-2">
             <div className="flex w-full flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center">
                 <div className="relative w-full lg:max-w-xs">
                     <Search
-                        className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-zinc-400"
+                        className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-fg3"
                         aria-hidden="true"
                     />
                     <Input
@@ -57,7 +61,7 @@ export function ApplicationsFilters({
                         onChange={(event) => onChange({ ...filters, search: event.target.value })}
                         placeholder="Search company, role, notes…"
                         aria-label="Search applications"
-                        className="pl-8"
+                        className={cn(CONTROL, "pl-8")}
                     />
                 </div>
 
@@ -67,7 +71,7 @@ export function ApplicationsFilters({
                         onChange({ ...filters, status: isJobAppStatus(value) ? value : "ALL" })
                     }
                 >
-                    <SelectTrigger className="w-full lg:w-[9.5rem]" aria-label="Filter by status">
+                    <SelectTrigger className={cn(SELECT_CONTROL, "w-full lg:w-[9.5rem]")} aria-label="Filter by status">
                         <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -81,7 +85,7 @@ export function ApplicationsFilters({
                 </Select>
 
                 <Select value={filters.ats} onValueChange={(value) => onChange({ ...filters, ats: value })}>
-                    <SelectTrigger className="w-full lg:w-[10rem]" aria-label="Filter by ATS">
+                    <SelectTrigger className={cn(SELECT_CONTROL, "w-full lg:w-[10rem]")} aria-label="Filter by ATS">
                         <SelectValue placeholder="ATS" />
                     </SelectTrigger>
                     <SelectContent>
@@ -101,28 +105,28 @@ export function ApplicationsFilters({
                         max={filters.to === "" ? undefined : filters.to}
                         onChange={(event) => onChange({ ...filters, from: event.target.value })}
                         aria-label="Applied on or after"
-                        className="w-full lg:w-[10rem]"
+                        className={cn(CONTROL, "tnum w-full lg:w-[10rem]")}
                     />
-                    <span className="text-xs text-zinc-500">to</span>
+                    <span className="text-xs text-fg3">to</span>
                     <Input
                         type="date"
                         value={filters.to}
                         min={filters.from === "" ? undefined : filters.from}
                         onChange={(event) => onChange({ ...filters, to: event.target.value })}
                         aria-label="Applied on or before"
-                        className="w-full lg:w-[10rem]"
+                        className={cn(CONTROL, "tnum w-full lg:w-[10rem]")}
                     />
                 </div>
 
                 {!isPristine && (
-                    <Button variant="ghost" size="sm" onClick={onReset} className="gap-1.5">
+                    <Button variant="ghost" onClick={onReset} className="px-3 py-1.5 text-[13px]">
                         <X className="h-3.5 w-3.5" />
                         Clear filters
                     </Button>
                 )}
             </div>
 
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            <p className="tnum text-xs text-fg3">
                 Showing {shownCount} of {totalCount} loaded application{totalCount === 1 ? "" : "s"}.
             </p>
         </div>

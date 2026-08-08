@@ -10,6 +10,7 @@ import {
 } from 'react';
 
 import { MAX_QUESTION_CHARS } from '@/shared/constants';
+import { Sparkles } from '@/ui/icons';
 import { sendMessage } from '@/platform/bus';
 import type {
   AnswerHit,
@@ -208,7 +209,7 @@ export function SparkleButton({ target, ctx }: SparkleButtonProps): ReactElement
         ctx.pushToast({
           id: `spark-gesture-${target.id}`,
           kind: 'info',
-          title: 'Click ✨ again',
+          title: 'Click Answer again',
           message: 'NextMove needs a fresh click before it will spend one of your keys.',
           timeoutMs: 6_000,
         });
@@ -365,7 +366,9 @@ export function SparkleButton({ target, ctx }: SparkleButtonProps): ReactElement
           : 'Close',
       'aria-label': 'Answer this question with NextMove',
     },
-    busy ? h('span', { className: 'jf-spinner' }) : h('span', { className: 'jf-spark__icon' }, '✨'),
+    busy
+      ? h('span', { className: 'jf-spinner' })
+      : h(Sparkles, { size: 12, className: 'jf-spark__icon', 'aria-hidden': true }),
     busy ? (phase.kind === 'looking' ? 'Checking your answers…' : 'Writing…') : 'Answer',
   );
 

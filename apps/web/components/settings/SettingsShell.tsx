@@ -1,63 +1,33 @@
 "use client"
 
-/** JF-001 SEC 8.5 / 15.7 — the Settings shell: title plus the section tabs. */
-
-import Link from "next/link"
+import type { ReactNode } from "react"
 import { usePathname } from "next/navigation"
 import { KeyRound, Laptop } from "lucide-react"
-import type { LucideIcon } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { SettingsRail } from "@/components/quiet/SettingsRail"
+import type { SettingsRailItem } from "@/components/quiet/SettingsRail"
 
-type SettingsTab = {
-    name: string
-    href: string
-    icon: LucideIcon
-}
-
-const TABS: readonly SettingsTab[] = [
-    { name: "AI Keys", href: "/settings/ai-keys", icon: KeyRound },
-    { name: "Devices", href: "/settings/devices", icon: Laptop },
+const ITEMS: SettingsRailItem[] = [
+    {
+        href: "/settings/ai-keys",
+        label: "AI keys",
+        icon: <KeyRound className="size-4 shrink-0" strokeWidth={1.5} />,
+    },
+    {
+        href: "/settings/devices",
+        label: "Devices",
+        icon: <Laptop className="size-4 shrink-0" strokeWidth={1.5} />,
+    },
 ]
 
-export function SettingsShell({ children }: { children: React.ReactNode }) {
+export function SettingsShell({ children }: { children: ReactNode }) {
     const pathname = usePathname()
 
     return (
-        <div className="flex min-h-screen w-full items-start justify-center pt-[8vh] md:pt-[12vh]">
-            <div className="flex w-[90%] max-w-4xl flex-col items-start justify-start gap-6 pb-16">
-                <div className="flex flex-col gap-4">
-                    <h1 className="font-mono text-3xl font-semibold">Settings</h1>
-
-                    <nav
-                        aria-label="Settings sections"
-                        className="bg-muted text-muted-foreground inline-flex h-9 w-fit items-center justify-center rounded-lg p-[3px]"
-                    >
-                        {TABS.map((tab) => {
-                            const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`)
-                            const Icon = tab.icon
-                            return (
-                                <Link
-                                    key={tab.href}
-                                    href={tab.href}
-                                    aria-current={active ? "page" : undefined}
-                                    className={cn(
-                                        "inline-flex h-[calc(100%-1px)] items-center justify-center gap-1.5 rounded-md border border-transparent px-3 py-1 font-mono text-sm font-medium whitespace-nowrap transition-[color,box-shadow]",
-                                        "focus-visible:ring-ring/50 focus-visible:outline-ring focus-visible:ring-[3px] focus-visible:outline-1",
-                                        active
-                                            ? "bg-background text-foreground shadow-sm dark:border-input dark:bg-input/30"
-                                            : "text-foreground/70 hover:text-foreground dark:text-muted-foreground",
-                                    )}
-                                >
-                                    <Icon className="size-4" />
-                                    {tab.name}
-                                </Link>
-                            )
-                        })}
-                    </nav>
-                </div>
-
-                <div className="w-full">{children}</div>
-            </div>
+        <div className="flex min-h-[calc(100dvh-61px)] w-full items-stretch bg-bg">
+            <nav aria-label="Settings sections" className="flex flex-none">
+                <SettingsRail items={ITEMS} active={pathname} className="px-2.5 py-3.5" />
+            </nav>
+            <main className="min-w-0 flex-1 px-7 py-6 max-md:px-4">{children}</main>
         </div>
     )
 }

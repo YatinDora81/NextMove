@@ -24,9 +24,7 @@ export function ModeToggle({ className }: ModeToggleProps) {
   }, [theme, setTheme, startTransition]);
 
   if (!mounted) {
-    return (
-      <div className={`w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 ${className}`} />
-    );
+    return <div className={`size-8 rounded-lg bg-well ${className}`} />;
   }
 
   const currentTheme = theme === "system" ? "light" : (theme as "light" | "dark");
@@ -35,17 +33,9 @@ export function ModeToggle({ className }: ModeToggleProps) {
     <ThemeToggleButton
       theme={currentTheme}
       onClick={handleThemeToggle}
-      variant="gif"
-      url="https://media.giphy.com/media/ArfrRmFCzYXsC6etQX/giphy.gif?cid=ecf05e47kn81xmnuc9vd5g6p5xyjt14zzd3dzwso6iwgpvy3&ep=v1_stickers_search&rid=giphy.gif&ct=s"
+      variant="circle"
+      start="top-right"
       className={className}
     />
-
-    // <ThemeToggleButton 
-    //       theme={currentTheme}
-    //       onClick={handleThemeToggle}
-    //       variant="gif"
-    //       url="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExZ3JwcXdzcHd5MW92NWprZXVpcTBtNXM5cG9obWh0N3I4NzFpaDE3byZlcD12MV9zdGlja2Vyc19zZWFyY2gmY3Q9cw/WgsVx6C4N8tjy/giphy.gif"
-    //     />
-
   );
 }

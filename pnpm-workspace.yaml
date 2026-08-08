@@ -10,3 +10,11 @@ packages:
 onlyBuiltDependencies:
   - "@prisma/client"
   - prisma
+  # E16 — these also ship blocked postinstall/install scripts on pnpm 10.
+  # Without @prisma/engines the client generator can't fetch its query engine on a
+  # clean checkout; bcrypt/esbuild/sharp/oxide fall back to slow or broken paths.
+  - "@prisma/engines"
+  - bcrypt
+  - esbuild
+  - sharp
+  - "@tailwindcss/oxide"

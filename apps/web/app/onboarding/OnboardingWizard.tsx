@@ -1,12 +1,14 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react"
+import type { ReactNode } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import toast from "react-hot-toast"
-import { ArrowLeft, ArrowRight, CloudOff, Loader2, RotateCw, ShieldAlert } from "lucide-react"
+import { CloudOff, Loader2, RotateCw, ShieldAlert } from "lucide-react"
 import type { SharedProfile } from "@repo/types/ProfileTypes"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/quiet/Button"
+import { Card } from "@/components/quiet/Card"
 import { StepIndicator } from "@/components/onboarding/StepIndicator"
 import { useAuth } from "@/hooks/useAuth"
 import { useProfileVault } from "@/hooks/useProfileVault"
@@ -47,7 +49,7 @@ const STEP_META: Record<StepId, StepMeta> = {
     connect: { label: "Connect", forwardLabel: "" },
 }
 
-const RAIL_STEPS = STEP_IDS.slice(1, -1).map((id) => ({ id, label: STEP_META[id].label }))
+const RAIL_STEPS = STEP_IDS.slice(1).map((id) => ({ id, label: STEP_META[id].label }))
 
 const STEP_NAMES: readonly string[] = STEP_IDS
 
@@ -384,31 +386,26 @@ export function OnboardingWizard({ initialStep }: { initialStep: StepId }) {
         const offline = errorKind === "network"
         return (
             <WizardShell>
-                <div
-                    className={cn(
-                        "flex flex-col items-start gap-4 rounded-xl border p-6",
-                        offline ? "border-border bg-muted/40" : "border-destructive/40 bg-destructive/5",
-                    )}
-                >
+                <Card className="flex flex-col items-start gap-4 p-6">
                     {offline ? (
-                        <CloudOff className="size-5 text-muted-foreground" />
+                        <CloudOff className="size-5 text-fg2" />
                     ) : (
-                        <ShieldAlert className="size-5 text-destructive" />
+                        <ShieldAlert className="size-5 text-dan" />
                     )}
                     <div className="flex flex-col gap-1">
-                        <h1 className="font-mono text-lg font-semibold">
+                        <h1 className="text-[19px] font-semibold tracking-[-0.015em] text-fg">
                             {offline ? "We couldn’t reach NextMove" : "We couldn’t open your vault"}
                         </h1>
-                        <p className="max-w-xl text-sm leading-relaxed text-muted-foreground">
+                        <p className="text-[13px] leading-relaxed text-fg2">
                             {error ??
                                 "Your profile is stored encrypted, and the key lives in this browser. If you started onboarding somewhere else, open this page there — or start fresh here and import later."}
                         </p>
                     </div>
-                    <Button variant="outline" onClick={() => void load()}>
+                    <Button variant="sec" onClick={() => void load()}>
                         <RotateCw className="size-4" />
                         Try again
                     </Button>
-                </div>
+                </Card>
             </WizardShell>
         )
     }
@@ -416,22 +413,23 @@ export function OnboardingWizard({ initialStep }: { initialStep: StepId }) {
     if (!hydrated) {
         return (
             <WizardShell>
-                <div
+                <Card
                     role="status"
                     aria-label="Opening your profile vault"
-                    className="flex min-h-64 items-center justify-center rounded-xl border border-border bg-card"
+                    className="flex min-h-64 items-center justify-center"
                 >
-                    <span className="flex items-center gap-2 font-mono text-sm text-muted-foreground">
+                    <span className="flex items-center gap-2 text-[13px] text-fg2">
                         <Loader2 className="size-4 animate-spin" />
                         Opening your vault…
                     </span>
-                </div>
+                </Card>
             </WizardShell>
         )
     }
 
-    const showRail = currentIndex > 0 && currentIndex < STEP_IDS.length - 1
-    const showFooter = showRail
+    const isFormStep = currentIndex > 0 && currentIndex < STEP_IDS.length - 1
+    const showRail = currentIndex > 0
+    const showFooter = isFormStep
 
     return (
         <WizardShell>
@@ -450,36 +448,38 @@ export function OnboardingWizard({ initialStep }: { initialStep: StepId }) {
             {error !== null ? (
                 <div
                     role="status"
-                    className="flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4"
+                    className="flex items-start gap-3 rounded-[10px] border border-warn/40 bg-warnbg p-4"
                 >
-                    <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                    <p className="text-xs leading-relaxed">{error}</p>
+                    <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warn" />
+                    <p className="text-xs leading-relaxed text-fg2">{error}</p>
                 </div>
             ) : null}
 
-            <div className="rounded-xl border border-border bg-card p-6 text-card-foreground shadow-sm md:p-8">
+            <Card className="p-6 shadow-qmd md:p-8">
                 <AnimatePresence mode="wait" initial={false}>
                     <motion.div
                         key={state.step}
-                        initial={{ opacity: 0, y: reduceMotion ? 0 : 8 }}
+                        initial={{ opacity: 0, y: reduceMotion ? 0 : 6 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: reduceMotion ? 0 : -8 }}
-                        transition={{ duration: reduceMotion ? 0 : 0.18, ease: "easeOut" }}
+                        exit={{ opacity: 0, y: reduceMotion ? 0 : -6 }}
+                        transition={{ duration: reduceMotion ? 0 : 0.14, ease: "easeOut" }}
                     >
                         {stepBody}
                     </motion.div>
                 </AnimatePresence>
 
                 {showFooter ? (
-                    <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-6">
+                    <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-hair pt-6">
                         <Button
                             type="button"
                             variant="ghost"
                             disabled={busy || previousStep === undefined}
+                            aria-label={
+                                previousStep ? `Back to ${STEP_META[previousStep].label}` : undefined
+                            }
                             onClick={() => previousStep && goTo(previousStep)}
                         >
-                            <ArrowLeft className="size-4" />
-                            {previousStep ? `Back to ${STEP_META[previousStep].label}` : "Back"}
+                            Back
                         </Button>
 
                         <div className="flex flex-wrap items-center gap-3">
@@ -498,19 +498,20 @@ export function OnboardingWizard({ initialStep }: { initialStep: StepId }) {
                             ) : null}
                             <Button
                                 type="button"
+                                variant="acc"
+                                className="px-5 py-2.5"
                                 disabled={busy || nextStep === undefined}
                                 onClick={() => nextStep && goTo(nextStep)}
                             >
                                 {busy ? <Loader2 className="size-4 animate-spin" /> : null}
                                 {busy ? "Saving…" : STEP_META[state.step].forwardLabel}
-                                {busy ? null : <ArrowRight className="size-4" />}
                             </Button>
                         </div>
                     </div>
                 ) : null}
-            </div>
+            </Card>
 
-            <p className={cn("text-center text-xs text-muted-foreground", !showRail && "sr-only")}>
+            <p className={cn("text-center text-xs text-fg2", !isFormStep && "sr-only")}>
                 Everything here is encrypted in this browser before it is stored. We hold the
                 ciphertext; only you hold the key.
             </p>
@@ -518,10 +519,10 @@ export function OnboardingWizard({ initialStep }: { initialStep: StepId }) {
     )
 }
 
-function WizardShell({ children }: { children: React.ReactNode }) {
+function WizardShell({ children }: { children: ReactNode }) {
     return (
-        <div className="flex min-h-screen w-full items-start justify-center pt-[8vh] md:pt-[12vh]">
-            <div className="flex w-[90%] max-w-3xl flex-col gap-6 pb-16">{children}</div>
+        <div className="min-h-screen w-full bg-well px-6 pt-10 pb-14">
+            <div className="mx-auto flex w-full max-w-[560px] flex-col gap-6">{children}</div>
         </div>
     )
 }

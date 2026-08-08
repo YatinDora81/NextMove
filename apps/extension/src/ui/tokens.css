@@ -2,49 +2,68 @@
 :host {
   color-scheme: light dark;
 
-  --jf-l-surface-sunken: #f5f7fa;
-  --jf-l-surface-base: #ffffff;
+  --jf-l-surface-sunken: #f4f4f6;
+  --jf-l-surface-sunken-strong: #ececef;
+  --jf-l-surface-base: #fcfcfd;
   --jf-l-surface-e1: #ffffff;
   --jf-l-surface-e2: #ffffff;
   --jf-l-surface-e3: #ffffff;
 
-  --jf-l-border: #e3e7ec;
-  --jf-l-border-strong: #858e9a;
+  --jf-l-hairline: rgb(23 23 27 / 8%);
+  --jf-l-hairline-strong: rgb(23 23 27 / 14%);
+  --jf-l-border: rgb(23 23 27 / 8%);
+  --jf-l-border-strong: #86868f;
 
-  --jf-l-fg: #0f141a;
-  --jf-l-fg-muted: #4b5563;
-  --jf-l-fg-subtle: #646e7c;
+  --jf-l-fg: #17171b;
+  --jf-l-fg-muted: #5f5f68;
+  --jf-l-fg-subtle: #6a6a73;
+  --jf-l-fg-faint: #9a9aa2;
 
-  --jf-l-accent: #2563eb;
+  --jf-l-accent: #4353e8;
+  --jf-l-accent-strong: #3a49d6;
   --jf-l-accent-contrast: #ffffff;
-  --jf-l-warn: #9a6200;
-  --jf-l-danger: #c4302f;
-  --jf-l-ok: #127a45;
+  --jf-l-warn: #8a5a00;
+  --jf-l-danger: #b32e3c;
+  --jf-l-ok: #177a4c;
 
-  --jf-l-shadow-rgb: 16 21 28;
+  --jf-l-grid-line: #e4e4e7;
+  --jf-l-kbd-bg: #ffffff;
+  --jf-l-kbd-border: rgb(23 23 27 / 16%);
 
-  --jf-d-surface-sunken: #080b0f;
-  --jf-d-surface-base: #0b0f14;
-  --jf-d-surface-e1: #141a21;
-  --jf-d-surface-e2: #1b222b;
-  --jf-d-surface-e3: #222b36;
+  --jf-l-shadow-rgb: 9 9 11;
 
-  --jf-d-border: #2a323d;
-  --jf-d-border-strong: #727c88;
+  --jf-d-surface-sunken: #1b1b20;
+  --jf-d-surface-sunken-strong: #232329;
+  --jf-d-surface-base: #0c0c0f;
+  --jf-d-surface-e1: #141417;
+  --jf-d-surface-e2: #1b1b20;
+  --jf-d-surface-e3: #232329;
 
-  --jf-d-fg: #ecedee;
-  --jf-d-fg-muted: #b3bac2;
-  --jf-d-fg-subtle: #9ba1a6;
+  --jf-d-hairline: rgb(244 244 246 / 8%);
+  --jf-d-hairline-strong: rgb(244 244 246 / 14%);
+  --jf-d-border: rgb(244 244 246 / 8%);
+  --jf-d-border-strong: #6f6f78;
 
-  --jf-d-accent: #78a6ff;
-  --jf-d-accent-contrast: #0b0f14;
-  --jf-d-warn: #e0a93e;
-  --jf-d-danger: #ff8a8a;
-  --jf-d-ok: #54d08c;
+  --jf-d-fg: #f1f1f3;
+  --jf-d-fg-muted: #a2a2ab;
+  --jf-d-fg-subtle: #8e8e97;
+  --jf-d-fg-faint: #63636d;
+
+  --jf-d-accent: #8492ff;
+  --jf-d-accent-strong: #98a4ff;
+  --jf-d-accent-contrast: #0c0c0f;
+  --jf-d-warn: #e0b45c;
+  --jf-d-danger: #ee8b95;
+  --jf-d-ok: #5cc98c;
+
+  --jf-d-grid-line: #262626;
+  --jf-d-kbd-bg: #1b1b20;
+  --jf-d-kbd-border: rgb(244 244 246 / 18%);
 
   --jf-d-shadow-rgb: 0 0 0;
 
   --jf-surface-sunken: var(--jf-l-surface-sunken);
+  --jf-surface-sunken-strong: var(--jf-l-surface-sunken-strong);
   --jf-surface-base: var(--jf-l-surface-base);
   --jf-surface-e1: var(--jf-l-surface-e1);
   --jf-surface-e2: var(--jf-l-surface-e2);
@@ -57,18 +76,26 @@
   --jf-surface: var(--jf-surface-e1);
   --jf-surface-subtle: var(--jf-surface-sunken);
 
+  --jf-hairline: var(--jf-l-hairline);
+  --jf-hairline-strong: var(--jf-l-hairline-strong);
   --jf-border: var(--jf-l-border);
   --jf-border-strong: var(--jf-l-border-strong);
 
   --jf-fg: var(--jf-l-fg);
   --jf-fg-muted: var(--jf-l-fg-muted);
   --jf-fg-subtle: var(--jf-l-fg-subtle);
+  --jf-fg-faint: var(--jf-l-fg-faint);
 
   --jf-accent: var(--jf-l-accent);
+  --jf-accent-strong: var(--jf-l-accent-strong);
   --jf-accent-contrast: var(--jf-l-accent-contrast);
   --jf-warn: var(--jf-l-warn);
   --jf-danger: var(--jf-l-danger);
   --jf-ok: var(--jf-l-ok);
+
+  --jf-grid-line: var(--jf-l-grid-line);
+  --jf-kbd-bg: var(--jf-l-kbd-bg);
+  --jf-kbd-border: var(--jf-l-kbd-border);
 
   --jf-key-active: var(--jf-ok);
   --jf-key-cooldown: var(--jf-warn);
@@ -81,9 +108,9 @@
   --jf-danger-soft: color-mix(in srgb, var(--jf-danger) var(--jf-soft-alpha), transparent);
   --jf-ok-soft: color-mix(in srgb, var(--jf-ok) var(--jf-soft-alpha), transparent);
 
-  --jf-shadow-1: 0 1px 2px rgb(var(--jf-l-shadow-rgb) / 6%);
-  --jf-shadow-2: 0 1px 2px rgb(var(--jf-l-shadow-rgb) / 5%), 0 2px 6px -1px rgb(var(--jf-l-shadow-rgb) / 8%);
-  --jf-shadow-3: 0 1px 2px rgb(var(--jf-l-shadow-rgb) / 5%), 0 6px 16px -4px rgb(var(--jf-l-shadow-rgb) / 12%);
+  --jf-shadow-1: 0 1px 2px rgb(var(--jf-l-shadow-rgb) / 5%);
+  --jf-shadow-2: 0 1px 2px rgb(var(--jf-l-shadow-rgb) / 5%), 0 6px 18px -8px rgb(var(--jf-l-shadow-rgb) / 8%);
+  --jf-shadow-3: 0 1px 2px rgb(var(--jf-l-shadow-rgb) / 5%), 0 10px 28px -10px rgb(var(--jf-l-shadow-rgb) / 10%);
 
   --jf-elevation-1: 0 0 0 1px var(--jf-border), var(--jf-shadow-1);
   --jf-elevation-2: 0 0 0 1px var(--jf-border), var(--jf-shadow-2);
@@ -101,26 +128,32 @@
   --jf-gap: var(--jf-space-3);
 
   --jf-text-2xs: 11px;
-  --jf-text-xs: 12px;
-  --jf-text-sm: 13px;
-  --jf-text-md: 14px;
-  --jf-text-lg: 16px;
+  --jf-text-xs: 12.5px;
+  --jf-text-sm: 13.5px;
+  --jf-text-md: 15px;
+  --jf-text-lg: 17px;
   --jf-text-xl: 20px;
-  --jf-text-2xl: 24px;
+  --jf-text-2xl: 26px;
 
   --jf-leading-tight: 1.2;
   --jf-leading-snug: 1.35;
-  --jf-leading-normal: 1.5;
+  --jf-leading-normal: 1.55;
   --jf-leading-relaxed: 1.6;
 
   --jf-weight-normal: 400;
   --jf-weight-medium: 500;
   --jf-weight-semibold: 600;
+  --jf-weight-display: 650;
+
+  --jf-tracking-display: -0.028em;
+  --jf-tracking-tight: -0.01em;
+  --jf-tracking-overline: 0.09em;
 
   --jf-radius-sm: 6px;
   --jf-radius-md: 8px;
+  --jf-radius-inset: 10px;
   --jf-radius-lg: 12px;
-  --jf-radius-xl: 16px;
+  --jf-radius-xl: 14px;
   --jf-radius-full: 999px;
   --jf-radius: var(--jf-radius-lg);
 
@@ -128,46 +161,53 @@
   --jf-ring-width: 2px;
   --jf-ring-offset: 2px;
 
-  --jf-duration-fast: 150ms;
-  --jf-duration: 180ms;
-  --jf-duration-slow: 200ms;
+  --jf-duration-fast: 120ms;
+  --jf-duration: 150ms;
+  --jf-duration-slow: 180ms;
   --jf-ease: cubic-bezier(0.4, 0, 0.2, 1);
   --jf-ease-out: cubic-bezier(0, 0, 0.2, 1);
 
-  --jf-popup-width: 360px;
+  --jf-popup-width: 400px;
   --jf-popup-max-height: 560px;
 
-  --jf-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --jf-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  --jf-font: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --jf-font-mono: "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]),
   :host(:not([data-theme="light"])) {
     --jf-surface-sunken: var(--jf-d-surface-sunken);
+    --jf-surface-sunken-strong: var(--jf-d-surface-sunken-strong);
     --jf-surface-base: var(--jf-d-surface-base);
     --jf-surface-e1: var(--jf-d-surface-e1);
     --jf-surface-e2: var(--jf-d-surface-e2);
     --jf-surface-e3: var(--jf-d-surface-e3);
 
+    --jf-hairline: var(--jf-d-hairline);
+    --jf-hairline-strong: var(--jf-d-hairline-strong);
     --jf-border: var(--jf-d-border);
     --jf-border-strong: var(--jf-d-border-strong);
 
     --jf-fg: var(--jf-d-fg);
     --jf-fg-muted: var(--jf-d-fg-muted);
     --jf-fg-subtle: var(--jf-d-fg-subtle);
+    --jf-fg-faint: var(--jf-d-fg-faint);
 
     --jf-accent: var(--jf-d-accent);
+    --jf-accent-strong: var(--jf-d-accent-strong);
     --jf-accent-contrast: var(--jf-d-accent-contrast);
     --jf-warn: var(--jf-d-warn);
     --jf-danger: var(--jf-d-danger);
     --jf-ok: var(--jf-d-ok);
 
-    --jf-soft-alpha: 18%;
+    --jf-grid-line: var(--jf-d-grid-line);
+    --jf-kbd-bg: var(--jf-d-kbd-bg);
+    --jf-kbd-border: var(--jf-d-kbd-border);
 
-    --jf-shadow-1: 0 1px 2px rgb(var(--jf-d-shadow-rgb) / 30%);
-    --jf-shadow-2: 0 1px 3px rgb(var(--jf-d-shadow-rgb) / 40%);
-    --jf-shadow-3: 0 2px 8px -2px rgb(var(--jf-d-shadow-rgb) / 50%);
+    --jf-shadow-1: 0 1px 2px rgb(var(--jf-d-shadow-rgb) / 40%);
+    --jf-shadow-2: 0 1px 2px rgb(var(--jf-d-shadow-rgb) / 40%), 0 8px 24px -12px rgb(var(--jf-d-shadow-rgb) / 50%);
+    --jf-shadow-3: 0 1px 2px rgb(var(--jf-d-shadow-rgb) / 40%), 0 12px 32px -12px rgb(var(--jf-d-shadow-rgb) / 55%);
   }
 }
 
@@ -176,32 +216,63 @@
   color-scheme: dark;
 
   --jf-surface-sunken: var(--jf-d-surface-sunken);
+  --jf-surface-sunken-strong: var(--jf-d-surface-sunken-strong);
   --jf-surface-base: var(--jf-d-surface-base);
   --jf-surface-e1: var(--jf-d-surface-e1);
   --jf-surface-e2: var(--jf-d-surface-e2);
   --jf-surface-e3: var(--jf-d-surface-e3);
 
+  --jf-hairline: var(--jf-d-hairline);
+  --jf-hairline-strong: var(--jf-d-hairline-strong);
   --jf-border: var(--jf-d-border);
   --jf-border-strong: var(--jf-d-border-strong);
 
   --jf-fg: var(--jf-d-fg);
   --jf-fg-muted: var(--jf-d-fg-muted);
   --jf-fg-subtle: var(--jf-d-fg-subtle);
+  --jf-fg-faint: var(--jf-d-fg-faint);
 
   --jf-accent: var(--jf-d-accent);
+  --jf-accent-strong: var(--jf-d-accent-strong);
   --jf-accent-contrast: var(--jf-d-accent-contrast);
   --jf-warn: var(--jf-d-warn);
   --jf-danger: var(--jf-d-danger);
   --jf-ok: var(--jf-d-ok);
 
-  --jf-soft-alpha: 18%;
+  --jf-grid-line: var(--jf-d-grid-line);
+  --jf-kbd-bg: var(--jf-d-kbd-bg);
+  --jf-kbd-border: var(--jf-d-kbd-border);
 
-  --jf-shadow-1: 0 1px 2px rgb(var(--jf-d-shadow-rgb) / 30%);
-  --jf-shadow-2: 0 1px 3px rgb(var(--jf-d-shadow-rgb) / 40%);
-  --jf-shadow-3: 0 2px 8px -2px rgb(var(--jf-d-shadow-rgb) / 50%);
+  --jf-shadow-1: 0 1px 2px rgb(var(--jf-d-shadow-rgb) / 40%);
+  --jf-shadow-2: 0 1px 2px rgb(var(--jf-d-shadow-rgb) / 40%), 0 8px 24px -12px rgb(var(--jf-d-shadow-rgb) / 50%);
+  --jf-shadow-3: 0 1px 2px rgb(var(--jf-d-shadow-rgb) / 40%), 0 12px 32px -12px rgb(var(--jf-d-shadow-rgb) / 55%);
 }
 
 :root[data-theme="light"],
 :host([data-theme="light"]) {
   color-scheme: light;
+}
+
+.jf-gridbg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--jf-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--jf-grid-line) 1px, transparent 1px);
+  background-size: 40px 40px;
+  -webkit-mask-image: radial-gradient(ellipse 85% 70% at 50% 32%, #000 28%, transparent 74%);
+  mask-image: radial-gradient(ellipse 85% 70% at 50% 32%, #000 28%, transparent 74%);
+}
+
+.jf-logochip {
+  display: inline-block;
+  flex: none;
+  border: 1px solid var(--jf-hairline-strong);
+  border-radius: 22%;
+  background-color: #ffffff;
+  background-image: var(--jf-logo-image, none);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 86%;
 }

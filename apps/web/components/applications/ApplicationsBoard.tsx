@@ -1,30 +1,22 @@
 "use client"
 
-/**
- * JF-001 SEC 6.7 board view: kanban lanes `draft → applied → interview → offer /
- * rejected / ghosted`, where dragging a card between lanes appends to `history[]` with a
- * timestamp. The append itself lives in the hook (`setStatus`), so the drag here and the
- * "Move to" menu in the table produce identical audit trails.
- *
- * Drag uses the native HTML5 API — no new dependency (SPINE §3). Because native drag is
- * not keyboard-accessible, every card also carries the same "Move to" menu, so the board
- * is fully operable without a pointer.
- */
-
 import { useMemo, useState, type DragEvent } from "react"
 import { ExternalLink, GripVertical } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Card } from "@/components/quiet/Card"
+import { Chip } from "@/components/quiet/Chip"
 import ApplicationRowActions from "@/components/applications/ApplicationRowActions"
 import {
     BOARD_LANES,
     JobAppStatus,
     JobApplication,
-    STATUS_ACCENT,
+    STATUS_DOT,
     STATUS_LABEL,
     appliedAtMs,
     fillScorePct,
     formatAts,
     formatDate,
+    formatDayLabel,
     safeHostname,
 } from "@/components/applications/types"
 
@@ -51,7 +43,7 @@ function groupByLane(rows: readonly JobApplication[]): Record<JobAppStatus, JobA
         lanes[row.status].push(row)
     }
     for (const lane of BOARD_LANES) {
-        // Newest activity first inside a lane.
+
         lanes[lane].sort((left, right) => (appliedAtMs(right) ?? 0) - (appliedAtMs(left) ?? 0))
     }
     return lanes
@@ -80,28 +72,28 @@ function BoardCard({
     const score = fillScorePct(row)
 
     return (
-        <div
+        <Card
             draggable
             onDragStart={onDragStart}
             onDragEnd={onDragEnd}
             aria-roledescription="Draggable application card"
             className={cn(
-                "group flex cursor-grab flex-col gap-2 rounded-lg border border-zinc-200 bg-white p-3 shadow-sm transition-opacity active:cursor-grabbing dark:border-zinc-800 dark:bg-zinc-900",
+                "group flex cursor-grab flex-col gap-2 rounded-[10px] p-3 transition-opacity active:cursor-grabbing",
                 isDragging && "opacity-40",
             )}
         >
             <div className="flex items-start justify-between gap-1">
                 <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold" title={row.company}>
+                    <div className="truncate text-[13.5px] font-semibold text-fg" title={row.company}>
                         {row.company}
                     </div>
-                    <div className="truncate text-xs text-zinc-600 dark:text-zinc-400" title={row.role}>
+                    <div className="truncate text-xs text-fg2" title={row.role}>
                         {row.role}
                     </div>
                 </div>
                 <div className="flex shrink-0 items-center">
                     <GripVertical
-                        className="h-4 w-4 text-zinc-300 opacity-0 transition-opacity group-hover:opacity-100 dark:text-zinc-700"
+                        className="h-4 w-4 text-fg3 opacity-0 transition-opacity group-hover:opacity-100"
                         aria-hidden="true"
                     />
                     <ApplicationRowActions
@@ -115,20 +107,22 @@ function BoardCard({
                 </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-zinc-500 dark:text-zinc-500">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-fg3">
                 <span>{formatAts(row.ats)}</span>
                 <span aria-hidden="true">·</span>
-                <span className="tabular-nums">{formatDate(row.appliedAt)}</span>
+                <span className="tnum" title={formatDate(row.appliedAt)}>
+                    {formatDayLabel(row.appliedAt)}
+                </span>
                 {score !== null && (
                     <>
                         <span aria-hidden="true">·</span>
-                        <span className="tabular-nums">{score}% filled</span>
+                        <span className="tnum">{score}% filled</span>
                     </>
                 )}
             </div>
 
             {row.notes !== null && row.notes.trim() !== "" && (
-                <p className="line-clamp-2 text-xs text-zinc-600 dark:text-zinc-400">{row.notes}</p>
+                <p className="line-clamp-2 text-xs text-fg2">{row.notes}</p>
             )}
 
             {host !== null && row.url !== null && (
@@ -136,13 +130,13 @@ function BoardCard({
                     href={row.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 truncate text-[11px] text-blue-600 hover:underline dark:text-blue-400"
+                    className="inline-flex items-center gap-1 truncate text-[11px] text-fg2 underline-offset-2 transition-colors hover:text-fg hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
                 >
                     <span className="truncate">{host}</span>
                     <ExternalLink className="h-3 w-3 shrink-0" />
                 </a>
             )}
-        </div>
+        </Card>
     )
 }
 
@@ -190,28 +184,26 @@ export function ApplicationsBoard({
                             }}
                             onDrop={(event) => handleDrop(lane, event)}
                             className={cn(
-                                "flex w-[17rem] shrink-0 flex-col gap-3 rounded-xl border p-3 transition-colors",
-                                isHovered
-                                    ? "border-blue-400 bg-blue-50/70 dark:border-blue-700 dark:bg-blue-950/30"
-                                    : "border-zinc-200 bg-zinc-50/70 dark:border-zinc-800 dark:bg-zinc-900/40",
+                                "flex w-[17rem] shrink-0 flex-col gap-3 rounded-xl p-3 transition-colors",
+                                isHovered ? "bg-acc-soft ring-1 ring-acc/40" : "bg-well",
                             )}
                         >
                             <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-2">
                                     <span
-                                        className={cn("h-2 w-2 rounded-full", STATUS_ACCENT[lane])}
+                                        className={cn("size-1.5 rounded-full", STATUS_DOT[lane])}
                                         aria-hidden="true"
                                     />
-                                    <span className="text-sm font-semibold">{STATUS_LABEL[lane]}</span>
+                                    <span className="text-[13px] font-semibold text-fg">{STATUS_LABEL[lane]}</span>
                                 </div>
-                                <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-[11px] tabular-nums text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                                <Chip tone="mut" dot={false} className="tnum bg-surface px-2 py-0.5 text-[11px]">
                                     {laneRows.length}
-                                </span>
+                                </Chip>
                             </div>
 
                             <div className="flex min-h-[6rem] flex-col gap-2">
                                 {laneRows.length === 0 ? (
-                                    <p className="px-1 py-6 text-center text-xs text-zinc-400 dark:text-zinc-600">
+                                    <p className="px-1 py-6 text-center text-xs text-fg3">
                                         Drop a card here to move it to {STATUS_LABEL[lane].toLowerCase()}.
                                     </p>
                                 ) : (

@@ -160,7 +160,7 @@ export function PreferencesPanel(): ReactElement {
 
       <FieldSet
         legend="AI defaults"
-        description="Used when you press ✨ on a form. Nothing here causes a request on its own — every AI call still needs an explicit click."
+        description="Used when you press Answer on a form. Nothing here causes a request on its own — every AI call still needs an explicit click."
       >
         <FieldGrid cols={3}>
           <Field label="Tone">
