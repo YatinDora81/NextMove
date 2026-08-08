@@ -1,0 +1,20 @@
+{
+  // Typecheck-only project for `@repo/db`.
+  //
+  // `tsconfig.json` exists to describe the *emitted* package: `rootDir: "./src"`, `outDir:
+  // "./dist"`. Pointing `tsc --noEmit` at it fails outright with TS6059 the moment anything
+  // outside `src/` is pulled in — and `tests/migrations.test.ts` (the PGlite migration-chain
+  // suite) lives in `tests/`. The result was that the single largest test file in the repo was
+  // typechecked by nothing at all.
+  //
+  // Same fix apps/http-server already uses: a sibling project that widens `rootDir` to the
+  // package root, includes the test + config files, and never emits. Keep the two in sync.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "types": ["node"]
+  },
+  "include": ["src/**/*", "tests/**/*", "vitest.config.ts"],
+  "exclude": ["dist", "node_modules", "src/generated"]
+}

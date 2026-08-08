@@ -29,6 +29,13 @@ model Users {
   aiTemplates       AiTemplate[]        @relation("User_AiTemplate")
   passwordResets    PasswordReset[]     @relation("User_PasswordReset")
 
+  // JobFill (JF-001) relations
+  profileBlob     ProfileBlob?     @relation("User_ProfileBlob")
+  jobApplications JobApplication[] @relation("User_JobApplication")
+  siteMappings    SiteMapping[]    @relation("User_SiteMapping")
+  devices         Device[]         @relation("User_Device")
+  geminiKeys      UserGeminiKey[]  @relation("User_GeminiKey")
+
   @@index([id, email])
 }
 
@@ -180,6 +187,95 @@ model Room {
   user Users @relation("Room_User", fields: [userId], references: [id])
 }
 
+// ---------------------------------------------------------------------------
+// JF-001 · Phase 2 sync track (SEC 7.4) — additive only, existing models untouched
+// ---------------------------------------------------------------------------
+
+model ProfileBlob {
+  // E2E-encrypted vault sync — the server stores ciphertext it cannot read
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  ciphertext Bytes
+  nonce      Bytes
+  version    Int // optimistic concurrency — PUT with a stale version ⇒ 409
+  updatedAt  DateTime @updatedAt
+
+  user Users @relation("User_ProfileBlob", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model JobApplication {
+  // extension-filled ATS applications ≠ GeneratedMessages outreach
+  id        String       @id @default(uuid())
+  userId    String
+  clientId  String       @unique // extension row id → idempotent sync (no dupes on retry)
+  company   String
+  role      String
+  url       String?
+  ats       String?
+  status    JobAppStatus @default(APPLIED)
+  appliedAt DateTime?
+  notes     String?
+  fillStats Json? // { filled, total } from FillReport
+  history   Json? // [{ at, to }] status transitions
+  updatedAt DateTime     @updatedAt
+
+  user Users @relation("User_JobApplication", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, appliedAt])
+}
+
+model SiteMapping {
+  // learn-from-correction (F-13) memory roams with the user
+  userId      String
+  domain      String
+  sigHash     String
+  profilePath String
+  updatedAt   DateTime @updatedAt
+
+  user Users @relation("User_SiteMapping", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, domain, sigHash])
+}
+
+model Device {
+  // paired extension installs (SEC 8.2)
+  id        String    @id @default(uuid())
+  userId    String
+  name      String? // "Chrome · work laptop"
+  lastSeen  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user Users @relation("User_Device", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// JF-001 · Web BYOK track (SEC 15.3) — server-side envelope-sealed Gemini keys
+// ---------------------------------------------------------------------------
+
+model UserGeminiKey {
+  id            String      @id @default(uuid())
+  userId        String
+  label         String // "personal", "second account"
+  ciphertext    Bytes // AES-256-GCM output
+  iv            Bytes // 12-byte random nonce, unique per encryption
+  authTag       Bytes // GCM authentication tag (tamper evidence)
+  keyVersion    Int         @default(1) // which master key sealed it → rotation without downtime
+  last4         String // display only — the list UI never touches ciphertext
+  status        AiKeyStatus @default(ACTIVE)
+  strikes       Int         @default(0) // durable rotation state (429 backoff tier)
+  cooldownUntil DateTime?
+  lastUsedAt    DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  user Users @relation("User_GeminiKey", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+}
+
 enum MessageBy {
   AI
   SELF
@@ -193,4 +289,20 @@ enum MessageType {
 enum CreatedBy {
   AI
   SELF
+}
+
+enum JobAppStatus {
+  DRAFT
+  APPLIED
+  INTERVIEW
+  OFFER
+  REJECTED
+  GHOSTED
+}
+
+enum AiKeyStatus {
+  ACTIVE
+  COOLDOWN
+  EXHAUSTED
+  DEAD
 }
