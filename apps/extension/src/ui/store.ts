@@ -1,27 +1,3 @@
-/**
- * ui/store.ts — the Zustand stores behind the popup and the Options app (SEC 03, SEC 4.2).
- *
- * Every store is a thin, typed shell over the MessageBus. The UI holds no business logic: it asks
- * the service worker for state and asks the service worker to change state. That is what SEC 4.2
- * means by "Options app must never run page-fill logic" — the Options page cannot fill a form even
- * if it wanted to, because it has no code that can.
- *
- * Three deliberate exceptions to "everything over the bus", each because the protocol in
- * `shared/messages.ts` has no message for it and inventing one would break the contract:
- *
- *   - `jf.settings` — read/written through the typed storage layer. `chrome.storage.local` is
- *     shared across extension contexts and the service worker re-reads it on every use.
- *   - `jf.mappings` (F-13 editor) — `FIELD_MAP_GET` answers for one domain at a time and there is
- *     no "list every domain" message, so the editor reads the slot directly.
- *   - profile *deletion* (F-11) — there is no `PROFILE_DELETE` message; `deleteProfile()` in the
- *     storage layer is the sanctioned path and keeps the active-profile pointer consistent.
- *
- * Everything else — profiles, keys, tracker, answers, sync, fill — goes over the bus.
- *
- * INV-2: no store mints or caches a gesture nonce. Panels mint one inside the click handler via
- * `ui/gesture.ts` and pass it straight to the send.
- */
-
 import { create } from 'zustand';
 
 import { sendMessage, sendToTab } from '@/platform/bus';
@@ -60,14 +36,8 @@ import type {
   TrackerStats,
 } from '@/shared/types';
 
-/* ------------------------------------------------------------------------------------------------
- * Bus plumbing
- * ---------------------------------------------------------------------------------------------- */
-
-/** A `{ ok: false, error }` reply, re-thrown so stores can use one try/catch. */
 export class BusFailure extends Error {
   readonly code: BusErrorCode;
-  /** epoch ms — set by ALL_KEYS_BUSY / QUOTA_EXHAUSTED so the UI can render a countdown. */
   readonly retryAt: number | null;
 
   constructor(code: BusErrorCode, message: string, retryAt: number | null) {
@@ -79,7 +49,6 @@ export class BusFailure extends Error {
   }
 }
 
-/** Send and unwrap. Throws `BusFailure` on a protocol-level error so callers never test `ok`. */
 export async function call<T extends MessageType>(
   type: T,
   payload: PayloadOf<T>,
@@ -98,14 +67,9 @@ export function describeError(error: unknown): string {
   return String(error);
 }
 
-/** `retryAt` when the failure carries one — drives the SEC 5.6 countdown copy. */
 export function retryAtOf(error: unknown): number | null {
   return error instanceof BusFailure ? error.retryAt : null;
 }
-
-/* ------------------------------------------------------------------------------------------------
- * Profiles (F-01 / F-11)
- * ---------------------------------------------------------------------------------------------- */
 
 interface ProfilesState {
   profiles: Profile[];
@@ -113,7 +77,6 @@ interface ProfilesState {
   loading: boolean;
   saving: boolean;
   error: string | null;
-  /** Id currently open in the vault editor; not necessarily the active-for-fill profile. */
   editingId: string | null;
 
   load: () => Promise<void>;
@@ -124,15 +87,12 @@ interface ProfilesState {
   remove: (profileId: string) => Promise<void>;
 }
 
-/** Base identity is shared across profiles (F-11); only summary/skills/resume diverge. */
 function deriveProfile(base: Profile, id: string, label: string, now: number): Profile {
   return {
     ...base,
     id,
     label,
     isDefault: false,
-    // Personal identity, links, education, authorization, EEO and compensation are the "base
-    // identity" F-11 talks about — copied wholesale. Summary and skills are the override surface.
     personal: {
       ...base.personal,
       address: { ...base.personal.address },
@@ -202,7 +162,7 @@ export const useProfilesStore = create<ProfilesState>((set, get) => ({
 
   setActive: async (profileId) => {
     const previous = get().activeProfileId;
-    set({ activeProfileId: profileId, error: null }); // optimistic — the switcher must feel instant
+    set({ activeProfileId: profileId, error: null });
     try {
       const data = await call('PROFILE_ACTIVE_SET', { profileId });
       set({ activeProfileId: data.activeProfileId });
@@ -223,8 +183,6 @@ export const useProfilesStore = create<ProfilesState>((set, get) => ({
 
   remove: async (profileId) => {
     try {
-      // No PROFILE_DELETE exists in the SEC 6.6 protocol; the storage layer owns the invariant
-      // that a deleted profile can never stay the active one.
       const profiles = await deleteProfileSlot(profileId);
       set((state) => ({
         profiles,
@@ -237,7 +195,6 @@ export const useProfilesStore = create<ProfilesState>((set, get) => ({
   },
 }));
 
-/** The profile currently open in the editor, or the active one. `null` before the first load. */
 export function selectEditingProfile(state: ProfilesState): Profile | null {
   const id = state.editingId ?? state.activeProfileId;
   if (id === null) return state.profiles[0] ?? null;
@@ -249,10 +206,6 @@ export function selectActiveProfile(state: ProfilesState): Profile | null {
   if (id === null) return state.profiles.find((p) => p.isDefault) ?? state.profiles[0] ?? null;
   return state.profiles.find((profile) => profile.id === id) ?? null;
 }
-
-/* ------------------------------------------------------------------------------------------------
- * AI keys (F-08 / SEC 5.3)
- * ---------------------------------------------------------------------------------------------- */
 
 export interface KeyPoolCounts {
   total: number;
@@ -269,7 +222,6 @@ interface KeysState {
   loading: boolean;
   busy: boolean;
   error: string | null;
-  /** Result of the last add/test, keyed by key id — shows Google's own words verbatim. */
   lastTest: { id: string; ok: boolean; message: string } | null;
 
   load: () => Promise<void>;
@@ -297,9 +249,6 @@ export const useKeysStore = create<KeysState>((set, get) => ({
     }
   },
 
-  // The gesture is minted by the panel inside the click handler. KEYS_ADD spends a live
-  // validation call against Google (SEC 5.3), so it is carried even though the bus only *enforces*
-  // a nonce for the GESTURE_REQUIRED set — INV-2 is about intent, not just enforcement.
   add: async (key, label, gesture) => {
     set({ busy: true, error: null, lastTest: null });
     try {
@@ -365,11 +314,6 @@ export function countPool(keys: readonly GeminiKeyPublic[]): KeyPoolCounts {
   return counts;
 }
 
-/**
- * Earliest moment the pool can serve again, or `null` when something is usable right now.
- * `Infinity` (every key DEAD) also returns `null` — a countdown to never is worse than no
- * countdown, and the DEAD badge already tells that story (SEC 5.6).
- */
 export function poolRetryAt(keys: readonly GeminiKeyPublic[]): number | null {
   if (keys.length === 0) return null;
   let earliest = Number.POSITIVE_INFINITY;
@@ -381,14 +325,6 @@ export function poolRetryAt(keys: readonly GeminiKeyPublic[]): number | null {
   return Number.isFinite(earliest) ? earliest : null;
 }
 
-/**
- * The one thing the popup and the key manager both need to say out loud (SEC 5.6).
- *
- * Order matters and is not obvious: an EXHAUSTED key also carries a `retryAt` (its Pacific-midnight
- * reset), so a pool that is entirely out of daily quota looks identical to a rate-limited one if
- * you only test `retryAt`. "Cooling" therefore requires an actual COOLDOWN key, and the daily-quota
- * case is checked first.
- */
 export type PoolCondition = 'none' | 'healthy' | 'cooling' | 'exhausted' | 'dead';
 
 export function poolCondition(keys: readonly GeminiKeyPublic[]): PoolCondition {
@@ -399,10 +335,6 @@ export function poolCondition(keys: readonly GeminiKeyPublic[]): PoolCondition {
   if (counts.EXHAUSTED > 0) return 'exhausted';
   return 'dead';
 }
-
-/* ------------------------------------------------------------------------------------------------
- * Settings (SEC 7.1 `jf.settings`)
- * ---------------------------------------------------------------------------------------------- */
 
 interface SettingsState {
   settings: Settings | null;
@@ -434,10 +366,6 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     }
   },
 }));
-
-/* ------------------------------------------------------------------------------------------------
- * Tracker (F-12 / SEC 6.7)
- * ---------------------------------------------------------------------------------------------- */
 
 export type TrackerSortField = 'date' | 'company' | 'role' | 'status' | 'ats' | 'fillScore';
 
@@ -528,15 +456,12 @@ export const useTrackerStore = create<TrackerState>((set, get) => ({
     }
   },
 
-  // Kanban drag and the row action share one path so `history[]` is appended exactly once
-  // (the tracker service owns the transition — the UI never writes history itself).
   setStatus: async (id, status) => {
     const updated = await get().update(id, { status });
     if (updated !== null) await get().load();
   },
 }));
 
-/** SEC 6.7 board lanes, in the order the design doc lists them. */
 export const BOARD_LANES: readonly AppStatus[] = [
   'draft',
   'applied',
@@ -555,16 +480,6 @@ export const STATUS_LABEL: Record<AppStatus, string> = {
   ghosted: 'Ghosted',
 };
 
-/* ------------------------------------------------------------------------------------------------
- * Answer Bank (F-17 / SEC 5.7)
- * ---------------------------------------------------------------------------------------------- */
-
-/**
- * "Pin favourites" (SEC 5.7 management UI) is a presentation preference, not part of the
- * `AnswerRecord` contract in `shared/types.ts` — and the SEC 7.1 storage map forbids inventing a
- * seventh `chrome.storage.local` key. Pins therefore live in the Options page's own `localStorage`,
- * which is per-extension-origin, local, and outside the synced/exported data set by construction.
- */
 const PIN_STORAGE_KEY = 'jf.ui.pinnedAnswers';
 
 function readPins(): Set<string> {
@@ -650,8 +565,6 @@ export const useAnswersStore = create<AnswersState>((set, get) => ({
         answer,
         source,
         profileId,
-        // The editor never knows which employer the answer was written for, and guessing would
-        // risk baking the wrong company into a reusable answer (SEC 5.7).
         company: null,
       };
       if (scope !== undefined) payload.scope = scope;
@@ -689,7 +602,6 @@ export const useAnswersStore = create<AnswersState>((set, get) => ({
   },
 }));
 
-/** Pinned answers float to the top; the rest keep the service's most-recently-used order. */
 export function orderAnswers(
   records: readonly AnswerRecord[],
   pinned: ReadonlySet<string>,
@@ -700,10 +612,6 @@ export function orderAnswers(
     return pa - pb;
   });
 }
-
-/* ------------------------------------------------------------------------------------------------
- * Learned mappings (F-13)
- * ---------------------------------------------------------------------------------------------- */
 
 export interface MappingRow {
   domain: string;
@@ -764,7 +672,6 @@ export const useMappingsStore = create<MappingsState>((set, get) => ({
   },
 }));
 
-/** Flatten `{domain: {hash: path}}` into sortable rows for the editor table. */
 export function flattenMappings(store: MappingStore): MappingRow[] {
   const rows: MappingRow[] = [];
   for (const [domain, byHash] of Object.entries(store)) {
@@ -776,19 +683,11 @@ export function flattenMappings(store: MappingStore): MappingRow[] {
   return rows;
 }
 
-/* ------------------------------------------------------------------------------------------------
- * Sync (F-15 / SEC 8.2) — everything here degrades to "not connected" (INV-3)
- * ---------------------------------------------------------------------------------------------- */
-
 interface SyncStoreState {
   state: SyncState | null;
   busy: boolean;
   error: string | null;
   lastPush: { profile: boolean; mappings: number; applications: number } | null;
-  /**
-   * Outcome of the last SYNC_PULL. `found: false` is a *success* — it means the account simply has
-   * no vault yet — so the panel needs the shape, not just a boolean, to say the right thing.
-   */
   lastPull: { found: boolean; applied: number } | null;
 
   load: () => Promise<void>;
@@ -811,7 +710,6 @@ export const useSyncStore = create<SyncStoreState>((set) => ({
       const data = await call('SYNC_STATUS', {});
       set({ state: data.state, busy: false });
     } catch (error) {
-      // INV-3: a sync subsystem that cannot answer is "not connected", never a broken page.
       set({ busy: false, state: null, error: describeError(error) });
     }
   },
@@ -850,8 +748,6 @@ export const useSyncStore = create<SyncStoreState>((set) => ({
     }
   },
 
-  // Same shape as `push`, deliberately: the two are one mental model for the panel. The asymmetry
-  // lives in the handler (a pull rewrites what the extension autofills with), not here.
   pull: async () => {
     set({ busy: true, error: null });
     try {
@@ -865,26 +761,12 @@ export const useSyncStore = create<SyncStoreState>((set) => ({
   },
 }));
 
-/* ------------------------------------------------------------------------------------------------
- * Fill (SEC 4.3 Flow A) — the popup's one job
- * ---------------------------------------------------------------------------------------------- */
-
 export interface FillOutcome {
   report: FillReport | null;
   error: string | null;
-  /** `true` when no content script answered — usually a chrome:// page or the Web Store. */
   unreachable: boolean;
 }
 
-/**
- * Ask the active tab's content script to fill the form it is looking at.
- *
- * INV-1 lives on the other side of this call: the content script locates and highlights, and the
- * human presses Submit. Nothing in the popup can click anything on the page.
- *
- * `tabs.query` needs no `tabs` permission for the fields used here (id only) — SEC 9.2 least
- * privilege means the manifest never asks for one.
- */
 export async function fillActiveTab(
   profileId: string | null,
   trigger: FillTrigger = 'popup',
@@ -898,17 +780,14 @@ export async function fillActiveTab(
   const reply = await sendToTab(tabId, 'FILL_REQUEST', { profileId, trigger });
   if (reply.ok) return { report: reply.data, error: null, unreachable: false };
 
-  // A transport failure here means the content script is not present in that tab.
   const unreachable = reply.error.code === 'INTERNAL' || reply.error.code === 'TIMEOUT';
   return { report: null, error: reply.error.message, unreachable };
 }
 
-/** Open the Options page from the popup. */
 export function openOptions(): void {
   void browser.runtime.openOptionsPage();
 }
 
-/** Open the Options page focused on one section (`#tracker`, `#keys`, …). */
 export function openOptionsAt(section: string): void {
   void browser.tabs.create({ url: browser.runtime.getURL(`/options.html#${section}`) });
 }

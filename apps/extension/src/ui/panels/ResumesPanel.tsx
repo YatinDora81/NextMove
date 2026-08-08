@@ -1,30 +1,3 @@
-/**
- * ui/panels/ResumesPanel.tsx — F-02 (resume → profile) and F-05 (auto-attach source of truth).
- *
- * SEC 4.3 Flow C, implemented exactly as written:
- *
- *   1. Upload → the blob is written to IndexedDB **immediately**, before anything else happens.
- *      It is local, and it stays local: a resume file never leaves this device.
- *   2. pdf.js / mammoth extract the text locally (`@/ai/resume-extract` — no network in that
- *      module, and it is imported from here and nowhere else).
- *   3. An explicit CONSENT SCREEN shows the user the exact text that will be sent, character count
- *      included, *before* the "Build profile with Gemini" button becomes reachable.
- *   4. Gemini returns strict JSON; the user accepts or rejects it field by field.
- *
- * INV-2: the parse is a `RESUME_PARSE` bus message carrying a nonce minted inside the click
- * handler on the consent screen. There is no path from "upload" to "Gemini" that skips step 3.
- *
- * Step 2 lives here, not in the service worker, and that is deliberate on two counts. It is what
- * SEC 4.3 Flow C describes — extraction is a local, user-context operation, and the worker's only
- * contribution is the Gemini call. And it keeps pdfjs-dist and mammoth out of the MV3 worker, which
- * is bundled as a single file that Chrome re-parses on every wake-up; here they are real lazy
- * chunks that a user who never parses a resume never downloads.
- *
- * The consequence for the consent screen is that the promise gets stronger, not weaker: the string
- * rendered in the <pre> below is the very string put on the wire, because `runParse` sends
- * `session.text` itself rather than asking the worker to go and re-read something.
- */
-
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { DragEvent, ReactElement } from 'react';
 
@@ -109,8 +82,6 @@ export function ResumesPanel(): ReactElement {
     void loadKeys();
   }, [refresh, loadKeys]);
 
-  /* -- upload ------------------------------------------------------------------------------- */
-
   const ingest = useCallback(
     async (files: readonly File[]) => {
       let added = 0;
@@ -121,7 +92,6 @@ export function ResumesPanel(): ReactElement {
         }
         const record: ResumeRecord = {
           id: randomId('res'),
-          // Shared across profiles by default; the picker below can pin it to one.
           profileId: null,
           name: file.name,
           mime: file.type,
@@ -131,13 +101,11 @@ export function ResumesPanel(): ReactElement {
           isDefault: false,
           addedAt: Date.now(),
         };
-        // Step 1 of Flow C: stored locally, immediately, before any parsing is even considered.
         await putResume(record);
         added += 1;
       }
       if (added === 0) return;
       const all = await listResumes();
-      // First resume in the vault becomes the default so F-05 attach has something to reach for.
       if (!all.some((resume) => resume.isDefault)) {
         const first = all[0];
         if (first !== undefined) await setDefaultResume(first.id);
@@ -163,8 +131,6 @@ export function ResumesPanel(): ReactElement {
     [ingest],
   );
 
-  /* -- Flow C ------------------------------------------------------------------------------- */
-
   const beginParse = useCallback(async (resume: ResumeRecord) => {
     setError(null);
     setStage('extracting');
@@ -178,7 +144,6 @@ export function ResumesPanel(): ReactElement {
       model: null,
     });
     try {
-      // Step 2: pdf.js / mammoth, entirely on this device. No network call happens here.
       const extracted = await extractResumeText(resume.blob, {
         mime: resume.mime,
         name: resume.name,
@@ -191,8 +156,6 @@ export function ResumesPanel(): ReactElement {
         );
         return;
       }
-      // Cache what we are about to show, so the text the service worker sends is byte-for-byte the
-      // text the consent screen displayed (SEC 7.1 `parseCache`).
       await putParseCache({
         resumeId: resume.id,
         text: extracted.text,
@@ -222,10 +185,7 @@ export function ResumesPanel(): ReactElement {
     if (current === null) return;
     setStage('parsing');
     try {
-      // INV-2: the nonce is minted here, inside the click that follows the consent screen, and is
-      // spent immediately. Nothing is cached, nothing is speculative.
       const gesture = await mintGesture('build profile with Gemini');
-      // The text shown on the consent screen, sent verbatim — nothing else leaves this device.
       const reply = await sendMessage(
         'RESUME_PARSE',
         { resumeId: current.resume.id, text: current.text },
@@ -275,8 +235,6 @@ export function ResumesPanel(): ReactElement {
     setSession(null);
     setAccepted(new Set());
   }, [accepted, diff, profile, saveProfile, session]);
-
-  /* -- render ------------------------------------------------------------------------------- */
 
   return (
     <div className="flex flex-col gap-5">
@@ -396,7 +354,6 @@ export function ResumesPanel(): ReactElement {
         several could apply, it asks rather than guessing.
       </Notice>
 
-      {/* ---- Step 3: the consent screen ------------------------------------------------------ */}
       <Modal
         open={stage === 'consent' || stage === 'parsing'}
         onClose={() => {
@@ -461,7 +418,6 @@ export function ResumesPanel(): ReactElement {
         </div>
       </Modal>
 
-      {/* ---- Step 4: field-by-field accept --------------------------------------------------- */}
       <Modal
         open={stage === 'review'}
         onClose={() => {

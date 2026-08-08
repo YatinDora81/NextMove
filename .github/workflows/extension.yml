@@ -12,28 +12,34 @@
 # someone remembered to.
 name: extension
 
+# TEMPORARILY MANUAL-ONLY. The push and pull_request triggers are commented out on purpose so this
+# pipeline does not fire on every commit while the onboarding work is still landing. Re-enable by
+# deleting the leading "#" from the two blocks below — nothing else about the job has changed.
+# Until then it can still be started by hand from the Actions tab (workflow_dispatch).
 on:
-  push:
-    branches: [main]
-    paths:
-      - "apps/extension/**"
-      - "packages/rotation/**"
-      - "packages/Types/**"
-      - "packages/typescript-config/**"
-      - "turbo.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - ".github/workflows/extension.yml"
-  pull_request:
-    paths:
-      - "apps/extension/**"
-      - "packages/rotation/**"
-      - "packages/Types/**"
-      - "packages/typescript-config/**"
-      - "turbo.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - ".github/workflows/extension.yml"
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - "apps/extension/**"
+  #     - "packages/rotation/**"
+  #     - "packages/Types/**"
+  #     - "packages/vault/**"
+  #     - "packages/typescript-config/**"
+  #     - "turbo.json"
+  #     - "pnpm-lock.yaml"
+  #     - "pnpm-workspace.yaml"
+  #     - ".github/workflows/extension.yml"
+  # pull_request:
+  #   paths:
+  #     - "apps/extension/**"
+  #     - "packages/rotation/**"
+  #     - "packages/Types/**"
+  #     - "packages/vault/**"
+  #     - "packages/typescript-config/**"
+  #     - "turbo.json"
+  #     - "pnpm-lock.yaml"
+  #     - "pnpm-workspace.yaml"
+  #     - ".github/workflows/extension.yml"
   workflow_dispatch:
 
 concurrency:

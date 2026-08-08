@@ -1,60 +1,11 @@
-/**
- * codec.ts — the byte-level end-to-end envelope, shared verbatim by `apps/web` and
- * `apps/extension` (JF-001 Rev 3.0 SEC 7.4 / 9.2).
- *
- * This module exists because the same bytes must be produced in two different runtimes. The web
- * onboarding wizard seals a profile vault in a browser tab; the MV3 service worker opens it hours
- * later on a different machine. If those two ever ran *similar but separate* implementations they
- * would drift on the first parameter change, and the failure mode is a user whose profile silently
- * will not decrypt. So there is exactly one implementation, in one package, and both import it.
- *
- * ── Wire format ────────────────────────────────────────────────────────────────────────────────
- *
- *   ciphertext (base64):
- *   ┌────────┬────────┬─────────┬───────────┬──────────────────────────────┐
- *   │ magic  │ format │ saltLen │ salt      │ AES-256-GCM ciphertext + tag │
- *   │ 4 B    │ 1 B    │ 1 B     │ saltLen B │ …                            │
- *   └────────┴────────┴─────────┴───────────┴──────────────────────────────┘
- *   nonce (base64): the 12-byte AES-GCM IV, carried beside the blob because
- *   `profileBlobEnvelopeSchema` has a column for it and must not grow one for the salt.
- *
- * ── Why two format bytes ───────────────────────────────────────────────────────────────────────
- *
- *   FORMAT_PBKDF2 (1)  Key = PBKDF2-SHA-256(passphrase, salt, 210 000). What SEC 9.2 originally
- *                      specified. Still written for the *device-token* envelope and still read for
- *                      any vault sealed before the handoff flow existed, so no one's data strands.
- *   FORMAT_RAW_KEY (2) Key = 32 raw random bytes, `saltLen` 0, no KDF. This is what the web →
- *                      extension handoff uses: the website generates the key with
- *                      `generateVaultKey()`, hands it straight to the extension over
- *                      `chrome.runtime.sendMessage`, and it never touches the server.
- *
- * A raw key is *stronger* than a passphrase-derived one (full 256 bits of entropy, no dictionary
- * to attack) and removes the single worst piece of UX in the original design — asking the user to
- * invent, remember, and retype a 12-character passphrase on every device. The trade is
- * recoverability, which is why `generateVaultKey` output is meant to be shown once as a
- * downloadable recovery key.
- *
- * INVARIANT: nothing in this file reads or writes storage, network, `chrome.*`, or `process.env`.
- * It is pure over its arguments so it can be unit-tested and so neither host app can smuggle a
- * side effect into the other's runtime.
- */
-
 import { VaultError } from './errors';
 
-/* ------------------------------------------------------------------------------------------------
- * Parameters — the numbers both runtimes must agree on
- * ---------------------------------------------------------------------------------------------- */
-
-/** OWASP 2023 floor for PBKDF2-SHA-256. Only used by `FORMAT_PBKDF2`. */
 export const VAULT_PBKDF2_ITERATIONS = 210_000;
 export const VAULT_SALT_BYTES = 16;
 export const VAULT_IV_BYTES = 12;
-/** AES-256. `generateVaultKey()` emits exactly this many random bytes. */
 export const VAULT_KEY_BYTES = 32;
-/** AES-GCM tag length in bytes — used only for truncation checks. */
 export const GCM_TAG_BYTES = 16;
 
-/** A passphrase floor worth having. Below this, PBKDF2 iterations are theatre. */
 export const MIN_VAULT_PASSPHRASE_LENGTH = 12;
 
 export const FORMAT_PBKDF2 = 1;
@@ -63,19 +14,13 @@ export const FORMAT_RAW_KEY = 2;
 const MIN_SALT_BYTES = 8;
 const MAX_SALT_BYTES = 64;
 const MAGIC_BYTES_LENGTH = 4;
-const HEADER_FIXED_BYTES = MAGIC_BYTES_LENGTH + 2; // magic + format + saltLen
+const HEADER_FIXED_BYTES = MAGIC_BYTES_LENGTH + 2;
 
-/** ASCII magic for a sealed profile vault. */
 export const VAULT_MAGIC = 'JFS1';
-/** ASCII magic for a device-token envelope (device-local, never E2E — there is no other end). */
 export const DEVICE_TOKEN_MAGIC = 'JFD1';
 
 export type SealedBlobMagic = typeof VAULT_MAGIC | typeof DEVICE_TOKEN_MAGIC;
 
-/**
- * `lib.dom`'s `BufferSource` narrowed to an `ArrayBuffer`-backed view. TypeScript 5.7+ separates
- * these from `SharedArrayBuffer`-backed views, and WebCrypto only accepts the former.
- */
 type Bytes = Uint8Array<ArrayBuffer>;
 
 const MAGICS: Record<SealedBlobMagic, Bytes> = {
@@ -86,15 +31,6 @@ const MAGICS: Record<SealedBlobMagic, Bytes> = {
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
-/* ------------------------------------------------------------------------------------------------
- * Key material
- * ---------------------------------------------------------------------------------------------- */
-
-/**
- * What opens (or seals) an envelope. A discriminated union rather than a bare string so a caller
- * physically cannot pass a passphrase where a raw key is meant — the two produce different format
- * bytes and mixing them up would be a silent, unrecoverable data error.
- */
 export type VaultKeyMaterial =
   | { readonly kind: 'passphrase'; readonly passphrase: string }
   | { readonly kind: 'rawKey'; readonly keyB64: string };
@@ -107,16 +43,10 @@ export function rawKeyMaterial(keyB64: string): VaultKeyMaterial {
   return { kind: 'rawKey', keyB64 };
 }
 
-/**
- * Mints a fresh 256-bit vault key as base64. This is *the* secret in the E2E design: whoever holds
- * it can read the profile, and nobody who does not hold it can — including the NextMove server,
- * which only ever sees the ciphertext.
- */
 export function generateVaultKey(): string {
   return bytesToBase64(randomBytes(VAULT_KEY_BYTES));
 }
 
-/** True when `value` is base64 decoding to exactly a 256-bit key. Cheap validation for handoff. */
 export function isVaultKey(value: unknown): value is string {
   if (typeof value !== 'string' || value.length === 0) return false;
   try {
@@ -125,10 +55,6 @@ export function isVaultKey(value: unknown): value is string {
     return false;
   }
 }
-
-/* ------------------------------------------------------------------------------------------------
- * Byte helpers
- * ---------------------------------------------------------------------------------------------- */
 
 function asciiBytes(text: string): Bytes {
   const out = new Uint8Array(text.length);
@@ -147,7 +73,6 @@ function subtle(): SubtleCrypto {
   return c.subtle;
 }
 
-/** Cryptographically-random bytes. Never `Math.random` — this is key material. */
 export function randomBytes(length: number): Bytes {
   const c: Crypto | undefined = globalThis.crypto;
   if (!c || typeof c.getRandomValues !== 'function') {
@@ -160,7 +85,7 @@ export function randomBytes(length: number): Bytes {
 
 export function bytesToBase64(bytes: Bytes): string {
   let binary = '';
-  const CHUNK = 0x8000; // chunked so a large vault cannot blow the argument limit on spread
+  const CHUNK = 0x8000;
   for (let offset = 0; offset < bytes.length; offset += CHUNK) {
     const slice = bytes.subarray(offset, Math.min(offset + CHUNK, bytes.length));
     binary += String.fromCharCode(...slice);
@@ -192,7 +117,6 @@ function concatBytes(parts: readonly Bytes[]): Bytes {
   return out;
 }
 
-/** Length-fixed prefix compare. The magic is public, so no timing signal of value matters. */
 function startsWithMagic(blob: Bytes, magic: Bytes): boolean {
   if (blob.length < magic.length) return false;
   let diff = 0;
@@ -200,11 +124,6 @@ function startsWithMagic(blob: Bytes, magic: Bytes): boolean {
   return diff === 0;
 }
 
-/* ------------------------------------------------------------------------------------------------
- * Key derivation / import
- * ---------------------------------------------------------------------------------------------- */
-
-/** PBKDF2-SHA-256 → non-extractable AES-256-GCM key. `FORMAT_PBKDF2` only. */
 export async function deriveVaultKey(
   passphrase: string,
   salt: Bytes,
@@ -222,7 +141,6 @@ export async function deriveVaultKey(
   );
 }
 
-/** Imports a base64 256-bit key as non-extractable AES-GCM. `FORMAT_RAW_KEY` only. */
 export async function importVaultKey(keyB64: string): Promise<CryptoKey> {
   const raw = base64ToBytes(keyB64);
   if (raw.length !== VAULT_KEY_BYTES) {
@@ -255,14 +173,8 @@ function assertMaterial(material: VaultKeyMaterial): void {
   }
 }
 
-/* ------------------------------------------------------------------------------------------------
- * Seal / open
- * ---------------------------------------------------------------------------------------------- */
-
 export interface SealedBlob {
-  /** base64 of `magic || format || saltLen || salt || AES-GCM(ct+tag)`. */
   ciphertext: string;
-  /** base64 of the 12-byte AES-GCM IV. */
   nonce: string;
 }
 
@@ -321,8 +233,6 @@ export async function openBlob(
   const format = blob[4];
   const saltLength = blob[5] ?? 0;
 
-  // The format byte and the key material must agree. A vault sealed with a raw key cannot be
-  // opened with a passphrase and vice versa, and saying so beats a generic decrypt failure.
   if (format === FORMAT_PBKDF2 && material.kind !== 'passphrase') {
     throw new VaultError('bad-format', 'This vault was sealed with a passphrase.');
   }
@@ -355,18 +265,11 @@ export async function openBlob(
   try {
     plaintext = await subtle().decrypt({ name: 'AES-GCM', iv }, key, body);
   } catch {
-    // Deliberately opaque: a wrong key and a tampered ciphertext are indistinguishable to the
-    // caller, which is the correct security posture.
     throw new VaultError('decrypt-failed', 'Could not decrypt — wrong key or corrupt data.');
   }
   return textDecoder.decode(plaintext);
 }
 
-/**
- * Cheap structural proof that a base64 body really came out of `sealBlob`. `sync/guard.ts` calls
- * this on every outbound body so a plaintext profile can never leave a device even if some future
- * caller forgets to seal it.
- */
 export function hasSealedHeader(ciphertextBase64: string, magic: SealedBlobMagic): boolean {
   try {
     const blob = base64ToBytes(ciphertextBase64);

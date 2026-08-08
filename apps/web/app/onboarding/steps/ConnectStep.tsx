@@ -1,19 +1,5 @@
 "use client"
 
-/**
- * Step 7 — Connect. The last screen, and the only place the recovery key is offered.
- *
- * Two jobs, in this order. First, get the vault key off this browser and into somewhere the user
- * controls: it is the E2E secret, it is never sent to us, and "losing it" means losing the vault
- * with no support path back. Second, hand off to the extension — which is a different page
- * (`/extension/connect`) because the handshake owns a single-use nonce and deserves its own URL.
- *
- * The install CTA is chosen by probing the extension directly. `chrome.runtime` is only defined on
- * a page an installed extension has declared `externally_connectable` for, and even then a stale
- * install answers nothing — so "no reply inside the timeout" is treated as not installed, exactly
- * as the handshake receiver's contract describes.
- */
-
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import toast from "react-hot-toast"
@@ -36,7 +22,6 @@ import { cn } from "@/lib/utils"
 
 const EXTENSION_ID = process.env.NEXT_PUBLIC_EXTENSION_ID ?? ""
 
-/** Long enough for a cold service worker to wake, short enough not to stall the screen. */
 const PROBE_TIMEOUT_MS = 1500
 
 type HelloResponse = {
@@ -56,11 +41,6 @@ type ChromeRuntime = {
     lastError?: { message?: string }
 }
 
-/**
- * Read `chrome.runtime` without augmenting the global `Window` type — the handshake page needs the
- * same access, and two `declare global` blocks describing the same property is a compile error
- * waiting to happen.
- */
 function extensionRuntime(): ChromeRuntime | null {
     if (typeof window === "undefined") return null
     const host = window as unknown as { chrome?: { runtime?: ChromeRuntime } }
@@ -115,8 +95,6 @@ export function ConnectStep({
                 if (settled) return
                 settled = true
                 window.clearTimeout(timer)
-                // Touching lastError inside the callback is what stops Chrome logging an
-                // "Unchecked runtime.lastError" when nothing is listening on that id.
                 const failed = runtime.lastError !== undefined || response?.ok !== true
                 setProbe(failed ? "missing" : "installed")
                 setPaired(response?.paired === true)
@@ -180,7 +158,6 @@ export function ConnectStep({
                 </div>
             ) : null}
 
-            {/* 1 — the recovery key. Deliberately first, and deliberately loud. */}
             <section
                 className={cn(
                     "flex flex-col gap-4 rounded-lg border p-5",
@@ -231,7 +208,6 @@ export function ConnectStep({
                 )}
             </section>
 
-            {/* 2 — the extension. Which CTA shows depends on whether one answered the probe. */}
             <section className="flex flex-col gap-4 rounded-lg border border-border p-5">
                 <div className="flex items-start gap-3">
                     <Puzzle className="mt-0.5 size-4 shrink-0 text-muted-foreground" />

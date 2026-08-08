@@ -1,22 +1,3 @@
-/**
- * ui/panels/KeysPanel.tsx — F-08 / SEC 5.3, the BYOK key manager.
- *
- * SEC 5.3 in full: add a key with an immediate validation call, label it, show it masked forever,
- * badge its rotation state, delete it instantly. Three things this screen must never do, and does
- * not:
- *
- *   - **No reveal button.** SEC 5.3: "Always masked; no 'reveal' button." There is no code path in
- *     this file, or anywhere in `src/ui/**`, that can obtain a plaintext key: `GeminiKeyPublic`
- *     does not carry one, and `KEYS_*` replies never contain one (INV-5).
- *   - **No key in a log, a toast, or an error message.** Google's own rejection text is surfaced
- *     verbatim (SEC 5.2 asks for exactly that) — it never contains the key.
- *   - **No quiet validation.** The "Test" button and "Add key" both spend a real request against
- *     Google, so both mint a user-gesture nonce first (INV-2).
- *
- * The at-rest disclosure below is SEC 9.2's honest limit, quoted rather than paraphrased. Security
- * theatre is worse than no claim at all.
- */
-
 import { useEffect, useState } from 'react';
 import type { ReactElement } from 'react';
 
@@ -75,8 +56,6 @@ export function KeysPanel(): ReactElement {
     const trimmedLabel = label.trim();
     if (trimmedKey === '' || trimmedLabel === '') return;
     try {
-      // INV-2: adding a key spends a live `models.list` validation call, so it is minted and sent
-      // inside this click — never queued, never retried in the background.
       const gesture = await mintGesture('validate a new Gemini key');
       const record = await add(trimmedKey, trimmedLabel, gesture);
       if (record === null) return;
@@ -206,7 +185,6 @@ export function KeysPanel(): ReactElement {
         </Notice>
       ) : null}
 
-      {/* -- add ------------------------------------------------------------------------------ */}
       <div className="rounded-[var(--jf-radius)] border border-[var(--jf-border)] bg-[var(--jf-surface)] p-4">
         <h2 className="text-sm font-semibold text-[var(--jf-fg)]">Add a key</h2>
         <p className="mt-1 text-xs text-[var(--jf-fg-muted)]">
@@ -237,8 +215,6 @@ export function KeysPanel(): ReactElement {
             {(props) => (
               <Input
                 {...props}
-                // `type="password"` and no reveal control anywhere: SEC 5.3 is explicit that the
-                // key is never displayed again, and a paste field is the last place it is visible.
                 type="password"
                 autoComplete="off"
                 spellCheck={false}
@@ -272,7 +248,6 @@ export function KeysPanel(): ReactElement {
         )}
       </div>
 
-      {/* -- pool ----------------------------------------------------------------------------- */}
       {loading && keys.length === 0 ? (
         <p className="text-sm text-[var(--jf-fg-muted)]">Loading your key pool…</p>
       ) : keys.length === 0 ? (
@@ -300,7 +275,6 @@ export function KeysPanel(): ReactElement {
         </>
       )}
 
-      {/* -- disclosures ---------------------------------------------------------------------- */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <Notice tone="info" title="Create restricted keys (Google is changing this)">
           Google is migrating the Gemini API from unrestricted &ldquo;standard&rdquo; keys to

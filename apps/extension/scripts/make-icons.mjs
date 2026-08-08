@@ -1,34 +1,3 @@
-/**
- * scripts/make-icons.mjs — generates apps/extension/public/icons/{16,48,128}.png.
- *
- * The MV3 manifest (SEC 10) references icons/16.png, icons/48.png and icons/128.png, so those files
- * must exist as real PNGs or `wxt build` fails.
- *
- *   node apps/extension/scripts/make-icons.mjs
- *
- * -- Where the mark comes from ------------------------------------------------------------------
- *
- * It is not drawn here any more. This script now RESAMPLES the web app's brand master,
- * `apps/web/public/logo.png` -- the same 512x512 file that `NavbarLogo` renders and that
- * `app/favicon.ico` was cut from. That is the entire point: the toolbar icon, the browser tab and
- * the site header are one asset, so re-cutting the favicon can never leave the extension wearing
- * last season's logo.
- *
- * Before this, the icon was a blue rounded square with a white download arrow -- a different
- * colour, a different shape and a different letter from the product it shipped with.
- *
- * -- Why it is still dependency-free ------------------------------------------------------------
- *
- * Decode and encode are both ~100 lines over `node:zlib`, so the icons stay reproducible
- * byte-for-byte on any machine and in CI without a design tool or an image library. The decoder
- * handles the one format the master is in (8-bit RGBA, non-interlaced) and refuses anything else
- * loudly rather than emitting a silently wrong icon.
- *
- * Downscaling is area-averaged in PREMULTIPLIED alpha. Averaging straight RGBA is the classic way
- * to get a dark halo around a mark on a transparent ground: fully transparent pixels still carry a
- * colour, and it bleeds into the average.
- */
-
 import { deflateSync, inflateSync } from 'node:zlib';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -36,13 +5,8 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = join(HERE, '..', 'public', 'icons');
-/** The single brand master. Shared with the web app on purpose -- see the header. */
 const SOURCE = join(HERE, '..', '..', 'web', 'public', 'logo.png');
 const SIZES = [16, 48, 128];
-
-/* ------------------------------------------------------------------------------------------------
- * PNG encoder (RGBA8, no interlace)
- * ---------------------------------------------------------------------------------------------- */
 
 const CRC_TABLE = (() => {
   const table = new Uint32Array(256);
@@ -74,7 +38,7 @@ function encodePng(rgba, width, height) {
   const stride = width * 4;
   const raw = Buffer.alloc((stride + 1) * height);
   for (let y = 0; y < height; y += 1) {
-    raw[y * (stride + 1)] = 0; // filter type 0 (None) — these images are tiny
+    raw[y * (stride + 1)] = 0;
     Buffer.from(rgba.buffer, rgba.byteOffset + y * stride, stride).copy(
       raw,
       y * (stride + 1) + 1,
@@ -84,11 +48,11 @@ function encodePng(rgba, width, height) {
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(width, 0);
   ihdr.writeUInt32BE(height, 4);
-  ihdr[8] = 8; // bit depth
-  ihdr[9] = 6; // colour type: RGBA
-  ihdr[10] = 0; // deflate
-  ihdr[11] = 0; // adaptive filtering
-  ihdr[12] = 0; // no interlace
+  ihdr[8] = 8;
+  ihdr[9] = 6;
+  ihdr[10] = 0;
+  ihdr[11] = 0;
+  ihdr[12] = 0;
 
   return Buffer.concat([
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
@@ -97,10 +61,6 @@ function encodePng(rgba, width, height) {
     chunk('IEND', Buffer.alloc(0)),
   ]);
 }
-
-/* ------------------------------------------------------------------------------------------------
- * PNG decoder (8-bit RGBA, non-interlaced) — the mirror of the encoder above
- * ---------------------------------------------------------------------------------------------- */
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
@@ -130,8 +90,6 @@ function decodePng(file) {
       width = data.readUInt32BE(0);
       height = data.readUInt32BE(4);
       const [bitDepth, colourType, , , interlace] = [data[8], data[9], data[10], data[11], data[12]];
-      // Narrow on purpose. A silently mis-decoded icon is worse than a build that stops and says
-      // exactly which assumption the master file broke.
       if (bitDepth !== 8 || colourType !== 6 || interlace !== 0) {
         throw new Error(
           `${SOURCE} must be 8-bit RGBA, non-interlaced (got bitDepth=${bitDepth}, ` +
@@ -144,7 +102,7 @@ function decodePng(file) {
     } else if (type === 'IEND') {
       break;
     }
-    off += 12 + length; // length + type + data + crc
+    off += 12 + length;
   }
 
   const bpp = 4;
@@ -182,20 +140,6 @@ function decodePng(file) {
   return { width, height, rgba };
 }
 
-/* ------------------------------------------------------------------------------------------------
- * Resampling
- * ---------------------------------------------------------------------------------------------- */
-
-/**
- * Area-averaged downscale into `size` x `size`.
- *
- * Every destination pixel covers a rectangle of source pixels, and edge pixels are weighted by how
- * much of them the rectangle actually covers — 512 -> 48 is not an integer ratio, and dropping the
- * fraction is what makes a resized mark look like it has been sharpened with a brick.
- *
- * The average runs on PREMULTIPLIED colour so transparent source pixels contribute no colour, only
- * absence. Un-premultiplying afterwards restores a normal RGBA buffer for the encoder.
- */
 function resample(src, size) {
   const out = new Uint8Array(size * size * 4);
   const scaleX = src.width / size;

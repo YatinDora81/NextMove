@@ -1,26 +1,4 @@
-/**
- * profileTypes.ts — the job-application profile contract (JF-001 Rev 3.0 SEC 7.2).
- *
- * This lives in `@repo/types` rather than inside the extension because, since the web onboarding
- * wizard became the place a profile is *authored*, three runtimes have to agree on its shape:
- *
- *   apps/web        builds a profile from the onboarding form and seals it (@repo/vault)
- *   apps/extension  opens the sealed vault and fills forms from it
- *   packages/vault  parses the decrypted payload before handing it to either
- *
- * `apps/http-server` deliberately does **not** import this. The server stores `ProfileBlob` as
- * opaque ciphertext and has no business knowing what is inside it (SEC 7.4) — if a controller ever
- * needs this file, that is the review signal that the server-blind property is being broken.
- *
- * The extension keeps its hand-written `Profile` interface and asserts structural equality against
- * these schemas at compile time, so drift between the two is a type error, not a runtime surprise.
- */
-
 import { z } from "zod"
-
-/* ------------------------------------------------------------------------------------------------
- * Leaf enums
- * ---------------------------------------------------------------------------------------------- */
 
 export const remotePreferenceSchema = z.enum(["onsite", "hybrid", "remote", "flexible"])
 export const compensationPeriodSchema = z.enum(["hour", "day", "month", "year"])
@@ -29,10 +7,6 @@ export type RemotePreference = z.infer<typeof remotePreferenceSchema>
 export type CompensationPeriod = z.infer<typeof compensationPeriodSchema>
 
 const epochMs = z.number().int().nonnegative()
-
-/* ------------------------------------------------------------------------------------------------
- * The vault (SEC 7.2)
- * ---------------------------------------------------------------------------------------------- */
 
 export const postalAddressSchema = z.object({
     line1: z.string(),
@@ -110,10 +84,6 @@ export const profileAnswerSchema = z.object({
     reusable: z.boolean(),
 })
 
-/**
- * The vault contract. Strict by design: `resume_extract.v1` must return this exact shape minus the
- * identity fields, and an invalid generation gets one repair prompt (SEC 5.6).
- */
 export const profileSchema = z.object({
     id: z.string(),
     label: z.string(),
@@ -131,13 +101,8 @@ export const profileSchema = z.object({
     updatedAt: epochMs,
 })
 
-/** Partial patch used by the options editor, the onboarding wizard, and draft merges. */
 export const profilePatchSchema = profileSchema.partial()
 
-/**
- * SEC 5.5 `resume_extract.v1` output contract — everything a resume can tell us. The client
- * assigns id/label/isDefault/updatedAt; the model never invents them.
- */
 export const resumeExtractOutputSchema = profileSchema.omit({
     id: true,
     label: true,
@@ -160,18 +125,8 @@ export type ProfileAnswer = z.infer<typeof profileAnswerSchema>
 export type SharedProfile = z.infer<typeof profileSchema>
 export type SharedProfileDraft = z.infer<typeof resumeExtractOutputSchema>
 
-/* ------------------------------------------------------------------------------------------------
- * The sealed payload (SEC 7.4)
- * ---------------------------------------------------------------------------------------------- */
-
-/** Bumped whenever the sealed payload's shape changes. Mirrors the extension's SCHEMA_VERSION. */
 export const PROFILE_VAULT_SCHEMA_VERSION = 1
 
-/**
- * Exactly what a `ProfileBlob` decrypts to. Closed by construction — Zod strips unknown keys and
- * this schema has no slot for API keys (INV-5), the Answer Bank, resumes, or settings. Growing it
- * is a deliberate act, not an accident.
- */
 export const syncProfileVaultSchema = z.object({
     schemaVersion: z.number().int().positive(),
     exportedAt: epochMs,
@@ -181,11 +136,6 @@ export const syncProfileVaultSchema = z.object({
 
 export type SyncProfileVault = z.infer<typeof syncProfileVaultSchema>
 
-/* ------------------------------------------------------------------------------------------------
- * Constructors
- * ---------------------------------------------------------------------------------------------- */
-
-/** A fully-formed but empty vault. Never exported by reference — see `createEmptyProfile`. */
 const EMPTY: SharedProfile = {
     id: "",
     label: "",
@@ -217,7 +167,6 @@ const EMPTY: SharedProfile = {
 
 export const EMPTY_PROFILE: SharedProfile = EMPTY
 
-/** Deep clone of `EMPTY_PROFILE` with identity applied. Never returns a shared reference. */
 export function createEmptyProfile(id: string, label: string, now: number): SharedProfile {
     return {
         ...EMPTY,
@@ -240,7 +189,6 @@ export function createEmptyProfile(id: string, label: string, now: number): Shar
     }
 }
 
-/** Promote a `resume_extract.v1` draft into a real profile. */
 export function draftToProfile(
     draft: SharedProfileDraft,
     id: string,
@@ -250,7 +198,6 @@ export function draftToProfile(
     return { ...draft, id, label, isDefault: false, updatedAt: now }
 }
 
-/** Builds the plaintext payload for a push. Nothing else may be added to it — INV-5 / SEC 7.4. */
 export function buildSyncProfileVault(
     profiles: readonly SharedProfile[],
     activeProfileId: string | null,

@@ -1,30 +1,3 @@
-/**
- * platform/db.ts — the IndexedDB layer (JF-001 Rev 3.0 SEC 7.1, SEC 7.3).
- *
- * Dexie 4 database `"jobfill"` with exactly the four tables the storage map names:
- *
- *   resumes      id, profileId, name, mime, size, blob, tags[], isDefault, addedAt   (MBs)
- *   applications tracker rows (SEC 7.3 / F-12)                                       (grows)
- *   parseCache   resumeId → extracted text + Gemini draft — re-parse without re-spend
- *   answerBank   Q→A memory (SEC 5.7 / F-17) — normalized question, answer, provenance
- *
- * Index notes worth knowing before you query:
- *   - IndexedDB cannot index booleans or nulls. `isDefault`, `template` and `current` are
- *     therefore NOT indexed — filter them in JS. `appliedAt` IS indexed, but rows still in
- *     `draft` (appliedAt === null) are absent from that index by definition; use the `status`
- *     index for them.
- *   - `answerBank` carries the SEC 5.7 lookup indexes: `qNorm`, `profileId`, `scope`, plus a
- *     compound `[scope+profileId]` for the "this profile, then global" fallback.
- *   - `applications` carries `status`, `appliedAt` and `company` per the design brief, plus
- *     `profileId`, `ats` and `updatedAt` for the dashboard filters (SEC 6.7).
- *
- * INV-3 (local-first): every table here works with the NextMove backend switched off. `syncedAt`
- * on a tracker row is advisory metadata for Phase-2 push, never a precondition for reading.
- *
- * Blobs never leave IndexedDB. Only text extracted from a resume can ever reach Gemini (SEC 03),
- * and only on an explicit gesture (INV-2).
- */
-
 import Dexie, { type Table } from 'dexie';
 
 import { DB_NAME, DB_TABLES, DB_VERSION } from '@/shared/constants';
@@ -40,10 +13,6 @@ import type {
 import { createLogger } from '@/platform/logger';
 
 const log = createLogger('db');
-
-/* ------------------------------------------------------------------------------------------------
- * Database
- * ---------------------------------------------------------------------------------------------- */
 
 export class NextMoveDatabase extends Dexie {
   readonly resumes: Table<ResumeRecord, string>;
@@ -62,8 +31,6 @@ export class NextMoveDatabase extends Dexie {
       [DB_TABLES.answerBank]: 'id, qNorm, profileId, scope, lastUsedAt, timesUsed, [scope+profileId]',
     });
 
-    // Assigned explicitly rather than declared with `!`: with `useDefineForClassFields` (target
-    // ESNext) an uninitialised field declaration would overwrite Dexie's own table properties.
     this.resumes = this.table<ResumeRecord, string>(DB_TABLES.resumes);
     this.applications = this.table<ApplicationRow, string>(DB_TABLES.applications);
     this.parseCache = this.table<ParseCacheRecord, string>(DB_TABLES.parseCache);
@@ -71,14 +38,8 @@ export class NextMoveDatabase extends Dexie {
   }
 }
 
-/** The singleton every other module uses. Dexie opens lazily on first access. */
 export const db = new NextMoveDatabase();
 
-/**
- * Open the database explicitly and report success. Dexie auto-opens, but the service worker
- * wants a definite answer at startup so a blocked/corrupt IndexedDB surfaces as a log line
- * instead of as a mysterious failure inside an unrelated feature.
- */
 export async function openDatabase(): Promise<boolean> {
   try {
     if (!db.isOpen()) await db.open();
@@ -89,7 +50,6 @@ export async function openDatabase(): Promise<boolean> {
   }
 }
 
-/** Drop every row in every table, keeping the schema. */
 export async function clearAllTables(): Promise<void> {
   await db.transaction('rw', db.resumes, db.applications, db.parseCache, db.answerBank, async () => {
     await Promise.all([
@@ -102,15 +62,10 @@ export async function clearAllTables(): Promise<void> {
   log.warn('cleared every jobfill table');
 }
 
-/** Delete the whole database — the IndexedDB half of a full local wipe (SEC 9.2). */
 export async function deleteDatabase(): Promise<void> {
   await db.delete();
   log.warn('deleted the jobfill database');
 }
-
-/* ------------------------------------------------------------------------------------------------
- * resumes
- * ---------------------------------------------------------------------------------------------- */
 
 export async function putResume(record: ResumeRecord): Promise<string> {
   return db.resumes.put(record);
@@ -120,7 +75,6 @@ export async function getResume(id: string): Promise<ResumeRecord | undefined> {
   return db.resumes.get(id);
 }
 
-/** Resumes for one profile plus the shared ones (`profileId === null`), newest first. */
 export async function listResumes(profileId?: string | null): Promise<ResumeRecord[]> {
   const all = await db.resumes.toArray();
   const filtered =
@@ -141,10 +95,6 @@ export async function countResumes(): Promise<number> {
   return db.resumes.count();
 }
 
-/**
- * Mark one resume as the default for its scope, clearing the flag on the others. `isDefault` is a
- * boolean and therefore unindexable, so the scan is explicit.
- */
 export async function setDefaultResume(id: string): Promise<ResumeRecord | undefined> {
   return db.transaction('rw', db.resumes, async () => {
     const target = await db.resumes.get(id);
@@ -158,7 +108,6 @@ export async function setDefaultResume(id: string): Promise<ResumeRecord | undef
   });
 }
 
-/** The resume a fill run should attach by default: profile-scoped first, then shared. */
 export async function getDefaultResume(profileId: string | null): Promise<ResumeRecord | undefined> {
   const candidates = await listResumes(profileId);
   return (
@@ -167,10 +116,6 @@ export async function getDefaultResume(profileId: string | null): Promise<Resume
     candidates[0]
   );
 }
-
-/* ------------------------------------------------------------------------------------------------
- * applications (tracker — F-12 / SEC 6.7)
- * ---------------------------------------------------------------------------------------------- */
 
 export async function putApplication(row: ApplicationRow): Promise<string> {
   return db.applications.put(row);
@@ -188,7 +133,6 @@ export async function countApplications(): Promise<number> {
   return db.applications.count();
 }
 
-/** Most recent row for a posting URL — how a re-fill finds the draft it already opened. */
 export async function findApplicationByUrl(url: string): Promise<ApplicationRow | undefined> {
   const rows = await db.applications.toArray();
   let best: ApplicationRow | undefined;
@@ -199,7 +143,6 @@ export async function findApplicationByUrl(url: string): Promise<ApplicationRow 
   return best;
 }
 
-/** Existing row for a company/role pair, used to keep auto-logging idempotent. */
 export async function findApplication(
   company: string,
   role: string,
@@ -216,14 +159,9 @@ export async function findApplication(
 
 export interface ApplicationPage {
   rows: ApplicationRow[];
-  /** Total matches before `limit`/`offset` were applied. */
   total: number;
 }
 
-/**
- * Filtered, sorted, paginated tracker rows (SEC 6.7 quick filters). Sorted newest-activity first:
- * `appliedAt` when the row has one, otherwise `updatedAt` — so drafts stay visible at the top.
- */
 export async function listApplications(query: TrackerQuery = {}): Promise<ApplicationPage> {
   const status = query.status ?? null;
   const ats = query.ats ?? null;
@@ -232,7 +170,6 @@ export async function listApplications(query: TrackerQuery = {}): Promise<Applic
   const to = query.to ?? null;
   const search = query.search ? query.search.trim().toLowerCase() : null;
 
-  // Narrow with the most selective available index before falling back to a table scan.
   let rows: ApplicationRow[];
   if (profileId !== null && status !== null) {
     rows = await db.applications.where('[profileId+status]').equals([profileId, status]).toArray();
@@ -269,12 +206,10 @@ export async function listApplications(query: TrackerQuery = {}): Promise<Applic
   return { rows: matches.slice(offset, offset + limit), total: matches.length };
 }
 
-/** Rows in one lifecycle state — the board view's lane query. */
 export async function listApplicationsByStatus(status: AppStatus): Promise<ApplicationRow[]> {
   return db.applications.where('status').equals(status).toArray();
 }
 
-/** Rows changed since the last successful push — Phase-2 sync only (INV-3: optional). */
 export async function listUnsyncedApplications(): Promise<ApplicationRow[]> {
   const rows = await db.applications.toArray();
   return rows.filter((row) => {
@@ -283,10 +218,6 @@ export async function listUnsyncedApplications(): Promise<ApplicationRow[]> {
     return (row.updatedAt ?? 0) > syncedAt;
   });
 }
-
-/* ------------------------------------------------------------------------------------------------
- * parseCache
- * ---------------------------------------------------------------------------------------------- */
 
 export async function getParseCache(resumeId: string): Promise<ParseCacheRecord | undefined> {
   return db.parseCache.get(resumeId);
@@ -304,10 +235,6 @@ export async function clearParseCache(): Promise<void> {
   await db.parseCache.clear();
 }
 
-/* ------------------------------------------------------------------------------------------------
- * answerBank (SEC 5.7 / F-17) — offline reads, no gesture, no key lease
- * ---------------------------------------------------------------------------------------------- */
-
 export async function putAnswer(record: AnswerRecord): Promise<string> {
   return db.answerBank.put(record);
 }
@@ -324,7 +251,6 @@ export async function countAnswers(): Promise<number> {
   return db.answerBank.count();
 }
 
-/** Exact normalized-question hit, honouring scope: this profile first, then global (SEC 5.7). */
 export async function findAnswerByQNorm(
   qNorm: string,
   profileId: string | null,
@@ -337,10 +263,6 @@ export async function findAnswerByQNorm(
   );
 }
 
-/**
- * Every answer a lookup for `profileId` is allowed to consider: that profile's own answers plus
- * all global ones. This is the candidate set the similarity scorer runs over.
- */
 export async function listAnswersForLookup(profileId: string | null): Promise<AnswerRecord[]> {
   const [scoped, global] = await Promise.all([
     profileId === null
@@ -356,7 +278,6 @@ export interface AnswerPage {
   total: number;
 }
 
-/** Options → Answer Bank list: substring search over the raw question and the answer text. */
 export async function listAnswers(options: {
   search?: string | undefined;
   profileId?: string | null | undefined;
@@ -382,7 +303,6 @@ export async function listAnswers(options: {
   return { records: matches.slice(offset, offset + limit), total: matches.length };
 }
 
-/** Reuse bookkeeping: `timesUsed++` and `lastUsedAt = now`. Returns the updated row. */
 export async function touchAnswer(
   id: string,
   now: number = Date.now(),

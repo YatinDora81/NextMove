@@ -1,19 +1,3 @@
-/**
- * shared/schema.ts — Zod is the source of truth at every trust boundary.
- *
- * Implements JF-001 Rev 3.0:
- *   SEC 5.5  Gemini JSON output contracts (cover_letter.v1, field_disambiguate.v1, resume_extract.v1)
- *   SEC 6.6  MessageBus envelope validation
- *   SEC 7.1  Storage-map records (meta, mappings, sync)
- *   SEC 7.2  Profile schema (the vault) — `profileSchema` is the contract `resume_extract.v1`
- *            must satisfy; it is deliberately STRICT so a bad generation fails loudly and gets
- *            one repair retry (SEC 5.6) instead of quietly writing junk into the vault.
- *   SEC 7.3  Key records, mappings, tracker rows, answer bank
- *
- * Anything crossing a boundary — chrome.storage, IndexedDB, the bus, a Gemini response, the CDN
- * config — is parsed here before it is trusted. Nothing in this file performs I/O.
- */
-
 import { z } from 'zod';
 
 import {
@@ -53,16 +37,7 @@ import type {
   SyncState,
 } from './types';
 
-/**
- * Compile-time drift guard. `Extends<Interface, z.infer<typeof schema>>` fails to compile the
- * moment a Zod mirror and its TypeScript interface disagree — used in both directions below so
- * the two can never drift apart silently.
- */
 type Extends<Target, Candidate extends Target> = Candidate extends Target ? true : never;
-
-/* ------------------------------------------------------------------------------------------------
- * Small unions
- * ---------------------------------------------------------------------------------------------- */
 
 export const atsIdSchema = z.enum([
   'greenhouse',
@@ -115,20 +90,6 @@ export const syncScopeSchema = z.enum(['profile', 'mappings', 'applications']);
 
 const epochMs = z.number().int().nonnegative();
 
-/* ------------------------------------------------------------------------------------------------
- * SEC 7.2 — the vault
- * ---------------------------------------------------------------------------------------------- */
-
-/*
- * The vault contract itself now lives in `@repo/types/ProfileTypes`, because three runtimes have
- * to agree on it: the web onboarding wizard authors a profile, `@repo/vault` seals it, and this
- * extension opens and fills from it. Two definitions of the same object is how a user ends up with
- * a vault the other half of the product cannot parse.
- *
- * What stays here is the part that is genuinely local: the `Extends<>` assertions below, which fail
- * to compile the moment the shared Zod schema and this package's hand-written `Profile` interface
- * disagree. That check is the reason the interface can stay hand-written at all.
- */
 export {
   compensationPeriodSchema,
   createEmptyProfile,
@@ -163,10 +124,6 @@ export type ProfileDraftInterfaceMatchesZod = Extends<
   ProfileDraft
 >;
 
-/* ------------------------------------------------------------------------------------------------
- * SEC 7.1 — settings
- * ---------------------------------------------------------------------------------------------- */
-
 const score = z.number().int().min(0).max(100);
 
 export const settingsSchema = z.object({
@@ -192,7 +149,6 @@ export const settingsSchema = z.object({
 
   remoteConfigEnabled: z.boolean().default(DEFAULT_SETTINGS.remoteConfigEnabled),
   syncEnabled: z.boolean().default(DEFAULT_SETTINGS.syncEnabled),
-  // F-16 is V2 and strictly opt-in. It ships false and stays false for v1.
   telemetryOptIn: z.boolean().default(DEFAULT_SETTINGS.telemetryOptIn),
 
   updatedAt: epochMs.default(DEFAULT_SETTINGS.updatedAt),
@@ -202,10 +158,6 @@ export type SettingsZodMatchesInterface = Extends<Settings, z.infer<typeof setti
 export type SettingsInterfaceMatchesZod = Extends<z.infer<typeof settingsSchema>, Settings>;
 
 export const settingsPatchSchema = settingsSchema.partial();
-
-/* ------------------------------------------------------------------------------------------------
- * SEC 7.3 — tracker rows
- * ---------------------------------------------------------------------------------------------- */
 
 export const fillStatsSchema = z.object({
   filled: z.number().int().nonnegative(),
@@ -255,10 +207,6 @@ export const applicationLogInputSchema = z.object({
   notes: z.string().optional(),
 });
 
-/* ------------------------------------------------------------------------------------------------
- * SEC 5.7 / 7.3 — answer bank
- * ---------------------------------------------------------------------------------------------- */
-
 export const answerRecordSchema = z.object({
   id: z.string().min(1),
   qNorm: z.string(),
@@ -282,10 +230,6 @@ export type AnswerRecordInterfaceMatchesZod = Extends<
   AnswerRecord
 >;
 
-/* ------------------------------------------------------------------------------------------------
- * SEC 7.1 / 7.3 — meta, mappings, key records, sync state
- * ---------------------------------------------------------------------------------------------- */
-
 export const metaRecordSchema = z.object({
   schemaVersion: z.number().int().positive().default(SCHEMA_VERSION),
   installId: z.string(),
@@ -296,7 +240,6 @@ export const metaRecordSchema = z.object({
 export type MetaRecordZodMatchesInterface = Extends<MetaRecord, z.infer<typeof metaRecordSchema>>;
 export type MetaRecordInterfaceMatchesZod = Extends<z.infer<typeof metaRecordSchema>, MetaRecord>;
 
-/** `jf.mappings` — { [domain]: { [sigHash]: ProfilePath } }. */
 export const mappingStoreSchema = z.record(z.string(), z.record(z.string(), z.string()));
 
 export type MappingStoreZodMatchesInterface = Extends<
@@ -308,7 +251,6 @@ export type MappingStoreInterfaceMatchesZod = Extends<
   MappingStore
 >;
 
-/** Mirror of `KeyState` from @repo/rotation — used to validate `jf.keys` on load. */
 export const keyLedgerSchema = z.object({
   used: z.number().int().nonnegative(),
   resetAt: epochMs,
@@ -326,10 +268,6 @@ export const keyStateSchema = z.object({
 
 export type KeyStateZodMatchesInterface = Extends<KeyState, z.infer<typeof keyStateSchema>>;
 
-/**
- * `jf.keys` row. INV-5: this schema has no field that could hold a plaintext key, and no code
- * outside `src/ai/vault.ts` may decrypt `ct`.
- */
 export const geminiKeyRecordSchema = z.object({
   id: z.string().min(1),
   label: z.string(),
@@ -357,10 +295,6 @@ export const syncStateSchema = z.object({
 
 export type SyncStateZodMatchesInterface = Extends<SyncState, z.infer<typeof syncStateSchema>>;
 export type SyncStateInterfaceMatchesZod = Extends<z.infer<typeof syncStateSchema>, SyncState>;
-
-/* ------------------------------------------------------------------------------------------------
- * SEC 6.2 — field signatures and fill reports (validated when they cross a context boundary)
- * ---------------------------------------------------------------------------------------------- */
 
 export const fieldSignatureSchema = z.object({
   label: z.string(),
@@ -394,10 +328,6 @@ export const jobContextSchema = z.object({
   url: z.string(),
 });
 
-/* ------------------------------------------------------------------------------------------------
- * SEC 6.6 — bus envelope
- * ---------------------------------------------------------------------------------------------- */
-
 export const messageTypeSchema = z.enum(
   [...MESSAGE_TYPES] as [MessageType, ...MessageType[]],
 );
@@ -406,10 +336,6 @@ export const busErrorCodeSchema = z.enum(
   [...BUS_ERROR_CODES] as [BusErrorCode, ...BusErrorCode[]],
 );
 
-/**
- * The envelope itself. Payloads stay `unknown` here — the router narrows them per message type
- * against `MessageContracts` after the envelope has been accepted.
- */
 export const messageEnvelopeSchema = z.object({
   type: messageTypeSchema,
   reqId: z.string().min(1),
@@ -423,17 +349,11 @@ export const busErrorSchema = z.object({
   retryAt: z.number().optional(),
 });
 
-/* ------------------------------------------------------------------------------------------------
- * SEC 5.5 — Gemini JSON output contracts
- * ---------------------------------------------------------------------------------------------- */
-
-/** `cover_letter.v1` → JSON { subject?, body }. No placeholder brackets, 3–5 paragraphs. */
 export const coverLetterOutputSchema = z.object({
   subject: z.string().optional(),
   body: z.string().min(1),
 });
 
-/** `field_disambiguate.v1` → JSON { path, confidence } for a 50–69 gray-zone field. */
 export const disambiguateOutputSchema = z.object({
   path: z.string().min(1),
   confidence: z.number().min(0).max(1),

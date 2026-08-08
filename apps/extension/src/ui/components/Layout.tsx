@@ -1,16 +1,3 @@
-/**
- * ui/components/Layout.tsx — the structural furniture: cards, section headers, empty states,
- * the inline notice used for SEC 5.6 failure copy, and the toast host.
- *
- * Nothing here is clever. It exists so that nine Options panels look like one application.
- *
- * Two rules this file now holds to, because both were broken in the popup:
- *   · No glyph icons. `ℹ ✓ ! ×` resolved to whatever font the OS felt like, could not inherit
- *     `currentColor` on every platform, and never optically centred. They are `@/ui/icons` now.
- *   · An empty state is a state, not a hole. Icon, what the surface is for, and a way out — the
- *     dashed rectangle with two lines of grey text told the user nothing they could act on.
- */
-
 import type { ReactElement, ReactNode } from 'react';
 
 import { AlertCircle, AlertTriangle, Check, Info } from '@/ui/icons';
@@ -67,13 +54,6 @@ export function PanelHeader({
   );
 }
 
-/**
- * Status + what belongs here + one way to fill it.
- *
- * `compact` is the popup's version: the same three parts, but the 48px of vertical air an Options
- * page can spend is a third of the popup's scrollable budget, so it drops to 20px and the icon
- * shrinks with it.
- */
 export function EmptyState({
   icon: Glyph,
   title,
@@ -157,11 +137,6 @@ const NOTICE: Record<NoticeTone, { border: string; text: string; bg: string; ico
     },
   };
 
-/**
- * Inline, non-dismissable explanation. This is where the SEC 5.6 failure copy lands: "All keys are
- * rate-limited — ready again in 00:47", "Free daily quota used across N keys", and so on. Warnings
- * and errors get `role="alert"` so they are announced when they appear.
- */
 export function Notice({
   tone = 'info',
   title,
@@ -187,8 +162,6 @@ export function Notice({
         className,
       )}
     >
-      {/* Nudged down by a hair: a 16px box next to 13px/1.6 text centres optically below the cap
-          height, not on it. */}
       <Glyph className={cx('mt-0.5 shrink-0', style.text)} />
       <div className="min-w-0 flex-1 text-[var(--jf-fg)]">
         {title === undefined ? null : <p className="font-semibold">{title}</p>}
@@ -199,7 +172,6 @@ export function Notice({
   );
 }
 
-/** A labelled number for the tracker stats strip (SEC 6.7). */
 export function Stat({
   label,
   value,

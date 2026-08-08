@@ -1,17 +1,5 @@
 "use client"
 
-/**
- * JF-001 SEC 7.2 — the onboarding wizard's progress rail.
- *
- * Two renderings of the same state rather than one that shrinks badly: a labelled segment rail on
- * anything wider than a phone, and a single "Step 3 of 5 · Experience" line plus a bar below that.
- * Labels matter here — a bare dot rail tells a user how much is left but not what is coming, and
- * "what is coming" is the whole reason someone keeps going.
- *
- * Completed steps are buttons; steps ahead of the furthest one reached are not, because jumping
- * forward would skip the vault write that happens on every transition.
- */
-
 import { Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -29,7 +17,6 @@ export function StepIndicator({
 }: {
     steps: readonly StepIndicatorItem[]
     currentIndex: number
-    /** The highest index the user has actually reached; anything beyond it is not navigable. */
     furthestIndex: number
     onSelect: (id: string) => void
     className?: string
@@ -40,7 +27,6 @@ export function StepIndicator({
 
     return (
         <nav aria-label="Onboarding progress" className={cn("w-full", className)}>
-            {/* Phone: one line of text and a bar. Nothing is truncated, nothing is guessed at. */}
             <div className="flex flex-col gap-2 sm:hidden">
                 <p className="font-mono text-xs text-muted-foreground">
                     Step {currentIndex + 1} of {total}

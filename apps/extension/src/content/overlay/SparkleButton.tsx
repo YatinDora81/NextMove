@@ -1,40 +1,3 @@
-/**
- * content/overlay/SparkleButton.tsx — F-09 AI screening answers, gated by F-17 Answer Memory.
- *
- * JF-001 Rev 3.0 · SEC 4.3 Flow B · SEC 5.7 · F-09 · F-17 · INV-2.
- *
- * The exact order of operations Flow B prescribes, implemented here:
- *
- *   1. The user clicks ✨. **This is the only entry point** (INV-2). The click handler mints a
- *      user-gesture nonce over `GESTURE_MINT` — the overlay is trusted extension UI, and the bus
- *      refuses `GESTURE_MINT` from anything that is not (see `platform/bus.ts`). The nonce is
- *      single-use with a 5 s TTL, so every later action (Regenerate) mints its own.
- *
- *   2. **Answer Memory first** (SEC 5.7). `ANSWERS_LOOKUP` is a fully OFFLINE read: no key lease,
- *      no network, no gesture required. A hit at ≥ SAME_Q shows the "You've answered this before"
- *      chip (Use saved · Edit saved · Regenerate with AI); a hit in the 0.75-0.92 band shows the
- *      side-by-side preview so the user can judge whether the older question really is the same
- *      one. Zero API spend on either path.
- *
- *   3. Only a miss, or an explicit **Regenerate**, sends `AI_GENERATE_ANSWER` — with the full
- *      context Flow B lists: the question, the job context scraped from the page (title, company,
- *      JD), the active profile, and the tone/length presets.
- *
- *   4. The draft is inserted carrying the **"AI draft — review before submitting"** chip, and
- *      whatever the user finally accepts is upserted to the bank with honest provenance:
- *      `ai` (accepted verbatim) · `ai-edited` (accepted after editing) · `user` (their own words).
- *
- * SEC 5.6 is respected on the failure side: `NO_KEYS`, `ALL_KEYS_BUSY` and `QUOTA_EXHAUSTED` come
- * back as bus errors and are rendered by `Toast` with the countdown / setup copy. With no keys at
- * all the ✨ still works — the Answer-Bank path is offline — but the AI actions render disabled
- * with the "Add a free Gemini key (2 min) →" hint.
- *
- * SEC 9.2: the question text, the company name and the answer are all page- or model-derived, and
- * are rendered as React text children (`textContent`). Nothing here builds markup from a string.
- *
- * No JSX — `apps/extension/tsconfig.json` sets no `jsx` factory, so this file uses `createElement`.
- */
-
 import {
   createElement as h,
   useCallback,
@@ -59,28 +22,15 @@ import type {
 
 import { toastFromBusError, successToast, type ToastSpec } from './Toast';
 
-/* ------------------------------------------------------------------------------------------------
- * Which fields get a ✨
- * ---------------------------------------------------------------------------------------------- */
-
-/** Question-shaped wording that marks a short text input as an open-text screening question. */
 const QUESTION_WORDS =
   /\b(why|how|what|describe|tell us|explain|share|elaborate|walk us|in your own words|motivat|interest(ed)? in|excites?|challenge|strength|weakness|proud|accomplish)\b/i;
 
-/** Wording that means "this is a data field", even when it is long or ends in a question mark. */
 const NOT_A_QUESTION =
   /\b(address|street|city|state|province|zip|postal|phone|email|linkedin|github|portfolio|website|url|salary|compensation|notice period|start date|referr?al|how did you hear)\b/i;
 
 const MIN_TEXTAREA_QUESTION_CHARS = 8;
 const MIN_INPUT_QUESTION_CHARS = 16;
 
-/**
- * "✨ button injected beside detected open-text questions" (F-09).
- *
- * A `<textarea>` is an open-text answer box almost by definition; a single-line input only earns a
- * ✨ when its label actually reads like a question. Data fields are excluded outright so the
- * affordance never appears next to "Street address".
- */
 export function isOpenTextQuestion(node: FieldNode): boolean {
   const sig = node.sig;
   if (!node.visible) return false;
@@ -100,7 +50,6 @@ export function isOpenTextQuestion(node: FieldNode): boolean {
   return false;
 }
 
-/** The question we ask Gemini and key the bank on. Untrusted page text, clamped before it travels. */
 export function questionOf(node: FieldNode): string {
   const sig = node.sig;
   const candidate = [sig.label, sig.ariaLabel, sig.placeholder].find(
@@ -109,34 +58,22 @@ export function questionOf(node: FieldNode): string {
   return (candidate ?? '').replace(/\s+/g, ' ').trim().slice(0, MAX_QUESTION_CHARS);
 }
 
-/* ------------------------------------------------------------------------------------------------
- * Shapes
- * ---------------------------------------------------------------------------------------------- */
-
 export interface SparkleTarget {
-  /** Stable id (the field signature hash). */
   id: string;
   el: HTMLElement;
-  /** Resolved question text. Untrusted page text. */
   question: string;
 }
 
 export interface SparkleContext {
-  /** SEC 6.7 auto-capture output — the JD/company/title handed to the prompt as context. */
   job: JobContext;
   profileId: string | null;
   tone: AnswerTone;
   length: AnswerLength;
-  /** `Settings.reuseBankedAnswers` — when false the bank is skipped and every click generates. */
   reuseBanked: boolean;
-  /** False when the key vault is empty; the AI actions render disabled with the SEC 5.6 hint. */
   aiAvailable: boolean;
-  /** Keys in the vault — fills the "…across N keys…" slot in the SEC 5.6 daily-exhaustion copy. */
   keyCount: number;
   pushToast: (spec: ToastSpec) => void;
-  /** Writes into the page through the FillEngine's framework-safe path. Resolves false on failure. */
   writeValue: (el: HTMLElement, text: string) => Promise<boolean>;
-  /** Current value of the field, for the "save what I wrote" (`user` provenance) path. */
   readValue: (el: HTMLElement) => string;
 }
 
@@ -148,24 +85,13 @@ type Phase =
   | {
       kind: 'draft';
       text: string;
-      /** What produced the starting text — decides provenance on accept (SEC 5.7 step 4). */
       origin: 'ai' | 'bank' | 'user';
       baseline: string;
       bankSource: AnswerSource | null;
     };
 
-/* ------------------------------------------------------------------------------------------------
- * Anchoring
- * ---------------------------------------------------------------------------------------------- */
-
 const ANCHOR_INTERVAL_MS = 500;
 
-/**
- * Track a host-page element's viewport rectangle without touching it.
- *
- * Same contract as `FieldMarkers`: read-only geometry, rAF-coalesced, capture-phase scroll so
- * fields inside scrollable panels track correctly. Returns null while the element is detached.
- */
 function useAnchorRect(el: Element | null): DOMRect | null {
   const [rect, setRect] = useState<DOMRect | null>(null);
   const frame = useRef<number | null>(null);
@@ -229,7 +155,6 @@ function useAnchorRect(el: Element | null): DOMRect | null {
   return rect;
 }
 
-/** Is any part of the anchor inside the viewport? Off-screen fields hide their ✨. */
 function onScreen(rect: DOMRect): boolean {
   return (
     rect.bottom > 4 &&
@@ -252,22 +177,10 @@ function panelPosition(rect: DOMRect): { top: number; left: number } {
   return { top, left };
 }
 
-/* ------------------------------------------------------------------------------------------------
- * Bus helpers
- * ---------------------------------------------------------------------------------------------- */
-
-/**
- * INV-2 — mint a single-use nonce from inside the click handler. Never cached, never reused: the
- * bus burns it on first use and it dies 5 s after minting.
- */
 async function mintGesture(reason: string): Promise<string | null> {
   const reply = await sendMessage('GESTURE_MINT', { reason });
   return reply.ok ? reply.data.gesture : null;
 }
-
-/* ------------------------------------------------------------------------------------------------
- * The affordance
- * ---------------------------------------------------------------------------------------------- */
 
 export interface SparkleButtonProps {
   target: SparkleTarget;
@@ -287,8 +200,6 @@ export function SparkleButton({ target, ctx }: SparkleButtonProps): ReactElement
   }, []);
 
   const close = useCallback(() => setPhase({ kind: 'idle' }), []);
-
-  /* ---- generation (the only path that spends a key) ---------------------------------------- */
 
   const generate = useCallback(
     async (gesture: string | null): Promise<void> => {
@@ -345,16 +256,12 @@ export function SparkleButton({ target, ctx }: SparkleButtonProps): ReactElement
     [ctx, target.id, target.question],
   );
 
-  /* ---- the ✨ click ------------------------------------------------------------------------ */
-
   const onSparkle = useCallback(() => {
     if (phase.kind !== 'idle') {
       close();
       return;
     }
 
-    // INV-2: the nonce is minted here, synchronously inside the real user gesture. It is passed
-    // down the whole chain so a bank *miss* can generate without asking for a second click.
     const gesturePromise = mintGesture('screening-answer');
 
     if (!ctx.reuseBanked) {
@@ -364,7 +271,6 @@ export function SparkleButton({ target, ctx }: SparkleButtonProps): ReactElement
 
     setPhase({ kind: 'looking' });
 
-    // SEC 5.7: the bank lookup runs BEFORE any key is leased and is a fully offline read.
     void sendMessage('ANSWERS_LOOKUP', {
       qRaw: target.question,
       company: ctx.job.company.length > 0 ? ctx.job.company : null,
@@ -385,12 +291,6 @@ export function SparkleButton({ target, ctx }: SparkleButtonProps): ReactElement
     );
   }, [close, ctx, generate, phase.kind, target.question]);
 
-  /* ---- accept ------------------------------------------------------------------------------ */
-
-  /**
-   * SEC 5.7 step 4 — "Whatever the user finally accepts, generated, edited, or typed from scratch,
-   * is upserted with provenance (ai | ai-edited | user)."
-   */
   const provenanceOf = useCallback(
     (origin: 'ai' | 'bank' | 'user', edited: boolean, bankSource: AnswerSource | null): AnswerSource => {
       if (origin === 'user') return 'user';
@@ -442,8 +342,6 @@ export function SparkleButton({ target, ctx }: SparkleButtonProps): ReactElement
     },
     [close, ctx, target.el, target.id, target.question],
   );
-
-  /* ---- render ------------------------------------------------------------------------------ */
 
   if (rect === null || !onScreen(rect)) return null;
 
@@ -500,10 +398,6 @@ export function SparkleButton({ target, ctx }: SparkleButtonProps): ReactElement
 
   return h('div', null, button, panel);
 }
-
-/* ------------------------------------------------------------------------------------------------
- * The chip / draft panel
- * ---------------------------------------------------------------------------------------------- */
 
 interface AnswerPanelProps {
   phase: Extract<Phase, { kind: 'offer' } | { kind: 'draft' }>;
@@ -586,8 +480,7 @@ function AnswerPanel(props: AnswerPanelProps): ReactElement {
             ),
             h('div', { className: 'jf-preview' }, hit.answer),
           )
-        : // SEC 5.7: 0.75-0.92 ⇒ "similar question" offer with a side-by-side preview.
-          h(
+        : h(
             'div',
             null,
             h(
@@ -653,7 +546,6 @@ function AnswerPanel(props: AnswerPanelProps): ReactElement {
     );
   }
 
-  // Draft: editable, and explicitly labelled as a draft until the human accepts it.
   const edited = phase.text.trim() !== phase.baseline.trim();
   const existing = ctx.readValue(target.el).trim();
 
@@ -738,16 +630,11 @@ function AnswerPanel(props: AnswerPanelProps): ReactElement {
   );
 }
 
-/* ------------------------------------------------------------------------------------------------
- * Layer
- * ---------------------------------------------------------------------------------------------- */
-
 export interface SparkleLayerProps {
   targets: readonly SparkleTarget[];
   ctx: SparkleContext;
 }
 
-/** Renders one ✨ per detected open-text question. Mounted into the overlay's `sparkles` layer. */
 export function SparkleLayer({ targets, ctx }: SparkleLayerProps): ReactElement | null {
   if (targets.length === 0) return null;
   return h(

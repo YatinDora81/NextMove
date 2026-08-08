@@ -1,21 +1,3 @@
-/**
- * ui/panels/PrivacyPanel.tsx — SEC 9.2, the privacy controls.
- *
- * Three things live here and nothing else needs to:
- *
- *   Export everything  One JSON file with your profiles, settings, learned mappings, tracker rows
- *                      and Answer Bank. **API keys are deliberately excluded** (INV-5: never
- *                      logged, never synced, never exported). Nothing in `src/ui/**` can obtain a
- *                      plaintext key to put in a file even if this code wanted to.
- *   Wipe everything    `chrome.storage.local` slots + the vault material + the whole IndexedDB
- *                      database. Genuinely unrecoverable, so it is behind a typed confirmation.
- *   Telemetry          F-16 is V2 and opt-in. It ships false and stays false unless the user
- *                      turns it on here; the copy states exactly what would be sent.
- *
- * The data-classification table below is SEC 9.1, and the encryption note is SEC 9.2's honest
- * limit rather than a marketing claim.
- */
-
 import { useState } from 'react';
 import type { ReactElement } from 'react';
 
@@ -62,7 +44,6 @@ export function PrivacyPanel(): ReactElement {
     try {
       await loadMappings();
       await loadAnswers();
-      // Read unfiltered copies rather than whatever the panels happen to be showing.
       const [applications, answers] = await Promise.all([
         call('TRACKER_QUERY', {}),
         call('ANSWERS_LIST', {}),
@@ -72,7 +53,6 @@ export function PrivacyPanel(): ReactElement {
         kind: EXPORT_KIND,
         schemaVersion: SCHEMA_VERSION,
         exportedAt: Date.now(),
-        // INV-5 — there is no `keys` field here, and there never will be.
         profiles,
         activeProfileId,
         settings,
@@ -92,7 +72,6 @@ export function PrivacyPanel(): ReactElement {
     setConfirmWipe(false);
     setWiping(true);
     try {
-      // Storage slots + vault material first, then IndexedDB (resumes, tracker, answers, cache).
       await wipeInstall();
       await deleteDatabase();
       toast.ok('Everything on this device has been erased. Reloading…');

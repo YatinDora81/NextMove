@@ -1,42 +1,3 @@
-/**
- * tests/setup.ts — the unit-test harness (JF-001 Rev 3.0 SEC 11, "Unit · Vitest + happy-dom").
- *
- * `vitest.config.ts` is owned by the scaffold agent and declares no `setupFiles`, so this module is
- * imported EXPLICITLY by every test that needs it (`import { … } from '../setup'`). That is a
- * feature rather than a workaround: a test that does not touch the extension platform gets a clean,
- * un-monkey-patched global object.
- *
- * What lives here:
- *
- *   1. FIXTURES.  `loadFixture()` parses a file from `fixtures/<ats>/<variant>.html` into the LIVE
- *      happy-dom document. It has to be the live document, not a detached `DOMParser` one: a
- *      detached document has no `defaultView`, so `getComputedStyle` is unavailable and
- *      `core/scanner.ts::isVisible` can no longer see `display:none` — the hidden Workday step and
- *      the honeypots would both leak into the field list and every golden expectation would be a
- *      lie.
- *
- *   2. `browser` / `chrome` MOCK.  A minimal in-memory implementation of the three MV3 surfaces the
- *      platform modules actually touch: `storage.local`, `runtime.sendMessage`/`onMessage` and
- *      `alarms`. Installed on `globalThis` because WXT auto-imports `browser` at build time and the
- *      platform modules resolve it off the global object at call time precisely so they stay
- *      testable (see the `ext()` helper in `src/platform/crypto.ts`).
- *
- *   3. DEXIE.  happy-dom ships no IndexedDB (`'indexedDB' in window === false`), so Dexie cannot
- *      open a database here AT ALL — this is the documented limitation SEC 11 pushes onto the
- *      Playwright layer. Rather than skip every storage-backed test, `memoryDb` is a hand-written
- *      in-memory stand-in with the exact slice of the Dexie `Table` API that `src/answers/bank.ts`
- *      and `src/tracker/service.ts` use (`get` · `put` · `delete` · `clear` · `toArray` ·
- *      `bulkPut` · `count`). Tests install it with:
- *
- *          vi.mock('@/platform/db', async () => ({ db: (await import('../setup')).memoryDb }));
- *
- *      Anything that needs a REAL IndexedDB query plan (`db.applications.where(...)` inside
- *      `platform/db.ts` itself) is out of scope for this layer and belongs in the e2e suite.
- *
- *   4. `makeProfile()` — a complete, valid SEC 7.2 vault entry, so matcher/fill tests exercise the
- *      real value-resolution path instead of an ad-hoc object literal per file.
- */
-
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -44,14 +5,9 @@ import { webcrypto } from 'node:crypto';
 
 import type { AnswerRecord, ApplicationRow, ParseCacheRecord, Profile, ResumeRecord } from '@/shared/types';
 
-/* ------------------------------------------------------------------------------------------------
- * Fixtures — SEC 11 "the ground truth"
- * ---------------------------------------------------------------------------------------------- */
-
 const TESTS_DIR = dirname(fileURLToPath(import.meta.url));
 export const FIXTURES_DIR = join(TESTS_DIR, '..', 'fixtures');
 
-/** Every fixture in the corpus, by the id the tests address it with. */
 export const FIXTURES = {
   greenhouse: 'greenhouse/standard.html',
   lever: 'lever/standard.html',
@@ -62,7 +18,6 @@ export const FIXTURES = {
 
 export type FixtureId = keyof typeof FIXTURES;
 
-/** A plausible page URL per fixture. Nothing here resolves to a real posting. */
 export const FIXTURE_URLS: Readonly<Record<FixtureId, string>> = {
   greenhouse: 'https://boards.greenhouse.io/northwindlabs/jobs/4210001',
   lever: 'https://jobs.lever.co/fablewright/00000000-0000-4000-8000-000000000001/apply',
@@ -72,17 +27,10 @@ export const FIXTURE_URLS: Readonly<Record<FixtureId, string>> = {
   generic: 'https://careers.ravensmoor.example/jobs/technical-writer/apply',
 };
 
-/** Raw fixture text, straight off disk. */
 export function readFixture(id: FixtureId): string {
   return readFileSync(join(FIXTURES_DIR, FIXTURES[id]), 'utf8');
 }
 
-/**
- * Parse a fixture into the live happy-dom `document` and return it.
- *
- * `document.write` is used deliberately — it produces a document that still has a `defaultView`,
- * which is what makes `getComputedStyle` (and therefore visibility and honeypot detection) work.
- */
 export function loadFixture(id: FixtureId): Document {
   const html = readFixture(id);
   document.open();
@@ -91,22 +39,12 @@ export function loadFixture(id: FixtureId): Document {
   return document;
 }
 
-/** Tear the fixture back down so the next test starts from an empty page. */
 export function unloadFixture(): void {
   document.open();
   document.write('<!doctype html><html><head></head><body></body></html>');
   document.close();
 }
 
-/* ------------------------------------------------------------------------------------------------
- * WebCrypto
- * ---------------------------------------------------------------------------------------------- */
-
-/**
- * happy-dom's `Window` does not always carry a full `SubtleCrypto`. Node's own WebCrypto is
- * standards-compliant and is what the service worker would use, so it is installed as the global
- * when (and only when) `crypto.subtle` is missing.
- */
 export function ensureWebCrypto(): Crypto {
   const existing = globalThis.crypto as Crypto | undefined;
   if (existing?.subtle !== undefined) return existing;
@@ -117,10 +55,6 @@ export function ensureWebCrypto(): Crypto {
   });
   return globalThis.crypto;
 }
-
-/* ------------------------------------------------------------------------------------------------
- * Minimal in-memory `browser` / `chrome`
- * ---------------------------------------------------------------------------------------------- */
 
 type StorageArea = Record<string, unknown>;
 
@@ -144,11 +78,6 @@ export interface BrowserMock {
       remove(keys: string | string[]): Promise<void>;
       clear(): Promise<void>;
     };
-    /**
-     * `storage.session` is memory-backed in Chrome and never hits disk. The handoff nonce lives
-     * there precisely for that reason, so the mock models it as a genuinely separate map — a test
-     * that confused the two areas would pass while the real extension leaked a nonce to disk.
-     */
     session: {
       get(keys?: string | string[] | null): Promise<StorageArea>;
       set(items: StorageArea): Promise<void>;
@@ -184,14 +113,11 @@ export interface BrowserMock {
       hasListener(fn: (alarm: MockAlarm) => void): boolean;
     };
   };
-  /* ---- test-only surface (not part of the MV3 API) ---- */
   __store: StorageArea;
   __alarms: Map<string, MockAlarm>;
   __sent: unknown[];
   __reset(): void;
-  /** Drive `runtime.onMessage` as the browser would. */
   __emitMessage(message: unknown, sender?: MockRuntimeMessage['sender']): unknown[];
-  /** Fire an alarm as the browser would. */
   __fireAlarm(name: string): void;
 }
 
@@ -361,7 +287,6 @@ function createBrowserMock(): BrowserMock {
 
 let installed: BrowserMock | null = null;
 
-/** Install (or return the already-installed) `browser`/`chrome` mock on `globalThis`. */
 export function installBrowserMock(): BrowserMock {
   if (installed !== null) return installed;
   const mock = createBrowserMock();
@@ -372,18 +297,12 @@ export function installBrowserMock(): BrowserMock {
   return mock;
 }
 
-/** Wipe the mock's state without reinstalling it. */
 export function resetBrowserMock(): BrowserMock {
   const mock = installBrowserMock();
   mock.__reset();
   return mock;
 }
 
-/* ------------------------------------------------------------------------------------------------
- * In-memory Dexie stand-in
- * ---------------------------------------------------------------------------------------------- */
-
-/** The slice of Dexie's `Table` that `answers/bank.ts` and `tracker/service.ts` actually call. */
 export interface MemoryTable<T> {
   get(key: string): Promise<T | undefined>;
   put(row: T): Promise<string>;
@@ -392,9 +311,7 @@ export interface MemoryTable<T> {
   clear(): Promise<void>;
   count(): Promise<number>;
   toArray(): Promise<T[]>;
-  /** Test-only: synchronous seed. */
   __seed(rows: readonly T[]): void;
-  /** Test-only: synchronous read. */
   __rows(): T[];
 }
 
@@ -405,8 +322,6 @@ function createMemoryTable<T extends Record<string, unknown>>(primaryKey: keyof 
   return {
     async get(key: string): Promise<T | undefined> {
       const row = rows.get(key);
-      // Dexie hands back a structurally independent record; copying here stops a test from
-      // accidentally mutating "stored" state through a returned reference.
       return row === undefined ? undefined : ({ ...row } as T);
     },
     async put(row: T): Promise<string> {
@@ -453,11 +368,6 @@ export interface MemoryDb {
   transaction(...args: unknown[]): Promise<unknown>;
 }
 
-/**
- * The Dexie stand-in. A module-level singleton so that
- * `vi.mock('@/platform/db', async () => ({ db: (await import('../setup')).memoryDb }))` and the
- * test body's own `import { memoryDb }` observe the SAME tables.
- */
 export const memoryDb: MemoryDb = {
   resumes: createMemoryTable<ResumeRecord & Record<string, unknown>>('id'),
   applications: createMemoryTable<ApplicationRow & Record<string, unknown>>('id'),
@@ -471,7 +381,6 @@ export const memoryDb: MemoryDb = {
   },
 };
 
-/** Empty every table in the stand-in. */
 export async function resetMemoryDb(): Promise<void> {
   await Promise.all([
     memoryDb.resumes.clear(),
@@ -481,21 +390,11 @@ export async function resetMemoryDb(): Promise<void> {
   ]);
 }
 
-/**
- * Is a real IndexedDB available in this environment? Always false under happy-dom today; the
- * few tests that would need one call this and skip with an explicit message rather than failing
- * for a reason that has nothing to do with the code under test.
- */
 export const HAS_INDEXEDDB: boolean =
   typeof globalThis === 'object' &&
   'indexedDB' in globalThis &&
   (globalThis as { indexedDB?: unknown }).indexedDB !== undefined;
 
-/* ------------------------------------------------------------------------------------------------
- * Fixtures for the vault (SEC 7.2)
- * ---------------------------------------------------------------------------------------------- */
-
-/** A complete, valid `Profile`. Entirely invented — no real person, no real employer. */
 export function makeProfile(overrides: Partial<Profile> = {}): Profile {
   const base: Profile = {
     id: 'prof_test_0001',
@@ -602,7 +501,6 @@ export function makeProfile(overrides: Partial<Profile> = {}): Profile {
   return { ...base, ...overrides };
 }
 
-/** A `Profile` with nothing in it — for the INV-4 "never write a value we do not have" path. */
 export function makeEmptyProfile(): Profile {
   const profile = makeProfile();
   return {

@@ -1,12 +1,3 @@
-/**
- * The profile vault's merge policy and the web → extension handshake.
- *
- * These two are grouped because they are the load-bearing halves of the same feature: the handshake
- * is how a device gets a vault key, and the merge is what happens to the profile once it has one.
- * Both were previously untested — the merge did not exist and the profile scope of `SYNC_PUSH` was
- * a logged no-op.
- */
-
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { installBrowserMock, makeProfile, resetBrowserMock } from '../setup';
@@ -28,24 +19,18 @@ import type { ExternalSender, HandoffReply } from '@/background/handoff';
 
 const TRUSTED: ExternalSender = { origin: WEB_APP_URL, frameId: 0, tab: { id: 7 } };
 
-/** The installed mock, read off the global the way the platform modules do at call time. */
 const ext = (): ReturnType<typeof installBrowserMock> =>
   (globalThis as unknown as { browser: ReturnType<typeof installBrowserMock> }).browser;
 
-/** Drives the listener the way Chrome does and resolves with whatever it passes to sendResponse. */
 async function send(message: unknown, sender: ExternalSender = TRUSTED): Promise<HandoffReply | null> {
   return new Promise((resolve) => {
     const kept = handleExternalMessage(message, sender, (reply) => resolve(reply));
-    // A listener that returns false will never call sendResponse — resolve so the test can assert.
     if (!kept) resolve(null);
   });
 }
 
 beforeEach(() => {
   resetBrowserMock();
-  // The handshake's happy path redeems the pairing code against the real API. There is no server
-  // here, and a real `fetch` would sit on the 15s sync timeout, so it is stubbed to fail fast. What
-  // these tests assert is everything *before* the network: origin, frame, nonce, and key validation.
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => {
@@ -57,10 +42,6 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
 });
-
-/* ------------------------------------------------------------------------------------------------
- * Merge
- * ---------------------------------------------------------------------------------------------- */
 
 describe('mergeProfiles', () => {
   it('keeps the newer copy of a profile that exists on both sides', () => {
@@ -89,8 +70,6 @@ describe('mergeProfiles', () => {
   });
 
   it('unions profiles that exist on only one side rather than deleting them', () => {
-    // Absence must never be read as a delete: a device that has not pulled yet would otherwise be
-    // able to wipe the account's other profiles.
     const local = makeProfile({ id: 'a', updatedAt: 1, isDefault: true });
     const remote = makeProfile({ id: 'b', updatedAt: 2, isDefault: false });
 
@@ -105,7 +84,7 @@ describe('mergeProfiles', () => {
     const { merged } = mergeProfiles([local], [remote]);
     const defaults = merged.filter((p) => p.isDefault);
     expect(defaults).toHaveLength(1);
-    expect(defaults[0]?.id).toBe('b'); // the more recently touched one wins
+    expect(defaults[0]?.id).toBe('b');
   });
 
   it('promotes a default when the merge would otherwise leave none', () => {
@@ -121,10 +100,6 @@ describe('mergeProfiles', () => {
   });
 });
 
-/* ------------------------------------------------------------------------------------------------
- * Handshake — sender validation
- * ---------------------------------------------------------------------------------------------- */
-
 describe('handleExternalMessage · who is allowed to talk to us', () => {
   it('accepts the production origin', async () => {
     const reply = await send({ type: HANDOFF_HELLO });
@@ -138,7 +113,6 @@ describe('handleExternalMessage · who is allowed to talk to us', () => {
   });
 
   it('refuses a lookalike origin that merely starts with an allowed one', async () => {
-    // The exact-match check exists for this: `startsWith` would accept it.
     const reply = await send(
       { type: HANDOFF_HELLO },
       { ...TRUSTED, origin: `${WEB_APP_URL}.evil.example` },
@@ -166,10 +140,6 @@ describe('handleExternalMessage · who is allowed to talk to us', () => {
     expect(HANDOFF_ALLOWED_ORIGINS).toContain('http://localhost:3000');
   });
 });
-
-/* ------------------------------------------------------------------------------------------------
- * Handshake — the nonce
- * ---------------------------------------------------------------------------------------------- */
 
 describe('handleExternalMessage · the nonce', () => {
   it('HELLO mints a nonce and stores it in session storage, not local', async () => {
@@ -215,8 +185,6 @@ describe('handleExternalMessage · the nonce', () => {
       vaultKey: generateVaultKey(),
     };
 
-    // The first attempt gets past the nonce check and fails later, at the network — there is no
-    // server in this environment. What matters is that it is NOT a nonce failure.
     const first = await send(body);
     expect(first?.error?.code).not.toBe('BAD_NONCE');
 
@@ -243,10 +211,6 @@ describe('handleExternalMessage · the nonce', () => {
     expect(reply?.error?.code).toBe('BAD_REQUEST');
   });
 });
-
-/* ------------------------------------------------------------------------------------------------
- * The first-run URL
- * ---------------------------------------------------------------------------------------------- */
 
 describe('connectUrl', () => {
   it('points at the web connect page and carries a fresh nonce', async () => {

@@ -1,40 +1,3 @@
-/**
- * content/overlay/mount.ts — the in-page overlay host.
- *
- * JF-001 Rev 3.0 · SEC 4.1 ("OverlayUI — review panel, ✨ buttons, map-this-field (Shadow DOM)") ·
- * SEC 4.4 HLD decision of record: "Overlay isolation — Closed Shadow DOM + unique element name.
- * Host page CSS/JS cannot restyle or sniff the JobFill UI." · SEC 9.2 (page text is untrusted).
- *
- * Three properties this module is responsible for:
- *
- *   1. CLOSED shadow root. `attachShadow({ mode: 'closed' })` returns a root that is NOT reachable
- *      through `hostElement.shadowRoot`, so page scripts cannot walk into our UI, read what the
- *      user is about to submit, or rewrite it. The root is held in a module-private variable and
- *      never handed to anything outside `src/content/**`.
- *
- *      Worth stating plainly, because "closed" is often oversold: closed mode stops *lookup*, not
- *      *observation* — a page can still see that an unknown element was appended to
- *      `<html>` and can watch its box. What it cannot do is reach inside. The one classic bypass
- *      (monkey-patching `Element.prototype.attachShadow` before we run to capture the root) does
- *      not apply here: content scripts execute in an isolated world with their own DOM prototypes,
- *      so the page's patch is not the function we call.
- *
- *   2. A unique element name. The tag is `nextmove-autofill-root-<random>`, freshly generated per
- *      document, so a host page cannot ship a `#nextmove-autofill-root { display: none }` rule (or
- *      a querySelector poll) that reliably targets us. Custom-element naming rules are respected
- *      (ASCII lowercase, contains a hyphen), which also guarantees the browser parses it as a
- *      plain `HTMLElement` rather than an unknown element with surprising defaults.
- *
- *   3. Total style isolation in both directions. Every rule the overlay needs is injected into the
- *      shadow root by this file — nothing is imported from `app.css` (that stylesheet belongs to
- *      the popup/options surfaces and must never leak into a host page), and nothing here can leak
- *      out. The host element's own geometry is pinned with `!important` inline styles so a page
- *      rule such as `* { position: static !important }` cannot dislodge the layer.
- *
- * Nothing in this file reads or writes host-page content. It appends exactly one element to
- * `document.documentElement` and removes it again on teardown.
- */
-
 import type { ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 
@@ -43,57 +6,25 @@ import { createLogger } from '@/platform/logger';
 
 const log = createLogger('overlay');
 
-/* ------------------------------------------------------------------------------------------------
- * Public surface
- * ---------------------------------------------------------------------------------------------- */
-
-/** Named z-stacked containers inside the shadow root. Order here is paint order. */
 export const OVERLAY_LAYERS = ['markers', 'sparkles', 'pill', 'panel', 'toasts'] as const;
 
 export type OverlayLayer = (typeof OVERLAY_LAYERS)[number];
 
 export interface OverlayHandle {
-  /** The element appended to `<html>`. Its shadow root is closed and is not exposed on it. */
   readonly host: HTMLElement;
-  /** Randomised tag name of the host element, for diagnostics only. */
   readonly tagName: string;
-  /** Get (creating on first use) the container element for a layer. */
   layer(name: OverlayLayer): HTMLElement;
-  /** Render a React tree into a layer. Idempotent — re-rendering reuses the same root. */
   render(name: OverlayLayer, node: ReactNode): void;
-  /** Unmount a layer's React tree and empty its container. */
   clear(name: OverlayLayer): void;
-  /** Re-append the host if a host-page re-render tore it out of the document. */
   ensureAttached(): void;
-  /** True while the host element is in the document. */
   readonly attached: boolean;
-  /** Unmount everything and remove the host element. */
   destroy(): void;
 }
 
-/* ------------------------------------------------------------------------------------------------
- * Stylesheet — the whole overlay design system, scoped to the shadow root
- * ---------------------------------------------------------------------------------------------- */
-
-/**
- * Colour vocabulary is the F-06 legend of record: blue = filled, yellow = low confidence,
- * red = unmatched. It matches `app.css` by value, deliberately duplicated rather than imported so
- * the overlay carries no dependency on the popup/options shell.
- */
-/**
- * Shared design tokens, pulled in as text.
- *
- * Vite's `?inline` gives us the compiled stylesheet as a string rather than injecting it into the
- * page — which is exactly what a closed shadow root needs, since nothing the extension adds to
- * `document` can reach inside one. Before this, the block below was ~40 hand-typed token
- * declarations that had already drifted from `app.css`; now there is one file and no copy.
- */
 import overlayTokens from '@/ui/tokens.css?inline';
 
 export const OVERLAY_STYLES = `
 :host {
-  /* Overlay-only, and deliberately not in tokens.css: "all: initial" is what stops the host
-     page's styles from leaking in, and it would be actively wrong on the extension's own pages. */
   all: initial;
   color-scheme: light dark;
 }
@@ -123,11 +54,6 @@ ${overlayTokens}
 .jf-layer--panel { z-index: 4; }
 .jf-layer--toasts { z-index: 5; }
 
-/*
- * Layers are click-through; only the elements that are actually UI opt back in (.jf-card,
- * .jf-spark, .jf-pill, .jf-marker__badge). A host page must never lose a click to an empty
- * region of our overlay.
- */
 .jf-layer * {
   box-sizing: border-box;
   font-family: inherit;
@@ -139,8 +65,6 @@ button {
   margin: 0;
   cursor: pointer;
 }
-
-/* ---- generic controls ------------------------------------------------------------------------ */
 
 .jf-btn {
   display: inline-flex;
@@ -185,8 +109,6 @@ button {
   position: absolute; width: 1px; height: 1px; overflow: hidden;
   clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
 }
-
-/* ---- field markers (F-06 outlines) ------------------------------------------------------------ */
 
 .jf-marker {
   position: fixed;
@@ -239,8 +161,6 @@ button {
 @media (prefers-reduced-motion: reduce) {
   .jf-marker, .jf-marker--pulse { transition: none; animation: none; }
 }
-
-/* ---- floating pill (F-03) --------------------------------------------------------------------- */
 
 .jf-pill {
   position: fixed;
@@ -300,8 +220,6 @@ button {
   line-height: 1;
 }
 .jf-pill__close:hover { background: var(--jf-surface-subtle); color: var(--jf-fg); }
-
-/* ---- review panel (F-06) ---------------------------------------------------------------------- */
 
 .jf-panel {
   position: fixed;
@@ -400,8 +318,6 @@ button {
 .jf-callout__row { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
 .jf-callout ul { margin: 6px 0 0; padding-left: 16px; }
 .jf-callout li { margin: 2px 0; overflow-wrap: anywhere; }
-
-/* ---- sparkle (F-09 / SEC 5.7) ----------------------------------------------------------------- */
 
 .jf-spark {
   position: fixed;
@@ -511,8 +427,6 @@ button {
 @keyframes jf-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .jf-spinner { animation-duration: 2s; } }
 
-/* ---- toasts (SEC 5.6) ------------------------------------------------------------------------- */
-
 .jf-toasts {
   position: fixed;
   right: 16px;
@@ -536,10 +450,6 @@ button {
 .jf-toast__actions { display: flex; gap: 6px; margin-top: 7px; flex-wrap: wrap; }
 `;
 
-/* ------------------------------------------------------------------------------------------------
- * Host creation
- * ---------------------------------------------------------------------------------------------- */
-
 function randomSuffix(): string {
   const c: Crypto | undefined = typeof crypto === 'undefined' ? undefined : crypto;
   if (c && typeof c.getRandomValues === 'function') {
@@ -555,15 +465,10 @@ function randomSuffix(): string {
   return Math.random().toString(16).slice(2, 10).padEnd(8, '0');
 }
 
-/**
- * A valid custom-element name (ASCII lowercase, contains a hyphen) with a per-document random
- * suffix, so no host page can hard-code a selector that reliably hits our layer (SEC 4.4).
- */
 function uniqueTagName(): string {
   return `${OVERLAY_HOST_ID}-${randomSuffix()}`;
 }
 
-/** Geometry that a host page's `!important` rules must not be able to override. */
 const HOST_INLINE_STYLE: ReadonlyArray<readonly [string, string]> = [
   ['all', 'initial'],
   ['position', 'fixed'],
@@ -594,10 +499,6 @@ interface OverlayInternals {
   roots: Map<OverlayLayer, Root>;
 }
 
-/**
- * The closed shadow root lives here and nowhere else. It is never assigned to the host element,
- * never returned from `OverlayHandle`, and never passed outside `src/content/**`.
- */
 let internals: OverlayInternals | null = null;
 
 function applyHostStyle(host: HTMLElement): void {
@@ -616,11 +517,9 @@ function build(): OverlayInternals {
 
   const tagName = uniqueTagName();
   const host = document.createElement(tagName);
-  // Deliberately no `id` and no class: a stable attribute is a stable selector for the host page.
   host.setAttribute('aria-hidden', 'false');
   applyHostStyle(host);
 
-  // SEC 4.4 — CLOSED. `host.shadowRoot` stays null for page scripts.
   const shadow = host.attachShadow({ mode: 'closed' });
 
   const style = document.createElement('style');
@@ -638,7 +537,6 @@ function layerOf(state: OverlayInternals, name: OverlayLayer): HTMLElement {
 
   const el = document.createElement('div');
   el.className = `jf-layer jf-layer--${name}`;
-  // Paint order follows OVERLAY_LAYERS: insert in declaration order rather than call order.
   const index = OVERLAY_LAYERS.indexOf(name);
   let inserted = false;
   for (const candidate of OVERLAY_LAYERS.slice(index + 1)) {
@@ -654,10 +552,6 @@ function layerOf(state: OverlayInternals, name: OverlayLayer): HTMLElement {
   state.layers.set(name, el);
   return el;
 }
-
-/* ------------------------------------------------------------------------------------------------
- * Handle
- * ---------------------------------------------------------------------------------------------- */
 
 function makeHandle(state: OverlayInternals): OverlayHandle {
   return {
@@ -677,7 +571,6 @@ function makeHandle(state: OverlayInternals): OverlayHandle {
       let root = state.roots.get(name);
       if (!root) {
         root = createRoot(container, {
-          // A host page's own errors must never surface as ours, and vice versa.
           onRecoverableError: (error: unknown) => log.debug(`overlay layer ${name} recovered`, error),
         });
         state.roots.set(name, root);
@@ -688,14 +581,9 @@ function makeHandle(state: OverlayInternals): OverlayHandle {
     clear(name: OverlayLayer): void {
       const root = state.roots.get(name);
       if (root) {
-        // Render nothing rather than unmount. `unmount()` is asynchronous enough (and destructive
-        // enough) that a `clear()` immediately followed by a `render()` — which is exactly what a
-        // re-scan does — would tear down the container the new tree had just claimed. Emptying the
-        // tree keeps the root reusable and the DOM correct in every ordering.
         root.render(null);
         return;
       }
-      // Non-React layers (markers, pill) manage their own children; emptying is the whole job.
       state.layers.get(name)?.replaceChildren();
     },
 
@@ -729,11 +617,6 @@ function makeHandle(state: OverlayInternals): OverlayHandle {
 
 let handle: OverlayHandle | null = null;
 
-/**
- * The document's single overlay. Created lazily: importing this module must have no effect on a
- * page, and SEC 9.2 forbids showing any UI until a scan has actually found application-shaped
- * fields, so the first call happens only after that decision.
- */
 export function getOverlay(): OverlayHandle {
   if (internals === null || handle === null) {
     internals = build();
@@ -744,12 +627,10 @@ export function getOverlay(): OverlayHandle {
   return handle;
 }
 
-/** True when the overlay host exists (whether or not it is currently in the document). */
 export function overlayMounted(): boolean {
   return internals !== null;
 }
 
-/** Tear the overlay down. Safe to call when nothing was ever mounted. */
 export function destroyOverlay(): void {
   handle?.destroy();
   handle = null;

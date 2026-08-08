@@ -1,12 +1,3 @@
-/**
- * ui/components/Table.tsx — the sortable data table behind the tracker, the key manager, the
- * Answer Bank and the mappings editor.
- *
- * Sortable headers are real `<button>`s inside `<th>` and carry `aria-sort`, so the sort state is
- * announced rather than implied by a caret. Horizontal overflow scrolls inside the table's own
- * container — a 9-column tracker table must never make the Options page scroll sideways.
- */
-
 import type { ReactElement, ReactNode } from 'react';
 
 import { ChevronDown, ChevronUp } from '@/ui/icons';
@@ -21,12 +12,10 @@ export interface SortState<K extends string> {
 }
 
 export interface Column<T, K extends string = string> {
-  /** Stable identity for React keys; also the sort field when `sortable` is true. */
   key: K;
   header: ReactNode;
   sortable?: boolean;
   align?: 'left' | 'right' | 'center';
-  /** Applied to both the header cell and every body cell in the column. */
   className?: string;
   render: (row: T) => ReactNode;
 }
@@ -89,9 +78,6 @@ export function Table<T, K extends string = string>({
                       className="inline-flex items-center gap-1 rounded-[var(--jf-radius-sm)] hover:text-[var(--jf-fg)]"
                     >
                       {column.header}
-                      {/* The caret is decoration: `aria-sort` on the <th> is what actually carries
-                          the state. An inactive column keeps a faint one so the header reads as
-                          sortable before it is clicked. */}
                       {active && sort.direction === 'asc' ? (
                         <ChevronUp size={12} className="shrink-0" />
                       ) : (
@@ -147,7 +133,6 @@ export function Table<T, K extends string = string>({
   );
 }
 
-/** Flip direction when the same field is clicked twice; otherwise start descending. */
 export function nextSort<K extends string>(current: SortState<K>, field: K): SortState<K> {
   if (current.field !== field) return { field, direction: 'desc' };
   return { field, direction: current.direction === 'desc' ? 'asc' : 'desc' };

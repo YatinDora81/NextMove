@@ -1,45 +1,9 @@
-/**
- * content/pill.ts — the floating "Fill this application" pill (F-03).
- *
- * JF-001 Rev 3.0 · F-03 ("Triggered by toolbar click, floating pill button, or shortcut Alt+J") ·
- * SEC 4.3 Flow A step 1 · SEC 9.2 ("No fingerprinting the user's browsing — JobFill activates its
- * UI only when a form scan finds application-shaped fields").
- *
- * Rules this file follows:
- *
- *   - It renders **nothing** until the orchestrator has decided the page is application-shaped.
- *     `content.ts` owns that decision; this module simply never mounts otherwise. Nothing about a
- *     page that is not an application is recorded anywhere.
- *
- *   - The pill lives inside the overlay's closed shadow root (SEC 4.4), so a host page cannot
- *     restyle it, click it, or detect it through the DOM.
- *
- *   - Dismissal is remembered per domain, in the extension's own storage under a single dedicated
- *     key. The host page's `localStorage` is never touched: writing there would leak the fact that
- *     JobFill is installed to any script on the page.
- *
- *   - INV-1 has nothing to fear here — the pill's only action is to ask the orchestrator to run a
- *     fill. It never touches a page control of any kind.
- *
- * Plain DOM rather than React on purpose: the pill is three elements that exist on every detected
- * application page, and it must be cheap (SEC 03: "keep the bundle small for store review").
- */
-
 import { createLogger } from '@/platform/logger';
 
 import type { OverlayHandle } from './overlay/mount';
 
 const log = createLogger('pill');
 
-/* ------------------------------------------------------------------------------------------------
- * Persistence — one dedicated key, outside the SEC 7.1 slot map
- * ---------------------------------------------------------------------------------------------- */
-
-/**
- * `jf.pill` holds only UI preferences: which domains the user waved the pill away on, and where
- * they dragged it. No page content, no URLs beyond the hostname the user explicitly dismissed on,
- * nothing that survives an uninstall.
- */
 export const PILL_STORAGE_KEY = 'jf.pill';
 
 export interface PillPosition {
@@ -48,7 +12,6 @@ export interface PillPosition {
 }
 
 export interface PillState {
-  /** hostname → epoch ms of the dismissal. */
   dismissed: Record<string, number>;
   position: PillPosition | null;
 }
@@ -100,14 +63,12 @@ async function writeState(state: PillState): Promise<void> {
   }
 }
 
-/** Has the user waved the pill away on this domain? */
 export async function isPillDismissed(domain: string): Promise<boolean> {
   if (domain.length === 0) return false;
   const state = await readState();
   return Object.prototype.hasOwnProperty.call(state.dismissed, domain);
 }
 
-/** Remember that the user dismissed the pill on this domain. */
 export async function dismissPillForDomain(domain: string): Promise<void> {
   if (domain.length === 0) return;
   const state = await readState();
@@ -115,7 +76,6 @@ export async function dismissPillForDomain(domain: string): Promise<void> {
   await writeState(state);
 }
 
-/** Bring the pill back everywhere (Options → "show the fill button again"). */
 export async function clearPillDismissals(): Promise<void> {
   const state = await readState();
   state.dismissed = {};
@@ -132,24 +92,16 @@ export async function savePillPosition(position: PillPosition | null): Promise<v
   await writeState(state);
 }
 
-/* ------------------------------------------------------------------------------------------------
- * The pill
- * ---------------------------------------------------------------------------------------------- */
-
 export interface FillPillOptions {
   overlay: OverlayHandle;
-  /** The user asked for a fill. The orchestrator owns everything that happens next. */
   onFill: () => void;
-  /** The user dismissed the pill. The domain has already been persisted when this fires. */
   onDismiss?: () => void;
-  /** Domain the dismissal is remembered against. Defaults to `location.hostname`. */
   domain?: string;
   label?: string;
 }
 
 const DEFAULT_LABEL = 'Fill this application';
 const EDGE_MARGIN = 16;
-/** Movement under this many pixels is a click, not a drag. */
 const DRAG_SLOP = 4;
 
 export class FillPill {
@@ -179,7 +131,6 @@ export class FillPill {
     return this.shown;
   }
 
-  /** Mount and show the pill. Restores the user's dragged position on first show. */
   show(): void {
     if (this.disposed) return;
     const root = this.ensureRoot();
@@ -207,10 +158,6 @@ export class FillPill {
     if (this.labelEl) this.labelEl.textContent = text;
   }
 
-  /**
-   * Busy state during a fill run. The button is disabled so a second click cannot start a second
-   * concurrent run over the same form.
-   */
   setBusy(busy: boolean, text = 'Filling…'): void {
     this.busy = busy;
     if (this.fillEl) {
@@ -230,8 +177,6 @@ export class FillPill {
     this.labelEl = null;
     this.fillEl = null;
   }
-
-  /* ---- construction ------------------------------------------------------------------------ */
 
   private ensureRoot(): HTMLElement {
     if (this.root !== null && this.root.isConnected) return this.root;
@@ -293,11 +238,8 @@ export class FillPill {
     return root;
   }
 
-  /* ---- placement --------------------------------------------------------------------------- */
-
   private defaultPosition(): PillPosition {
     const height = this.root?.offsetHeight ?? 40;
-    // Bottom-left: the review panel and the toast stack both own the bottom-right corner.
     return { left: EDGE_MARGIN, top: Math.max(EDGE_MARGIN, window.innerHeight - height - EDGE_MARGIN) };
   }
 
@@ -326,8 +268,6 @@ export class FillPill {
     if (!this.shown) return;
     this.applyPosition();
   };
-
-  /* ---- dragging ---------------------------------------------------------------------------- */
 
   private readonly onPointerDown = (event: PointerEvent): void => {
     if (this.root === null || event.button !== 0) return;

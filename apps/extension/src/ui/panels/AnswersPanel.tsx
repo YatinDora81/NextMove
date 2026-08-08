@@ -1,18 +1,3 @@
-/**
- * ui/panels/AnswersPanel.tsx — F-17 / SEC 5.7, the Answer Bank manager.
- *
- * "Options → Answer Bank: search, edit, pin favorites, delete, usage counts, 'used on N
- *  applications' trace."
- *
- * The bank is the reason the free tier stretches: a hit here costs zero API calls, and after ~15
- * applications more than half of screening questions resolve from it. So this screen is about
- * curation — the answers here are reused verbatim on real applications, and a stale one is worse
- * than no answer at all.
- *
- * `{company}` is shown as a highlighted token rather than raw text, because the whole point of the
- * template flag is that an answer written for Acme never lands in a Globex form.
- */
-
 import { useEffect, useState } from 'react';
 import type { ReactElement } from 'react';
 
@@ -86,7 +71,6 @@ export function AnswersPanel(): ReactElement {
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [pendingDelete, setPendingDelete] = useState<AnswerRecord | null>(null);
 
-  // Instant input, debounced query — the lookup is a full scan behind a bus round-trip.
   const [searchInput, setSearchInput] = useState(search);
   const debouncedSearch = useDebouncedValue(searchInput);
 
@@ -99,7 +83,6 @@ export function AnswersPanel(): ReactElement {
     void setSearch(debouncedSearch);
   }, [debouncedSearch, search, setSearch]);
 
-  // The tracker's "answers used" action drives the search from outside this panel.
   useEffect(() => {
     setSearchInput(search);
   }, [search]);
@@ -126,8 +109,6 @@ export function AnswersPanel(): ReactElement {
     const saved = await save({
       qRaw: question,
       answer,
-      // An answer the user typed or corrected in this editor is authored by them, or is an AI
-      // draft they edited — never plain 'ai' (SEC 5.7 provenance).
       source: current.record === null ? 'user' : current.record.source === 'ai' ? 'ai-edited' : current.record.source,
       profileId: current.scope === 'global' ? null : (current.record?.profileId ?? activeProfileId),
       scope: current.scope,

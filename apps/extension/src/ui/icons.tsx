@@ -1,57 +1,12 @@
-/**
- * ui/icons.tsx — the extension's icon set.
- *
- * WHY THIS FILE EXISTS AT ALL. Every icon in the UI used to be a Unicode glyph: `⚙` in the popup
- * header, `✕` on every close button, `▲▼` in table sort headers, `ℹ ✓ ! ×` in Notice, `✨` on the
- * in-page sparkle button. Glyphs are the wrong tool three ways. They resolve to a *font* — a
- * different one per OS, so the same button is a hairline outline on macOS, a heavy black shape on
- * Windows, and a colour emoji on some Android/ChromeOS builds. They sit on the text baseline, so
- * they never optically centre in a button and have to be nudged per-glyph. And they cannot inherit
- * `currentColor` reliably (an emoji presentation glyph ignores `color` entirely), which means the
- * one thing an icon must do in a themed UI — change with its container — is the one thing they
- * cannot do.
- *
- * No icon library, either: SEC 14.1 R-3 keeps `@repo/ui` out, and a dependency whose whole job is
- * to ship 1,500 SVGs so we can use 38 of them is not a trade this bundle makes (SEC 11).
- *
- * DRAWING RULES — hold to these when adding one, or the set stops looking like a set.
- *   · 24×24 viewBox, 22×22 live area (keep every coordinate inside 1…23 so a 2px stroke never
- *     clips at the edge).
- *   · `fill="none"`, `stroke="currentColor"`, round caps and joins.
- *   · Stroke weight 2 up to 23px, 1.5 from 24px up. A 2px stroke that looks correct at 16px reads
- *     as a marker pen at 32px; the step keeps optical weight constant.
- *   · Axis-aligned strokes land on integers so that at 16px (a 2/3 scale) they stay on or near a
- *     device pixel instead of smearing across two. Diagonals and arc endpoints are allowed
- *     fractional coordinates — they antialias regardless, and forcing them to integers distorts
- *     the geometry for no gain.
- *   · Draw for 16px first. Anything with more than ~3 internal details turns to mush at that size;
- *     that is why the gear here has six teeth rather than the conventional eight.
- */
-
 import type { ReactElement, ReactNode, SVGProps } from 'react';
 
 export interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'children'> {
-  /** Rendered box in px, both axes. 16 is the UI default; 20 for section headers, 24+ for empty states. */
   size?: number;
-  /**
-   * Escape hatch for a *standalone* icon — one that is the only content of a button, or is itself
-   * the information. Passing it flips the icon from `aria-hidden` to `role="img"` with this name.
-   * Do NOT pass it next to a visible text label: the label already names the control, and a second
-   * name makes screen readers say it twice.
-   */
   'aria-label'?: string;
 }
 
 export type IconComponent = ((props: IconProps) => ReactElement) & { displayName: string };
 
-/**
- * The shared primitive. Everything below is this plus a `d` attribute.
- *
- * Hidden by default is the right default: an icon nearly always sits beside text that already
- * names the thing, and an unlabelled `<svg>` in the accessibility tree is noise at best. The
- * `focusable="false"` is not redundant — SVG elements are focusable by default in some engines and
- * would otherwise add a dead tab stop between every button.
- */
 function Icon({
   size = 16,
   strokeWidth,
@@ -74,9 +29,6 @@ function Icon({
       strokeLinejoin="round"
       className={className}
       {...rest}
-      // After the spread on purpose: these three are the accessibility contract, and a stray
-      // `{...props}` from a call site must not be able to unset them. `aria-label` is the
-      // supported way to change the outcome.
       role={labelled ? 'img' : undefined}
       aria-label={labelled ? label : undefined}
       aria-hidden={labelled ? undefined : true}
@@ -87,22 +39,12 @@ function Icon({
   );
 }
 
-/** Bind one drawing to a named component. */
 function icon(displayName: string, art: ReactNode): IconComponent {
   const Component = (props: IconProps): ReactElement => <Icon {...props}>{art}</Icon>;
   Component.displayName = displayName;
   return Component;
 }
 
-/* ------------------------------------------------------------------------------------------------
- * Brand
- * ---------------------------------------------------------------------------------------------- */
-
-/**
- * The product mark: an N whose right stem is an arrow climbing out of the letter — "next" and
- * "move" in one figure. Explicitly not a download arrow (which is what the popup header was using
- * as a logo); this one points *up*, and the download arrow lives at `Download` where it belongs.
- */
 export const NextMoveMark = icon(
   'NextMoveMark',
   <>
@@ -111,11 +53,6 @@ export const NextMoveMark = icon(
   </>,
 );
 
-/* ------------------------------------------------------------------------------------------------
- * Chrome — the icons that replace glyphs in the shell
- * ---------------------------------------------------------------------------------------------- */
-
-/** Six-toothed rather than eight: at 16px the extra teeth close up into a grey ring. */
 export const Settings = icon(
   'Settings',
   <>
@@ -209,10 +146,6 @@ export const Upload = icon(
   </>,
 );
 
-/**
- * A 315° arc, not the conventional two half-arrows: two heads at 16px are four pixels of noise,
- * and one unmistakable head reads as "again" just as well.
- */
 export const RefreshCw = icon(
   'RefreshCw',
   <>
@@ -221,12 +154,6 @@ export const RefreshCw = icon(
   </>,
 );
 
-/**
- * Spins by default via the `jf-spin` class in app.css, which also carries the reduced-motion
- * handling (slowed, never stopped — a frozen spinner reads as a hung UI). Passing `className`
- * replaces that, which is what the Shadow-DOM overlay must do: `app.css` does not reach inside the
- * overlay host, so an overlay caller has to supply a class its own stylesheet defines.
- */
 export function Loader({ className = 'jf-spin', ...rest }: IconProps): ReactElement {
   return (
     <Icon className={className} {...rest}>
@@ -235,10 +162,6 @@ export function Loader({ className = 'jf-spin', ...rest }: IconProps): ReactElem
   );
 }
 Loader.displayName = 'Loader';
-
-/* ------------------------------------------------------------------------------------------------
- * Status — the Notice/Toast vocabulary
- * ---------------------------------------------------------------------------------------------- */
 
 export const Info = icon(
   'Info',
@@ -249,7 +172,6 @@ export const Info = icon(
   </>,
 );
 
-/** Stem above, dot below — the mirror of Info, so the two never read as the same icon. */
 export const AlertCircle = icon(
   'AlertCircle',
   <>
@@ -284,17 +206,8 @@ export const Clock = icon(
   </>,
 );
 
-/* ------------------------------------------------------------------------------------------------
- * Actions — fill, AI, sync
- * ---------------------------------------------------------------------------------------------- */
-
-/** The fill action. A bolt, because filling a 40-field Workday form is the "instant" moment. */
 export const Zap = icon('Zap', <path d="M14 2 4 13h7l-1 9 10-11h-7Z" />);
 
-/**
- * AI. The concave curves are the whole icon — a four-point star with straight edges reads as a
- * compass rose, and only the caving-in makes it a sparkle.
- */
 export const Sparkles = icon(
   'Sparkles',
   <>
@@ -304,14 +217,11 @@ export const Sparkles = icon(
   </>,
 );
 
-/** Baseline + two lobes. Flat-bottomed, so it sits level next to text rather than floating. */
 export const Cloud = icon(
   'Cloud',
   <path d="M9.5 18h7a3.5 3.5 0 1 0-1.61-6.61A5.5 5.5 0 1 0 9.5 18Z" />,
 );
 
-/** Synced. The tick hangs below the cloud instead of sitting inside it — inside, at 16px, it is
- * three pixels wide and unreadable. */
 export const CloudCheck = icon(
   'CloudCheck',
   <>
@@ -320,7 +230,6 @@ export const CloudCheck = icon(
   </>,
 );
 
-/** Sync off / offline. */
 export const CloudOff = icon(
   'CloudOff',
   <>
@@ -338,10 +247,6 @@ export const Key = icon(
     <path d="M21 12v3" />
   </>,
 );
-
-/* ------------------------------------------------------------------------------------------------
- * Profile — the Options panels
- * ---------------------------------------------------------------------------------------------- */
 
 export const User = icon(
   'User',
@@ -379,8 +284,6 @@ export const GraduationCap = icon(
   </>,
 );
 
-/** The chain-link form, not the interlocked-rings one: two arcs and a bar survive 16px, four
- * overlapping arcs do not. */
 export const Link = icon(
   'Link',
   <>
@@ -405,10 +308,6 @@ export const MessageSquare = icon(
   'MessageSquare',
   <path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2Z" />,
 );
-
-/* ------------------------------------------------------------------------------------------------
- * Theme — for the toggle the `[data-theme]` hooks in app.css exist to serve
- * ---------------------------------------------------------------------------------------------- */
 
 export const Sun = icon(
   'Sun',

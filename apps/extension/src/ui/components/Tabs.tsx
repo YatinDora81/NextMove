@@ -1,11 +1,3 @@
-/**
- * ui/components/Tabs.tsx — the WAI-ARIA tabs pattern, including roving-tabindex arrow keys.
- *
- * Used for the tracker's Table/Board switch (SEC 6.7) and the resume consent → diff flow. Only the
- * selected tab is in the tab order; ←/→/Home/End move between them, which is what a keyboard user
- * expects and what a plain row of buttons gets wrong.
- */
-
 import { useCallback, useRef } from 'react';
 import type { KeyboardEvent, ReactElement, ReactNode } from 'react';
 
@@ -14,7 +6,6 @@ import { cx } from './cx';
 export interface TabItem<K extends string> {
   key: K;
   label: ReactNode;
-  /** Small trailing count, e.g. the number of rows in a kanban lane. */
   badge?: ReactNode;
 }
 
@@ -22,7 +13,6 @@ export interface TabsProps<K extends string> {
   items: ReadonlyArray<TabItem<K>>;
   value: K;
   onChange: (key: K) => void;
-  /** Accessible name for the tablist; required because these are never the only nav on a page. */
   label: string;
   className?: string;
 }
@@ -91,8 +81,6 @@ export function Tabs<K extends string>({
           >
             {item.label}
             {item.badge === undefined ? null : (
-              // A `--jf-bg-subtle` pill is invisible on the tablist's own `--jf-bg-subtle`
-              // ground; `--jf-border` is the one neutral wash that reads on both tiers.
               <span className="rounded-full bg-[var(--jf-border)] px-1.5 text-[10px] tabular-nums text-[var(--jf-fg-muted)]">
                 {item.badge}
               </span>
@@ -104,7 +92,6 @@ export function Tabs<K extends string>({
   );
 }
 
-/** Panel that belongs to a tab. Hidden panels are unmounted rather than `display:none`. */
 export function TabPanel({
   active,
   children,

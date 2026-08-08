@@ -1,27 +1,5 @@
 "use client"
 
-/**
- * ConnectHandshake — the one-click pairing screen (JF-001 SEC 8.2).
- *
- * ── What it replaces ───────────────────────────────────────────────────────────────────────────
- *
- * Pairing used to be: open Settings, find Connected devices, click "New code", read eight
- * characters off the screen, open the extension options, find the Sync tab, retype them before the
- * five minutes run out. Six steps, each of them a place a new user gives up. Here it is one button,
- * because the page can hand the credential to the extension directly over
- * `chrome.runtime.sendMessage`.
- *
- * ── What actually crosses the wire ─────────────────────────────────────────────────────────────
- *
- *   nonce      proves this page is the tab the extension itself opened; single-use
- *   pairCode   an 8-character, 5-minute, one-shot code the extension redeems for its own JWT
- *   vaultKey   the E2E key, generated in this browser, travelling browser → extension over local
- *              IPC and never through a server
- *
- * The vault key is why the success screen leads with the recovery download rather than burying it:
- * at that moment the key exists in exactly one place in the world, and the user is about to leave.
- */
-
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { motion } from "motion/react"
@@ -51,7 +29,6 @@ import type { BridgeError } from "@/lib/extensionBridge"
 import { cn } from "@/lib/utils"
 import { DEVICE_PAIR_CODE } from "@/utils/url"
 
-/** Same fallback as the public /extension page: the store search resolves before an item id does. */
 const CHROME_STORE_URL =
     process.env.NEXT_PUBLIC_CHROME_STORE_URL ??
     "https://chromewebstore.google.com/search/NextMove%20Autofill"
@@ -65,10 +42,6 @@ interface Outcome {
     version: string
 }
 
-/**
- * The four things that happen after the click, named so that a user watching a spinner can tell
- * what is being done in their name. Order matches `runConnect` exactly.
- */
 const STEPS: { title: string; detail: string }[] = [
     {
         title: "Creating your encryption key",
@@ -109,7 +82,6 @@ function Panel({ children, className }: { children: React.ReactNode; className?:
     )
 }
 
-/** The one thing the browser gives us no API for: pinning. So we describe where to click. */
 function PinCoachMark() {
     return (
         <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/40 p-4">
@@ -144,11 +116,6 @@ export function ConnectHandshake({
     const [deviceName, setDeviceName] = useState<string | null>(null)
     const [keyExported, setKeyExported] = useState(false)
 
-    /**
-     * The nonce from the URL is good for exactly one CONNECT. Once it is spent — successfully or
-     * not — every retry has to ask the extension for a fresh one, so this ref is cleared rather
-     * than re-read from props.
-     */
     const nonceRef = useRef<string | null>(nonce)
 
     const probe = useCallback(async () => {
@@ -176,14 +143,10 @@ export function ConnectHandshake({
         void probe()
     }, [probe])
 
-    // Pull the vault early so a key mismatch surfaces before the user commits to connecting: a
-    // profile sealed on another machine cannot be opened by the key this browser is about to hand
-    // over, and finding that out afterwards is a much worse moment.
     useEffect(() => {
         void load()
     }, [load])
 
-    /** POST /api/devices/pair-code — one 8-character, 5-minute, single-use code. */
     const mintPairCode = useCallback(async (): Promise<string> => {
         const token = await getToken()
         if (token === null || token.length === 0) {
@@ -233,7 +196,6 @@ export function ConnectHandshake({
                 }
                 handshakeNonce = hello.reply.nonce
             }
-            // Spent from here on, whatever happens next.
             nonceRef.current = null
 
             setStepIndex(2)
@@ -284,10 +246,6 @@ export function ConnectHandshake({
         exportRecoveryKey()
         setKeyExported(true)
     }, [exportRecoveryKey])
-
-    /* -------------------------------------------------------------------------------------------
-     * Screens
-     * ----------------------------------------------------------------------------------------- */
 
     if (phase === "detecting") {
         return (
@@ -351,8 +309,6 @@ export function ConnectHandshake({
     }
 
     if (phase === "connected" && outcome !== null) {
-        // A re-pair of an already-connected browser says nothing about whether a profile exists,
-        // so only a fresh connect that pulled nothing is treated as "still needs a profile".
         const needsProfile = !outcome.alreadyPaired && outcome.profilesApplied === 0
         return (
             <Shell>
@@ -416,12 +372,6 @@ export function ConnectHandshake({
                         </ul>
                     </Panel>
 
-                    {/*
-                        The recovery key sits on the success screen and not behind a settings link
-                        because right now is the only moment the user is both holding the key and
-                        paying attention. Once they navigate away it exists in one browser profile
-                        and one extension, and nowhere else in the world.
-                    */}
                     <Panel className="flex flex-col gap-4 border-amber-300 bg-amber-50/60 dark:border-amber-900 dark:bg-amber-950/25">
                         <div className="flex items-center gap-2">
                             <KeyRound className="size-4 text-amber-700 dark:text-amber-300" />
@@ -475,7 +425,6 @@ export function ConnectHandshake({
         )
     }
 
-    // idle · connecting · failed all share the same frame, so the page does not jump on click.
     const running = phase === "connecting"
 
     return (

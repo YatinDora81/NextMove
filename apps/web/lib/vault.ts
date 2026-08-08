@@ -1,26 +1,3 @@
-/**
- * lib/vault.ts — apps/web's seam onto @repo/vault (JF-001 SEC 7.4 / 8.3).
- *
- * The codec itself lives in `packages/vault` because the extension's service worker has to produce
- * and consume byte-identical envelopes. What belongs *here* is everything that is specific to being
- * a web page: where the key is kept, how the envelope is fetched and pushed, and how a user gets a
- * copy of the key they can put in a password manager.
- *
- * ── The one rule ───────────────────────────────────────────────────────────────────────────────
- *
- * The vault key never leaves this browser except by the user's own hand: it goes to the extension
- * over `chrome.runtime.sendMessage` (a local IPC channel) and into a file the user downloads.
- * Nothing in this module puts it in a request body, a header, a query string, or a cookie. That is
- * the entire basis of the server-blind claim — the server stores ciphertext and cannot decrypt it.
- *
- * ── Why the key is per-browser ─────────────────────────────────────────────────────────────────
- *
- * `localStorage` is origin- and profile-scoped, so signing in on a second machine gets you an
- * account but not a key. That is not a bug to be papered over; it is the cost of end-to-end
- * encryption, and the honest answer to it is `downloadRecoveryKey()` — offered before the user
- * leaves onboarding, while the key still exists.
- */
-
 import { buildSyncProfileVault } from "@repo/types/ProfileTypes"
 import type { SharedProfile, SyncProfileVault } from "@repo/types/ProfileTypes"
 import {
@@ -34,28 +11,14 @@ import { SYNC_PROFILE } from "@/utils/url"
 
 export { generateVaultKey, isVaultKey }
 
-/** Where the E2E secret lives. Per-browser by design — see the module header. */
 export const VAULT_KEY_STORAGE_KEY = "nextmove.vaultKey"
 
-/** The `GET`/`PUT /api/sync/profile` body. Mirrors `profileBlobEnvelopeSchema`. */
 export interface ProfileEnvelope {
     ciphertext: string
     nonce: string
     version: number
 }
 
-/* ------------------------------------------------------------------------------------------------
- * Key storage
- * ---------------------------------------------------------------------------------------------- */
-
-/**
- * `window.localStorage` when it is both present and usable.
- *
- * Two separate failures hide behind one property access: server rendering (no `window` at all) and
- * a browser that throws on the getter — Chrome does exactly that when the user has blocked site
- * data, and Safari's private mode has historically thrown on `setItem` instead. Both must degrade
- * to "no persistence" rather than to an exception thrown out of a render.
- */
 function keyStore(): Storage | null {
     if (typeof window === "undefined") return null
     try {
@@ -65,13 +28,6 @@ function keyStore(): Storage | null {
     }
 }
 
-/**
- * The stored vault key, or null when this browser has none.
- *
- * A stored value that is not a well-formed 256-bit key is treated as *absent*, not as an error: a
- * truncated or hand-edited entry would otherwise seal a vault that nothing — including this
- * browser — could ever reopen.
- */
 export function readVaultKey(): string | null {
     const store = keyStore()
     if (store === null) return null
@@ -83,7 +39,6 @@ export function readVaultKey(): string | null {
     }
 }
 
-/** Persists a key. Returns false when the browser refused to store it — the caller must say so. */
 export function writeVaultKey(keyB64: string): boolean {
     if (!isVaultKey(keyB64)) return false
     const store = keyStore()
@@ -106,17 +61,6 @@ export function clearVaultKey(): void {
     }
 }
 
-/* ------------------------------------------------------------------------------------------------
- * Seal / open
- * ---------------------------------------------------------------------------------------------- */
-
-/**
- * Builds the plaintext vault and seals it at `version`.
- *
- * `version` is the optimistic-concurrency counter the server checks: pass `lastKnownVersion + 1`.
- * Every call produces different bytes even for identical input, because the AES-GCM IV is fresh —
- * which is why a 409 can never be retried by resending the same envelope.
- */
 export async function sealVault(
     profiles: readonly SharedProfile[],
     activeProfileId: string | null,
@@ -127,7 +71,6 @@ export async function sealVault(
     return sealProfileVault(vault, rawKeyMaterial(keyB64), version)
 }
 
-/** Decrypts an envelope. Throws `VaultError` — `isVaultError(err)` narrows it, `.code` explains it. */
 export async function openVault(
     envelope: Pick<ProfileEnvelope, "ciphertext" | "nonce">,
     keyB64: string,
@@ -135,17 +78,8 @@ export async function openVault(
     return openProfileVault(envelope, rawKeyMaterial(keyB64))
 }
 
-/* ------------------------------------------------------------------------------------------------
- * Recovery key download
- * ---------------------------------------------------------------------------------------------- */
-
 const RECOVERY_FILE_NAME = "nextmove-recovery-key.txt"
 
-/**
- * The file contents. Written as prose rather than a bare key on purpose: this file will be found
- * months later in a Downloads folder by someone who has forgotten what it is, and it has to explain
- * itself with no context and no product around it.
- */
 function recoveryKeyDocument(keyB64: string): string {
     return [
         "NextMove — profile vault recovery key",
@@ -176,7 +110,6 @@ function recoveryKeyDocument(keyB64: string): string {
     ].join("\n")
 }
 
-/** Triggers a `.txt` download of the key. No-ops during SSR. */
 export function downloadRecoveryKey(keyB64: string): void {
     if (typeof window === "undefined") return
 
@@ -190,14 +123,8 @@ export function downloadRecoveryKey(keyB64: string): void {
     anchor.click()
     anchor.remove()
 
-    // Released on the next task, not this one: revoking synchronously after click has historically
-    // cancelled the download in WebKit.
     window.setTimeout(() => URL.revokeObjectURL(url), 0)
 }
-
-/* ------------------------------------------------------------------------------------------------
- * Transport
- * ---------------------------------------------------------------------------------------------- */
 
 interface ApiEnvelope {
     success: boolean
@@ -209,7 +136,6 @@ function asRecord(value: unknown): Record<string, unknown> {
     return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {}
 }
 
-/** A non-JSON body (a proxy error page, a 502 from the edge) must still read as a failed response. */
 async function readEnvelope(res: Response): Promise<ApiEnvelope> {
     try {
         const parsed: unknown = await res.json()
@@ -233,17 +159,9 @@ function toProfileEnvelope(raw: unknown): ProfileEnvelope | null {
 }
 
 function bearer(token: string): Record<string, string> {
-    // Bearer, never `credentials: "include"` — the API is a separate origin and auth is a JWT the
-    // server action hands us, not a cookie the browser can attach.
     return { Authorization: `Bearer ${token}` }
 }
 
-/**
- * `GET /api/sync/profile`.
- *
- * Returns null when the account has never pushed a vault. That is a normal state for a new account,
- * not an error, and the server says so with a 200 and `data: null`.
- */
 export async function fetchProfileEnvelope(token: string): Promise<ProfileEnvelope | null> {
     const res = await fetch(SYNC_PROFILE, { method: "GET", headers: bearer(token) })
     const body = await readEnvelope(res)
@@ -253,24 +171,11 @@ export async function fetchProfileEnvelope(token: string): Promise<ProfileEnvelo
     return toProfileEnvelope(body.data)
 }
 
-/**
- * The three outcomes of a push, as data rather than as thrown strings.
- *
- * `conflict` is the interesting one and is deliberately not merged into `rejected`: it is the only
- * failure the caller can resolve on its own, and it carries the number needed to do so.
- */
 export type PutEnvelopeResult =
     | { ok: true; version: number }
     | { ok: false; reason: "conflict"; currentVersion: number; message: string }
     | { ok: false; reason: "rejected"; message: string }
 
-/**
- * `PUT /api/sync/profile` under optimistic locking.
- *
- * A 409 means another device advanced the vault while we were editing. Resending this same envelope
- * at `currentVersion + 1` would push *our* content over theirs; resending it unchanged would 409
- * again. Neither is correct — the caller must re-GET, merge, re-seal, and push once more.
- */
 export async function putProfileEnvelope(
     token: string,
     envelope: ProfileEnvelope,
@@ -284,8 +189,6 @@ export async function putProfileEnvelope(
 
     if (res.status === 409) {
         const data = asRecord(body.data)
-        // Falling back to `envelope.version - 1` keeps the caller's arithmetic sane if the server
-        // ever omits the field; the caller re-GETs anyway and prefers the version it reads there.
         const currentVersion =
             typeof data.currentVersion === "number" ? data.currentVersion : Math.max(0, envelope.version - 1)
         return {

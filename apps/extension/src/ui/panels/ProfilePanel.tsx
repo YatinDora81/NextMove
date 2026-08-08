@@ -1,16 +1,3 @@
-/**
- * ui/panels/ProfilePanel.tsx — F-01, the profile vault editor.
- *
- * The complete SEC 7.2 shape, in one screen: personal, address, links, work[] with bullets,
- * education[], skills, work authorization & sponsorship, EEO (with the global decline-to-state
- * switch), compensation, notice period and custom Q&A — plus the F-01 completeness meter, which
- * doubles as a to-do list rather than a vanity percentage.
- *
- * Editing is local-draft-then-save: the form never writes through on keystroke, so a half-typed
- * email can never reach a fill run. `PROFILE_SAVE` over the bus is the only write path (SEC 4.2 —
- * the Options app owns vault CRUD, the service worker owns storage).
- */
-
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactElement } from 'react';
 
@@ -44,11 +31,6 @@ import {
 import { computeCompleteness } from '@/ui/completeness';
 import { selectEditingProfile, useProfilesStore } from '@/ui/store';
 
-/* ------------------------------------------------------------------------------------------------
- * Draft state
- * ---------------------------------------------------------------------------------------------- */
-
-/** Deep-ish clone so nested edits never mutate the store's copy. */
 function cloneProfile(profile: Profile): Profile {
   return {
     ...profile,
@@ -96,10 +78,6 @@ function newAnswer(): ProfileAnswer {
   return { q: '', a: '', reusable: true };
 }
 
-/* ------------------------------------------------------------------------------------------------
- * Panel
- * ---------------------------------------------------------------------------------------------- */
-
 export function ProfilePanel(): ReactElement {
   const stored = useProfilesStore(selectEditingProfile);
   const profiles = useProfilesStore((state) => state.profiles);
@@ -110,8 +88,6 @@ export function ProfilePanel(): ReactElement {
 
   const [draft, setDraft] = useState<Profile | null>(null);
 
-  // Re-seed the form when a different profile is selected, or when the stored copy changes
-  // underneath us (a resume import writing into the same profile, for instance).
   useEffect(() => {
     setDraft(stored === null ? null : cloneProfile(stored));
   }, [stored]);
@@ -133,7 +109,6 @@ export function ProfilePanel(): ReactElement {
     else toast.ok('Profile saved.');
   }, [draft, save]);
 
-  // Ctrl/Cmd+S saves, because this is a form with sixty inputs and people will reach for it.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 's') return;
@@ -907,10 +882,6 @@ export function ProfilePanel(): ReactElement {
   );
 }
 
-/* ------------------------------------------------------------------------------------------------
- * Pieces
- * ---------------------------------------------------------------------------------------------- */
-
 function CompletenessCard({
   score,
   missing,
@@ -957,7 +928,6 @@ function CompletenessCard({
   );
 }
 
-/** `needsSponsorship: Record<countryCode, boolean>` — an editable list of country/answer pairs. */
 function SponsorshipEditor({
   value,
   onChange,

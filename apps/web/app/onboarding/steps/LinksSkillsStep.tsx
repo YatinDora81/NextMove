@@ -1,13 +1,5 @@
 "use client"
 
-/**
- * Step 4 — Links & skills.
- *
- * The three named links get normalised on blur: people paste "linkedin.com/in/name" far more often
- * than they paste a full URL, and rejecting that would be pedantry. We add the scheme, then
- * validate — so the error only ever fires on something genuinely unusable.
- */
-
 import { Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,7 +16,6 @@ import {
 
 type NamedLink = "linkedin" | "github" | "portfolio"
 
-/** "github.com/me" → "https://github.com/me". Anything already schemed, or clearly not a host, is left alone. */
 function normaliseUrl(raw: string): string {
     const trimmed = raw.trim()
     if (trimmed === "") return ""
@@ -47,8 +38,6 @@ export function LinksSkillsStep({ draft, errors, patch, onBlurField }: StepProps
             next[key] = normalised
             patch({ links: next })
         }
-        // Validate what we just wrote, not what the user typed — otherwise "github.com/me" would
-        // be flagged in the same frame we fixed it.
         onBlurField(`links.${key}`, normalised)
     }
 

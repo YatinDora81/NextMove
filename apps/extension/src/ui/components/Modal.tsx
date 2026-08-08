@@ -1,12 +1,3 @@
-/**
- * ui/components/Modal.tsx — a focus-trapping dialog built on the native `<dialog>` element.
- *
- * `showModal()` gives us the top layer, the backdrop, inert background content and Escape-to-close
- * for free — all things a div-with-position-fixed has to reimplement badly. The only things added
- * here are returning focus to the opener and routing the native `cancel` event through `onClose`,
- * so a destructive dialog (wipe everything) can never be dismissed into an ambiguous state.
- */
-
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactElement, ReactNode, SyntheticEvent } from 'react';
 
@@ -22,7 +13,6 @@ export interface ModalProps {
   description?: ReactNode;
   children?: ReactNode;
   footer?: ReactNode;
-  /** The resume consent screen wants a wide one; a confirmation wants a narrow one. */
   width?: 'sm' | 'md' | 'lg';
 }
 
@@ -56,7 +46,6 @@ export function Modal({
 
   const onCancel = useCallback(
     (event: SyntheticEvent<HTMLDialogElement>) => {
-      // Escape must go through React state, or `open` and the DOM drift apart.
       event.preventDefault();
       onClose();
     },
@@ -69,13 +58,9 @@ export function Modal({
       onCancel={onCancel}
       aria-modal="true"
       className={cx(
-        // `m-auto` is not cosmetic: Tailwind's preflight zeroes every margin, including the UA
-        // stylesheet's `margin:auto` that is the only thing centring a top-layer <dialog>. Without
-        // it every modal in the app pins itself to the top-left corner of the viewport.
         'm-auto w-[calc(100vw-2rem)] rounded-[var(--jf-radius)] border border-[var(--jf-border)] p-0',
         'bg-[var(--jf-surface)] text-[var(--jf-fg)] shadow-[var(--jf-shadow)]',
         'backdrop:bg-black/45',
-        // Grows from its own centre when the top layer shows it — see `.jf-pop` in app.css.
         'jf-pop',
         WIDTH[width],
       )}
@@ -88,8 +73,6 @@ export function Modal({
               <p className="mt-1 text-xs leading-relaxed text-[var(--jf-fg-muted)]">{description}</p>
             )}
           </div>
-          {/* The Button already carries the accessible name, so the icon stays aria-hidden —
-              labelling both would make a screen reader say "Close dialog" twice. */}
           <Button
             variant="ghost"
             size="sm"
@@ -100,8 +83,6 @@ export function Modal({
             <Close size={16} />
           </Button>
         </header>
-        {/* A confirmation without a `confirmWord` passes `null` here; rendering the scroller
-            anyway leaves ~40px of empty box between the question and its buttons. */}
         {children === undefined || children === null ? null : (
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
         )}
@@ -115,10 +96,6 @@ export function Modal({
   );
 }
 
-/**
- * Destructive confirmation. `confirmWord` forces the user to type something ("WIPE") before the
- * action arms — reserved for the SEC 9.2 wipe, which is genuinely unrecoverable.
- */
 export function ConfirmModal({
   open,
   onClose,
@@ -140,7 +117,6 @@ export function ConfirmModal({
 }): ReactElement {
   const [typed, setTyped] = useState('');
 
-  // Every open starts from a blank confirmation — a leftover "WIPE" must never pre-arm the button.
   useEffect(() => {
     if (open) setTyped('');
   }, [open]);

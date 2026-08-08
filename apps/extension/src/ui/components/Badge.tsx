@@ -1,15 +1,3 @@
-/**
- * ui/components/Badge.tsx — status pills, the key-status dot, and the completeness meter.
- *
- * The key-status palette is fixed by app.css (`--jf-key-*`) so a COOLDOWN badge in the popup and a
- * COOLDOWN row in Options are the same colour. Colour is never the only carrier: every badge also
- * spells its status out.
- *
- * Badge text is 12px, not 11px. A pill sits on a tinted field at ~4.5:1 rather than on the page, so
- * it is the worst place in the UI to spend the last legible point of type size — and in the popup
- * these pills carry the tracker's status, which is information, not decoration.
- */
-
 import type { ReactElement, ReactNode } from 'react';
 
 import type { KeyStatus } from '@repo/rotation';
@@ -60,10 +48,6 @@ export function Badge({
   );
 }
 
-/* ------------------------------------------------------------------------------------------------
- * Key-pool status (SEC 5.4)
- * ---------------------------------------------------------------------------------------------- */
-
 export const KEY_STATUS_TONE: Record<KeyStatus, BadgeTone> = {
   ACTIVE: 'ok',
   COOLDOWN: 'warn',
@@ -85,7 +69,6 @@ export const KEY_STATUS_LABEL: Record<KeyStatus, string> = {
   DEAD: 'Rejected by Google',
 };
 
-/** A coloured dot with an accessible name — used in the popup's at-a-glance pool row. */
 export function StatusDot({
   status,
   label,
@@ -116,16 +99,11 @@ export function KeyStatusBadge({ status }: { status: KeyStatus }): ReactElement 
   );
 }
 
-/* ------------------------------------------------------------------------------------------------
- * Completeness meter (F-01)
- * ---------------------------------------------------------------------------------------------- */
-
 export function Meter({
   value,
   label,
   className,
 }: {
-  /** 0–100. */
   value: number;
   label?: ReactNode;
   className?: string;

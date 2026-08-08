@@ -1,17 +1,3 @@
-/**
- * ui/panels/MappingsPanel.tsx — F-13, the learn-from-correction editor.
- *
- * "Unmatched field → user picks profile path from a dropdown once → mapping saved per
- *  (domain, field-signature-hash) and replayed forever. Mappings exportable."
- *
- * A saved mapping scores 100 in the matcher — above the adapter map, above the `autocomplete`
- * attribute, above every heuristic. That authority is exactly why it needs a screen: a wrong
- * mapping is a wrong fill on that site forever, and this is where you fix or forget one.
- *
- * There is no bus message that lists every domain (`FIELD_MAP_GET` answers for one), so the editor
- * reads the `jf.mappings` slot through the typed storage layer.
- */
-
 import { useEffect, useId, useMemo, useState } from 'react';
 import type { ReactElement } from 'react';
 
@@ -86,8 +72,6 @@ export function MappingsPanel(): ReactElement {
     if (file === null) return;
     try {
       const parsed: unknown = JSON.parse(await readFileAsText(file));
-      // Zod is the gate: a malformed mappings file must never reach the matcher, where every entry
-      // outranks the adapter map.
       const result = mappingStoreSchema.safeParse(parsed);
       if (!result.success) {
         toast.error('That file is not a NextMove mappings export.');

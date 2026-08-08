@@ -1,14 +1,5 @@
 "use client"
 
-/**
- * JF-001 SEC 7.2 — the field atoms every onboarding step is built from.
- *
- * These exist so the seven steps look like one form rather than seven forms: one label/hint/error
- * geometry, one chip, one repeater card. `react-hook-form` is deliberately absent — shadcn's `form`
- * primitive is not installed in this app and the wizard's state already lives in a single reducer,
- * so a second state library would only add a synchronisation problem.
- */
-
 import { useId, useState } from "react"
 import { ArrowDown, ArrowUp, ChevronDown, Plus, Trash2, X } from "lucide-react"
 import type { SharedProfile } from "@repo/types/ProfileTypes"
@@ -17,20 +8,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 
-/** Dotted paths ("personal.email") so an error can be addressed without a nested error object. */
 export type FieldErrors = Record<string, string>
 
-/** The contract every data-collecting step is handed by the wizard. */
 export type StepProps = {
     draft: SharedProfile
     errors: FieldErrors
-    /** Shallow one-level merge, mirroring `ProfileVaultApi.update`. */
     patch: (patch: Partial<SharedProfile>) => void
-    /**
-     * Validate a single field. Called on blur only — never on keystroke. The value is passed
-     * explicitly rather than read back off `draft`, so a handler that normalises-then-validates
-     * (the link fields do exactly that) checks the value it just wrote, not the pre-patch one.
-     */
     onBlurField: (field: string, value: string) => void
 }
 
@@ -43,11 +26,6 @@ export function StepHeader({ title, description }: { title: string; description:
     )
 }
 
-/**
- * A titled group inside a step. The wizard's rule is at most ~6 inputs visible at once; when a step
- * genuinely needs more (name + address, authorisation + EEO) it splits here rather than paginating,
- * because those pairs are one mental task each.
- */
 export function SubSection({
     title,
     hint,
@@ -150,11 +128,6 @@ export function TextField({
     )
 }
 
-/**
- * Free-text list input (skills, extra links). Enter and comma commit; Backspace on an empty input
- * removes the last chip, which is the behaviour people already have muscle memory for from every
- * email "To:" field.
- */
 export function ChipInput({
     label,
     values,
@@ -174,7 +147,6 @@ export function ChipInput({
     const [buffer, setBuffer] = useState("")
 
     const commit = (raw: string) => {
-        // One paste of "React, TypeScript, Node" should become three chips, not one.
         const parts = raw
             .split(",")
             .map((part) => part.trim())
@@ -226,7 +198,6 @@ export function ChipInput({
     )
 }
 
-/** A press-to-select pill. Used for the country lists, where the option set is short and fixed. */
 export function ToggleChip({
     label,
     selected,
@@ -258,11 +229,6 @@ export function ToggleChip({
     )
 }
 
-/**
- * One entry in a repeater (a job, a degree). Collapsed by default so a five-role history is a
- * five-line list rather than thirty inputs; reordering is up/down buttons instead of drag, because
- * drag-and-drop would mean a new dependency and a keyboard fallback we would have to build anyway.
- */
 export function RepeaterCard({
     title,
     subtitle,
@@ -367,7 +333,6 @@ export function EmptyRepeaterState({ title, body }: { title: string; body: strin
     )
 }
 
-/** Move `index` by `delta`, returning a new array. Out-of-range moves return the input untouched. */
 export function moveItem<T>(items: readonly T[], index: number, delta: number): T[] {
     const target = index + delta
     if (target < 0 || target >= items.length) return [...items]

@@ -1,19 +1,5 @@
 "use client"
 
-/**
- * Step 5 — Work eligibility, and the voluntary EEO block.
- *
- * Two questions get asked on essentially every application form in the world: "are you legally
- * authorised to work in X?" and "will you now or in the future require sponsorship?". They are not
- * the same question and the honest answer to both can be yes, so the model keeps them as two
- * independent country lists rather than one toggle.
- *
- * The EEO block is different in kind: it is voluntary, it is collected for reporting rather than
- * for hiring, and a product that silently pre-fills it would be making a decision on the user's
- * behalf. So the copy says so plainly, "decline to state" is a first-class switch, and turning it
- * on disables the rest instead of hiding it — the answers stay put in case it is turned back off.
- */
-
 import { Info } from "lucide-react"
 import type { ProfileEeo, RemotePreference } from "@repo/types/ProfileTypes"
 import { Input } from "@/components/ui/input"
@@ -30,7 +16,6 @@ import {
 import { cn } from "@/lib/utils"
 import { ChipInput, StepHeader, SubSection, ToggleChip, type StepProps } from "@/app/onboarding/steps/fields"
 
-/** The jurisdictions application forms actually name. Anything else goes in the free-text list. */
 const COMMON_COUNTRIES: readonly string[] = [
     "United States",
     "Canada",
@@ -118,8 +103,6 @@ export function EligibilityStep({ draft, patch }: StepProps) {
         patch({ authorization: { ...authorization, authorizedIn } })
     }
 
-    // `needsSponsorship` is a country → boolean map; a country is "off" when its entry is removed,
-    // not when it is set to false, so the map never accumulates dead keys.
     const sponsorshipCountries = Object.keys(authorization.needsSponsorship).filter(
         (country) => authorization.needsSponsorship[country] === true,
     )

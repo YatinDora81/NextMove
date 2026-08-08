@@ -1,34 +1,3 @@
-/**
- * content/overlay/ReviewPanel.tsx — F-06 Review-Before-Submit.
- *
- * JF-001 Rev 3.0 · SEC 4.3 Flow A step 6-7:
- *   "OverlayUI outlines results — blue = filled, yellow = low confidence, red = unmatched (each red
- *    row offers 'map this field'). Fill stats sent to TrackerService. Human submits. JobFill stops."
- *
- * Everything the panel promises is enforced elsewhere in code, and the panel's job is to make that
- * promise legible:
- *
- *   INV-1  Submit is never clicked programmatically. When the adapter located the wizard's "next
- *          step" control, the panel offers a **Show me** affordance that scrolls to it and outlines
- *          it (`FieldMarkers`, tone `next`). There is no code path from this component to
- *          `element.click()` — the human presses the button.
- *
- *   INV-4  Rows report what actually happened, not what was intended: a value the FillEngine wrote
- *          but could not verify arrives here as `suggested`, not `filled`.
- *
- *   F-13   Every red row carries a profile-path picker. One save sends `FIELD_MAP_SAVE` and the
- *          mapping replays forever for `(domain, sigHash)`.
- *
- *   SEC 4.4 Cross-origin frames this scanner could not traverse are listed honestly ("this form is
- *          inside a frame we can't access") rather than quietly dropped from the totals.
- *
- * SEC 9.2: labels, values and frame descriptions are page-derived and therefore untrusted. They are
- * passed to React as text children (which sets `textContent`); this file contains no
- * `dangerouslySetInnerHTML` and builds no markup from page strings.
- *
- * No JSX — `apps/extension/tsconfig.json` sets no `jsx` factory, so this file uses `createElement`.
- */
-
 import {
   createElement as h,
   useCallback,
@@ -38,54 +7,36 @@ import {
   type ReactNode,
 } from 'react';
 
-/* ------------------------------------------------------------------------------------------------
- * Shapes
- * ---------------------------------------------------------------------------------------------- */
-
-/** The F-06 legend: blue / yellow / red. */
 export type ReviewTone = 'filled' | 'suggested' | 'unmatched';
 
 export interface ReviewRow {
-  /** Stable row id; also the `FieldMarkers` id, so "Show" can reveal the right outline. */
   id: string;
-  /** `FieldSignature.hash` — the `(domain, sigHash)` half of an F-13 mapping. */
   hash: string;
   tone: ReviewTone;
-  /** Resolved field label. Untrusted page text. */
   label: string;
-  /** Section heading the field sits under, when the scanner found one. Untrusted page text. */
   section: string;
-  /** Profile path the matcher chose, or null when nothing scored above the floor. */
   path: string | null;
-  /** What was written (or proposed for a yellow row). Rendered as text. */
   value: string;
-  /** 0-100 matcher score (SEC 6.3). */
   score: number;
   required: boolean;
-  /** Engine reason code for a skip/error (`no-value`, `value-not-committed`, …). */
   reason?: string;
 }
 
-/** SEC 4.4 — a frame this scanner could not traverse. */
 export interface UnreachableFrameNote {
   description: string;
   origin: string;
   reason: string;
 }
 
-/** A child frame that ran its own scanner and reported back to the top frame. */
 export interface FrameContribution {
-  /** Browser-supplied `event.origin` of the reporting frame — never the frame's own claim. */
   origin: string;
   filled: number;
   suggested: number;
   skipped: number;
 }
 
-/** The wizard control the adapter located. INV-1: located and highlighted, never clicked. */
 export interface NextStepInfo {
   kind: 'next' | 'submit';
-  /** Accessible name of the control. Untrusted page text. */
   label: string;
 }
 
@@ -98,32 +49,22 @@ export interface ReviewStats {
 }
 
 export interface ReviewPanelProps {
-  /** Human-facing adapter name ("Greenhouse", "this site"). */
   atsLabel: string;
-  /** Host the F-13 mapping will be saved against. */
   domain: string;
   stats: ReviewStats;
   rows: readonly ReviewRow[];
-  /** Every path the matcher can produce, for the F-13 picker. */
   profilePaths: readonly string[];
   unreachableFrames: readonly UnreachableFrameNote[];
   frameContributions: readonly FrameContribution[];
-  /** The scanner hit its field ceiling — say so rather than imply the list is complete. */
   truncated: boolean;
   nextStep: NextStepInfo | null;
-  /** A refill is in flight. */
   busy: boolean;
   onRevealRow: (id: string) => void;
   onRevealNextStep: () => void;
-  /** Persist an F-13 mapping. Resolves false when the save failed. */
   onMapField: (row: ReviewRow, path: string) => Promise<boolean>;
   onRefill: () => void;
   onClose: () => void;
 }
-
-/* ------------------------------------------------------------------------------------------------
- * Copy helpers
- * ---------------------------------------------------------------------------------------------- */
 
 const TONE_LABEL: Readonly<Record<ReviewTone, string>> = {
   filled: 'Filled',
@@ -131,7 +72,6 @@ const TONE_LABEL: Readonly<Record<ReviewTone, string>> = {
   unmatched: 'Needs you',
 };
 
-/** Turns an engine reason code into something a human can act on. */
 function reasonCopy(reason: string | undefined): string | null {
   switch (reason) {
     case undefined:
@@ -173,7 +113,6 @@ function frameReasonCopy(reason: string): string {
   }
 }
 
-/** `personal.firstName` → `Personal · First name`. Paths are ours, so this is safe formatting. */
 export function prettyPath(path: string): string {
   return path
     .replace(/\[(\d+)\]/g, ' $1')
@@ -188,10 +127,6 @@ export function prettyPath(path: string): string {
     .join(' · ');
 }
 
-/* ------------------------------------------------------------------------------------------------
- * F-13 — map this field
- * ---------------------------------------------------------------------------------------------- */
-
 interface FieldMapperProps {
   row: ReviewRow;
   paths: readonly string[];
@@ -199,10 +134,6 @@ interface FieldMapperProps {
   onMapField: (row: ReviewRow, path: string) => Promise<boolean>;
 }
 
-/**
- * "Unmatched field → user picks profile path from a dropdown once → mapping saved per
- * (domain, field-signature-hash) and replayed forever" (F-13).
- */
 function FieldMapper({ row, paths, domain, onMapField }: FieldMapperProps): ReactElement {
   const [choice, setChoice] = useState<string>(row.path ?? '');
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
@@ -255,10 +186,6 @@ function FieldMapper({ row, paths, domain, onMapField }: FieldMapperProps): Reac
       : null,
   );
 }
-
-/* ------------------------------------------------------------------------------------------------
- * Rows
- * ---------------------------------------------------------------------------------------------- */
 
 interface RowProps {
   row: ReviewRow;
@@ -314,10 +241,6 @@ function Row({ row, paths, domain, onRevealRow, onMapField }: RowProps): ReactEl
   );
 }
 
-/* ------------------------------------------------------------------------------------------------
- * Panel
- * ---------------------------------------------------------------------------------------------- */
-
 export function ReviewPanel(props: ReviewPanelProps): ReactElement {
   const {
     atsLabel,
@@ -371,7 +294,6 @@ export function ReviewPanel(props: ReviewPanelProps): ReactElement {
   const notices: ReactNode[] = [];
 
   if (nextStep !== null) {
-    // INV-1 — located and highlighted, never clicked.
     notices.push(
       h(
         'div',

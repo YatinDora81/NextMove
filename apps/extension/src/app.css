@@ -1,37 +1,3 @@
-/**
- * app.css — the token layer and shell stylesheet for the popup and options surfaces.
- *
- * JF-001 SEC 03: React 19 + Tailwind v4 + Zustand. The extension's UI is its own, tiny by design
- * (SEC 14.1 R-3) — @repo/ui is never imported here, so every token the popup/options shell needs
- * is declared below rather than inherited from the web app's design system.
- *
- * In-page overlays render inside a Shadow DOM host (`OVERLAY_HOST_ID`) and get their own
- * stylesheet (`OVERLAY_STYLES` in content/overlay/mount.ts); nothing in this file may leak into a
- * host page, and nothing here is imported from there.
- *
- * HOW THE THEME IS STRUCTURED — read this before editing a colour.
- *
- *   1. Every colour value in the system is written exactly once, as a `--jf-l-*` (light) or
- *      `--jf-d-*` (dark) RAMP entry in `:root`. Ramps live outside every media query, so no colour
- *      is reachable only when the OS happens to be in one mode — which is what made the old file's
- *      dark palette impossible to audit or to force from a toggle.
- *   2. Semantic tokens (`--jf-fg`, `--jf-surface`, …) are `var()` aliases onto a ramp. They are the
- *      only names components may use.
- *   3. Dark mode swaps the aliases, never the values. The swap block appears twice — once under
- *      `prefers-color-scheme: dark` for the OS preference, once under `[data-theme="dark"]` so a
- *      future in-app toggle can beat the OS in both directions. Both blocks are pure `var()`
- *      remaps, so they cannot drift from the ramps.
- *
- * Contrast floors this file holds to, verified in both themes against all four surface tiers:
- * body text ≥ 4.5:1, and control borders / status dots / focus rings ≥ 3:1. `--jf-fg-subtle` used
- * to sit at 3.05:1 on white (it was #8a939f) while carrying 11px popup labels; it is 4.8:1 now.
- * If you re-tune a ramp entry, re-check it — the popup's smallest type rides on these.
- *
- * Chrome floor is 116 (manifest `minimum_chrome_version`), so `light-dark()` (123) is off the
- * table here even though it would collapse the two swap blocks into nothing. `color-mix()` (111)
- * is fair game and is how the soft fills stay derived rather than hand-listed per theme.
- */
-
 @import "tailwindcss";
 @import "./ui/tokens.css";
 
@@ -65,20 +31,6 @@
   --font-jf-mono: var(--jf-font-mono);
 }
 
-/* ------------------------------------------------------------------------------------------------
- * Shell
- * ---------------------------------------------------------------------------------------------- */
-
-/* The root font size stays at the browser default (16px) ON PURPOSE.
- *
- * It used to be 14px, which quietly rescaled the entire UI: every rem-based Tailwind utility is
- * relative to the ROOT, not to `body`, so `text-xs` rendered at 10.5px, `text-sm` at 12.25px and
- * `h-8` at 28px. That is why the Options panels measured cramped and sub-AA no matter what the
- * source said — the values in the source were never the values on screen. It also means a user who
- * has raised their browser's default font size gets the scaling they asked for.
- *
- * The 14px base type SEC 12 calls for now lives on `body`, where it belongs: it sets inherited text
- * without touching the rem unit. */
 html {
   margin: 0;
   padding: 0;
@@ -98,12 +50,9 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* The popup is a fixed-width sheet; the options page is a full document. */
 body.jf-popup {
   width: var(--jf-popup-width);
   min-height: 220px;
-  /* Chrome sizes the popup to its document and then clips at ~600px with no scrollbar of its own.
-     Capping here means a long key list scrolls inside our sheet instead of being silently cut. */
   max-height: var(--jf-popup-max-height);
   overflow-x: hidden;
   overflow-y: auto;
@@ -118,8 +67,6 @@ body.jf-options {
   isolation: isolate;
 }
 
-/* Chrome-only, and this stylesheet only ever runs in Chrome. `scrollbar-width` is 121+, above the
-   116 floor, so the webkit pseudo-elements are the portable spelling here. */
 .jf-popup ::-webkit-scrollbar,
 .jf-popup::-webkit-scrollbar {
   width: 10px;
@@ -149,20 +96,11 @@ body.jf-options {
   background: color-mix(in srgb, var(--jf-accent) 28%, transparent);
 }
 
-/* Keys are always masked, never revealed (INV-5 / SEC 5.3). */
 .jf-key-mask {
   font-family: var(--jf-font-mono);
   letter-spacing: 0.02em;
   user-select: none;
 }
-
-/* ------------------------------------------------------------------------------------------------
- * Motion
- *
- * Opacity and transform only — those are the two properties the compositor can animate without a
- * layout or paint pass, which is what keeps a 360px popup from dropping frames on the first render
- * while React is still hydrating panels behind it.
- * ---------------------------------------------------------------------------------------------- */
 
 @keyframes jf-fade-in {
   from {
@@ -197,28 +135,23 @@ body.jf-options {
   }
 }
 
-/* Panels and cards on first paint. */
 .jf-enter {
   animation: jf-rise-in var(--jf-duration) var(--jf-ease) both;
 }
 
-/* Content swaps inside an already-visible container — no travel, just a cross-fade. */
 .jf-enter-fast {
   animation: jf-fade-in var(--jf-duration-fast) var(--jf-ease) both;
 }
 
-/* Modals, popovers, menus: they grow from the click, so they scale rather than travel. */
 .jf-pop {
   animation: jf-pop-in var(--jf-duration-fast) var(--jf-ease-out) both;
   transform-origin: var(--jf-pop-origin, center);
 }
 
-/* Toasts enter from the edge they are docked to. */
 .jf-slide {
   animation: jf-slide-in var(--jf-duration-slow) var(--jf-ease-out) both;
 }
 
-/* Staggering a short list reads as one gesture; past ~3 items it reads as lag, so the scale stops. */
 .jf-delay-1 {
   animation-delay: 40ms;
 }
@@ -245,9 +178,6 @@ body.jf-options {
     scroll-behavior: auto !important;
   }
 
-  /* The blanket rule above collapses an animation to its final frame, which is right for every
-     enter transition — but `both` fill plus a 0.01ms duration would leave these mid-flight for one
-     frame, and a staggered list would flash. Pin the end state explicitly. */
   .jf-enter,
   .jf-enter-fast,
   .jf-pop,
@@ -263,8 +193,6 @@ body.jf-options {
     animation-delay: 0ms !important;
   }
 
-  /* A busy indicator that stops turning reads as a hung UI, and "reduce" is not "remove" (WCAG
-     2.3.3 is about large, distracting movement). A 16px spinner at half speed is neither. */
   .jf-spin {
     animation: jf-spin 1800ms linear infinite !important;
   }

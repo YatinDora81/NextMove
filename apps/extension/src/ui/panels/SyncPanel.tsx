@@ -1,28 +1,3 @@
-/**
- * ui/panels/SyncPanel.tsx — F-15 / SEC 8.2, optional pairing with a NextMove account.
- *
- * INV-3 is the whole design of this screen: JobFill works completely with the NextMove backend
- * switched off, deleted, or unreachable. So every state here degrades to "Not connected" — a failed
- * `SYNC_STATUS` is not an error banner, it is simply the disconnected state, and nothing else in
- * the extension changes behaviour because of it.
- *
- * Two things are stated plainly and repeatedly, because they are the reason this feature is safe to
- * offer at all: **API keys are never synced, and neither is the Answer Bank** (SEC 7.4 note, F-15).
- * The profile travels as ciphertext the server cannot read.
- *
- * ── Why there are two connect paths ───────────────────────────────────────────────────────────
- *
- * The primary one is a single button. The web app mints the pairing code, reads the extension's
- * nonce and hands both back over `chrome.runtime.sendMessage` — the user types nothing, and the
- * vault key crosses from web to extension without ever being rendered as text a shoulder-surfer or
- * a clipboard manager could take.
- *
- * The manual code entry is still here, collapsed, because that handshake needs
- * `externally_connectable`, which not every Chromium build honours (enterprise policy can disable
- * it, and Firefox has no equivalent). Deleting it would leave those users with no way in at all,
- * so it stays — same message, same validation, same five-minute single-use code.
- */
-
 import { useCallback, useEffect, useState } from 'react';
 import type { ReactElement } from 'react';
 
@@ -70,7 +45,6 @@ function defaultDeviceName(): string {
   return 'Chrome';
 }
 
-/** Strip anything outside the SEC 8.2 alphabet as the user types — no 0/O/1/I/L to mistype. */
 function sanitizeCode(raw: string): string {
   return [...raw.toUpperCase()]
     .filter((char) => PAIR_CODE_ALPHABET.includes(char))
@@ -102,13 +76,8 @@ export function SyncPanel(): ReactElement {
 
   const paired = state?.paired === true;
 
-  // The handshake completes in the *other* tab, and its only visible effect here is a stale
-  // "Not connected". Re-reading status when this tab comes back into view is what makes the
-  // one-click flow feel like one click rather than "now press Refresh". Only while unpaired:
-  // once connected there is nothing a foreign tab can change that a 5-minute alarm will not.
   useEffect(() => {
     if (paired) return;
-    // `visibilitychange` and `focus` both fire on a tab switch back; one status call is enough.
     let last = 0;
     const recheck = (): void => {
       if (document.visibilityState !== 'visible') return;
@@ -148,14 +117,11 @@ export function SyncPanel(): ReactElement {
   const onPull = async (): Promise<void> => {
     const ok = await pull();
     if (!ok) return;
-    // Read the outcome back off the store rather than trusting the boolean: `pull()` resolving true
-    // only means the request succeeded, and "your account has no vault yet" is one of its successes.
     const result = useSyncStore.getState().lastPull;
     if (result === null || !result.found) {
       toast.info('Your account has no saved profile yet. Press “Sync now” to upload this one.');
       return;
     }
-    // A pull rewrites the vault the fill engine reads, so the editor's copy is now stale.
     await reloadProfiles();
     toast.ok(
       result.applied === 0
@@ -246,8 +212,6 @@ export function SyncPanel(): ReactElement {
                   {PAIR_CODE_LENGTH}-character code, good for five minutes and usable once.
                 </p>
 
-                {/* The button sits on its own row rather than as a third column: each Field
-                    carries a hint of its own height, so nothing bottom-aligns with anything. */}
                 <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Field
                     label="Pairing code"
@@ -297,7 +261,6 @@ export function SyncPanel(): ReactElement {
 
           {error === null ? null : (
             <p className="mt-3 text-xs text-[var(--jf-fg-muted)]">
-              {/* INV-3: an unreachable backend is a disconnected state, not a broken extension. */}
               Not connected. {error}
             </p>
           )}
@@ -324,10 +287,6 @@ export function SyncPanel(): ReactElement {
     </div>
   );
 }
-
-/* ------------------------------------------------------------------------------------------------
- * Connected state
- * ---------------------------------------------------------------------------------------------- */
 
 function ConnectedCard({
   busy,
@@ -392,7 +351,6 @@ function ConnectedCard({
 
       {lastPull === null ? null : (
         <Notice tone={lastPull.found ? 'ok' : 'info'} className="mt-3">
-          {/* "Nothing in the cloud yet" is an answer, not a failure — say so in those words. */}
           {!lastPull.found
             ? 'Nothing to restore: your account has no saved profile yet.'
             : lastPull.applied === 0

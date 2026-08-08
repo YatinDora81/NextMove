@@ -1,25 +1,5 @@
 "use client"
 
-/**
- * JF-001 SEC 7.2 — the profile onboarding wizard.
- *
- * This is where a NextMove profile is *authored*. The extension never asks for any of it: it opens
- * the sealed vault this wizard writes and fills forms from it, so everything below is really one
- * long-form editor for a single `SharedProfile`.
- *
- * Three decisions shape the machinery:
- *
- *   1. One reducer, not a field-per-`useState`. Seven steps editing one deeply nested object means
- *      the interesting state is the *draft*, and a reducer keeps the draft, the step, the blur
- *      errors and the in-flight transition in a single atomic update.
- *   2. The vault is written on step transition, never on keystroke. `PUT /api/sync/profile` shares
- *      a 60/min limit with every other sync call, and an autosave-per-character wizard would spend
- *      that budget on the first paragraph of a job history.
- *   3. The current step lives in `?step=`, so a refresh, a deep link from the 402 AI card, or a
- *      bookmark all land where the user was. Combined with (2), reloading mid-wizard loses at most
- *      the step you were typing in.
- */
-
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
@@ -40,10 +20,6 @@ import { EligibilityStep } from "@/app/onboarding/steps/EligibilityStep"
 import { AiSetupStep } from "@/app/onboarding/steps/AiSetupStep"
 import { ConnectStep } from "@/app/onboarding/steps/ConnectStep"
 
-/* ------------------------------------------------------------------------------------------------
- * Steps
- * ---------------------------------------------------------------------------------------------- */
-
 export const STEP_IDS = [
     "welcome",
     "about",
@@ -57,9 +33,7 @@ export const STEP_IDS = [
 export type StepId = (typeof STEP_IDS)[number]
 
 type StepMeta = {
-    /** Shown in the progress rail — short enough to survive a five-column grid. */
     label: string
-    /** The CTA that leaves this step. Named for the destination, never "Next". */
     forwardLabel: string
 }
 
@@ -73,7 +47,6 @@ const STEP_META: Record<StepId, StepMeta> = {
     connect: { label: "Connect", forwardLabel: "" },
 }
 
-/** The rail covers the steps that actually collect something; welcome and connect are bookends. */
 const RAIL_STEPS = STEP_IDS.slice(1, -1).map((id) => ({ id, label: STEP_META[id].label }))
 
 const STEP_NAMES: readonly string[] = STEP_IDS
@@ -87,15 +60,6 @@ function stepIndex(step: StepId): number {
     return STEP_IDS.indexOf(step)
 }
 
-/* ------------------------------------------------------------------------------------------------
- * Validation
- * ---------------------------------------------------------------------------------------------- */
-
-/**
- * Deliberately loose. This is a job-application profile, not an identity document — the only thing
- * worth blocking on is data an employer's form will reject outright, and everything else is the
- * user's business.
- */
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 
 function urlProblem(value: string): string | null {
@@ -133,7 +97,6 @@ function validateValue(field: string, value: string): string | null {
     }
 }
 
-/** Fields that block forward movement, and how to read each one off the draft. */
 const BLOCKING_FIELDS: Partial<Record<StepId, Record<string, (draft: SharedProfile) => string>>> = {
     about: {
         "personal.firstName": (draft) => draft.personal.firstName,
@@ -158,15 +121,10 @@ function validateStep(step: StepId, draft: SharedProfile): FieldErrors {
     return errors
 }
 
-/* ------------------------------------------------------------------------------------------------
- * Reducer
- * ---------------------------------------------------------------------------------------------- */
-
 type WizardState = {
     step: StepId
     draft: SharedProfile | null
     errors: FieldErrors
-    /** Non-null while a step transition is waiting on the vault write that precedes it. */
     pendingStep: StepId | null
     furthestIndex: number
     skippedAi: boolean
@@ -207,7 +165,6 @@ function reducer(state: WizardState, action: WizardAction): WizardState {
                 ...state,
                 step,
                 pendingStep: null,
-                // Errors belong to the step you just left; carrying them forward is noise.
                 errors: {},
                 furthestIndex: Math.max(state.furthestIndex, stepIndex(step)),
                 lastSaveFailed: !action.saved,
@@ -238,16 +195,8 @@ function initialState(step: StepId): WizardState {
     }
 }
 
-/* ------------------------------------------------------------------------------------------------
- * Draft helpers
- * ---------------------------------------------------------------------------------------------- */
-
 type AuthUser = { firstName: string | null; lastName: string | null; email: string }
 
-/**
- * Seed the identity fields from the account the user already created, but never overwrite what the
- * vault holds — the vault is the newer, hand-edited copy by definition.
- */
 function withIdentityPrefill(profile: SharedProfile, user: AuthUser | null): SharedProfile {
     if (user === null) return profile
     const personal = { ...profile.personal }
@@ -257,7 +206,6 @@ function withIdentityPrefill(profile: SharedProfile, user: AuthUser | null): Sha
     return { ...profile, personal }
 }
 
-/** Exactly the slice of the profile this wizard owns. Answers and compensation are edited elsewhere. */
 function wizardPatch(draft: SharedProfile): Partial<SharedProfile> {
     return {
         summary: draft.summary,
@@ -271,10 +219,6 @@ function wizardPatch(draft: SharedProfile): Partial<SharedProfile> {
         updatedAt: Date.now(),
     }
 }
-
-/* ------------------------------------------------------------------------------------------------
- * Wizard
- * ---------------------------------------------------------------------------------------------- */
 
 export function OnboardingWizard({ initialStep }: { initialStep: StepId }) {
     const router = useRouter()
@@ -297,12 +241,6 @@ export function OnboardingWizard({ initialStep }: { initialStep: StepId }) {
 
     const [state, dispatch] = useReducer(reducer, initialStep, initialState)
 
-    /*
-     * `update` and `save` are read through a ref so the transition effect below can depend on
-     * `pendingStep` alone. Without it the effect would re-run on every context change — and the
-     * whole point of the two-phase transition is that `save()` must be the *post-update* closure.
-     * This effect has no dependency array on purpose: it must refresh on every render.
-     */
     const vaultActions = useRef({ update, save })
     useEffect(() => {
         vaultActions.current = { update, save }
@@ -314,7 +252,6 @@ export function OnboardingWizard({ initialStep }: { initialStep: StepId }) {
         bootstrapped.current = true
         void (async () => {
             try {
-                // The key has to exist before a GET can be decrypted into anything.
                 await ensureVaultKey()
                 await load()
             } catch {
@@ -329,7 +266,6 @@ export function OnboardingWizard({ initialStep }: { initialStep: StepId }) {
         dispatch({ type: "hydrate", profile: withIdentityPrefill(profile, user) })
     }, [hydrated, status, profile, user])
 
-    /* URL → state: deep links, the 402 card's `?step=ai`, and hand-edited addresses. */
     const urlStep = searchParams.get("step")
     const stepRef = useRef(state.step)
     stepRef.current = state.step
@@ -338,13 +274,11 @@ export function OnboardingWizard({ initialStep }: { initialStep: StepId }) {
         if (parsed !== null && parsed !== stepRef.current) dispatch({ type: "syncStep", step: parsed })
     }, [urlStep])
 
-    /* state → URL. `replace`, not `push`: the wizard's own Back button owns intra-wizard history. */
     useEffect(() => {
         if (parseStepId(urlStep) === state.step) return
         router.replace(`${pathname}?step=${state.step}`, { scroll: false })
     }, [state.step, urlStep, pathname, router])
 
-    /* Phase two of a transition: seal and PUT, then move. */
     const savingRef = useRef(false)
     useEffect(() => {
         const target = state.pendingStep
@@ -378,8 +312,6 @@ export function OnboardingWizard({ initialStep }: { initialStep: StepId }) {
     const goTo = useCallback(
         (target: StepId) => {
             if (state.pendingStep !== null || draft === null) return
-            // Blocking errors stop forward movement only. Going back to fix something must never
-            // be the thing that is blocked.
             if (stepIndex(target) > stepIndex(state.step)) {
                 const problems = validateStep(state.step, draft)
                 if (Object.keys(problems).length > 0) {
@@ -449,9 +381,6 @@ export function OnboardingWizard({ initialStep }: { initialStep: StepId }) {
     ])
 
     if (status === "error" && !hydrated) {
-        // The heading has to match the cause. A dropped connection and an unreadable vault are the
-        // same code path but very different news, and telling someone their vault won't open when
-        // their wifi blinked is how you convince them they lost their data.
         const offline = errorKind === "network"
         return (
             <WizardShell>
@@ -518,11 +447,6 @@ export function OnboardingWizard({ initialStep }: { initialStep: StepId }) {
                 />
             ) : null}
 
-            {/*
-             * A non-fatal vault warning — most often "this browser won't persist your key", which
-             * `materializeKey()` reports without failing the load. It is exactly the situation where
-             * the user has to act before they close the tab, so it cannot live only in a toast.
-             */}
             {error !== null ? (
                 <div
                     role="status"

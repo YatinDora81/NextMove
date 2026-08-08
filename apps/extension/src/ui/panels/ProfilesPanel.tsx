@@ -1,14 +1,3 @@
-/**
- * ui/panels/ProfilesPanel.tsx — F-11, multiple profiles.
- *
- * "Named profiles (e.g. 'Frontend', 'Fullstack') sharing base identity, overriding summary/skills/
- *  resume. Quick switcher in popup."
- *
- * So the list is the switcher's twin: create from an existing profile (which copies the base
- * identity and leaves the summary/skills to diverge), mark one active for fills, mark one default,
- * and delete. Editing itself lives in the vault panel — this screen only decides *which* profile.
- */
-
 import { useState } from 'react';
 import type { ReactElement } from 'react';
 

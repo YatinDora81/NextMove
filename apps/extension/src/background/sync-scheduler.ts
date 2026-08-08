@@ -1,26 +1,3 @@
-/**
- * background/sync-scheduler.ts — turning sync from a button into a background job (F-15).
- *
- * Before this file existed, everything the extension knew reached Postgres only when a user found
- * Options → Sync and clicked "Sync now". In practice that meant: never. A tracker row written while
- * applying to a job at 11pm sat on one machine until someone remembered a button existed.
- *
- * ── Why an alarm and a dirty flag, and not a debounce ──────────────────────────────────────────
- *
- * The obvious design is a `setTimeout` a few seconds after each write. It does not work in MV3. The
- * service worker is torn down aggressively when idle, and a timer that has not fired yet is a timer
- * that never will — the worker is gone and the callback with it. `chrome.alarms` is the only timer
- * that survives, because it lives in the browser rather than in the worker.
- *
- * So writes do the cheapest possible thing: set a flag in `chrome.storage.session`. The alarm wakes
- * the worker every few minutes, sees the flag, drains it, and clears it. A crash between the write
- * and the drain costs one cycle, never a row — the flag is the only state, and it errs toward
- * syncing again rather than skipping.
- *
- * INV-3 still holds: every entry point here returns immediately when the user has not paired, and
- * nothing in a fill, a match, an answer or a tracker write can block on any of it.
- */
-
 import { createLogger } from '@/platform/logger';
 import { getSettings } from '@/platform/storage';
 import { ALARM_SYNC_PUSH, SYNC_ALARM_PERIOD_MINUTES, SYNC_DIRTY_KEY } from '@/shared/constants';
@@ -29,12 +6,7 @@ import { isPaired } from '@/sync';
 
 const log = createLogger('bg:sync-scheduler');
 
-/** Scopes awaiting a push. A Set on the wire would not survive `storage.session`, so: an array. */
 type DirtyScopes = SyncScope[];
-
-/* ------------------------------------------------------------------------------------------------
- * The dirty flag
- * ---------------------------------------------------------------------------------------------- */
 
 async function readDirty(): Promise<DirtyScopes> {
   try {
@@ -50,13 +22,6 @@ async function readDirty(): Promise<DirtyScopes> {
   }
 }
 
-/**
- * Note that `scope` has local changes worth pushing.
- *
- * Callers are on hot paths — saving a profile, logging an application, learning a mapping — so this
- * never awaits the network and never throws. A scheduler that could break a fill would be worse
- * than no scheduler.
- */
 export async function markDirty(...scopes: readonly SyncScope[]): Promise<void> {
   if (scopes.length === 0) return;
   try {
@@ -79,17 +44,6 @@ async function clearDirty(): Promise<void> {
   }
 }
 
-/* ------------------------------------------------------------------------------------------------
- * The alarm
- * ---------------------------------------------------------------------------------------------- */
-
-/**
- * Arm the periodic push, or clear it when the user is not paired.
- *
- * `alarms.create` replaces an alarm of the same name and restarts its timer, so on a machine whose
- * worker recycles every couple of minutes, calling it unconditionally on every wake would mean the
- * alarm never actually fires. Hence the `get` first — the same reasoning `armConfigAlarm` uses.
- */
 export async function armSyncAlarm(): Promise<void> {
   try {
     const paired = await isPaired();
@@ -114,16 +68,6 @@ export async function armSyncAlarm(): Promise<void> {
   }
 }
 
-/**
- * Drain whatever is dirty. Called by the alarm, and directly after a handoff so a new device does
- * not wait five minutes to see its own data.
- *
- * The dirty flag is cleared *before* the push rather than after. That is deliberate: clearing after
- * a partial success would re-push everything next cycle, and every push in this extension is
- * already idempotent — applications key on `clientId`, mappings are last-write-wins per
- * (domain, sigHash), and the profile carries an optimistic version. Re-sending is free; losing a
- * scope's dirty bit because the drain crashed midway is not.
- */
 export async function drainSync(force = false): Promise<void> {
   try {
     if (!(await isPaired())) return;
@@ -135,13 +79,10 @@ export async function drainSync(force = false): Promise<void> {
 
     await clearDirty();
 
-    // Imported lazily so this module can be pulled into a context that never syncs without
-    // dragging the whole client and its Zod contracts along with it.
     const { dispatchLocal } = await import('@/background/router');
     const reply = await dispatchLocal('SYNC_PUSH', { scopes });
     if (!reply.ok) {
       log.warn(`background sync failed: ${reply.error.code} — ${reply.error.message}`);
-      // Put the scopes back so the next cycle retries them.
       await markDirty(...scopes);
       return;
     }

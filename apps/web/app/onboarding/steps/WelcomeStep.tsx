@@ -1,11 +1,5 @@
 "use client"
 
-/**
- * Step 1 — Welcome. No inputs: this screen exists to set an expectation ("five short screens, then
- * the extension fills forms for you") and to be honest about where the data goes before anyone
- * types their home address into it.
- */
-
 import { ArrowRight, Briefcase, Loader2, Lock, ShieldCheck, User } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"

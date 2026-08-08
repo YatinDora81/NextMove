@@ -1,13 +1,5 @@
 "use client"
 
-/**
- * Step 2 — About you. Split into two sub-sections because contact details and a postal address are
- * ten inputs together, and ten inputs on one screen is where people start skimming.
- *
- * `autoComplete` is set on every field. The browser's own autofill is the fastest way through this
- * screen, and there is no reason for an autofill product to fight it.
- */
-
 import { StepHeader, SubSection, TextField, type StepProps } from "@/app/onboarding/steps/fields"
 
 export function AboutYouStep({ draft, errors, patch, onBlurField }: StepProps) {

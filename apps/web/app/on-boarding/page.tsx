@@ -1,14 +1,5 @@
 import { redirect } from "next/navigation"
 
-/**
- * Legacy `/on-boarding`, kept alive purely as a redirect.
- *
- * The three-screen version of onboarding lived here and was linked from the 402 AI_SETUP_REQUIRED
- * card (`/on-boarding?step=ai`) and from anything a user bookmarked. The wizard that replaced it
- * lives at `/onboarding`, so this route's whole job is to translate the old step names onto the new
- * ones and get out of the way — `done` becomes `connect`, which is the screen that now ends the
- * flow.
- */
 const LEGACY_STEPS: Record<string, string> = {
     welcome: "welcome",
     ai: "ai",

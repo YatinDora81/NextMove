@@ -1,47 +1,3 @@
-/**
- * entrypoints/content.ts — the ISOLATED-world content script: JobFill's whole in-page brain.
- *
- * JF-001 Rev 3.0 · SEC 4.1 (content-script layer) · SEC 4.3 Flow A and Flow B · SEC 6.7 (tracker
- * auto-capture) · SEC 9.2 · INV-1 · INV-2 · INV-4.
- *
- * ── Flow A, one-click fill (SEC 4.3) ─────────────────────────────────────────────────────────────
- *   1. Trigger      FILL_REQUEST arrives from the popup or the Alt+J command, or the floating pill
- *                   fires locally.
- *   2. Detect ATS   `detectAts(url, document)` → a dedicated adapter or the generic fallback.
- *   3. Scan         `FormScanner` walks the document, same-origin iframes and open shadow roots.
- *   4. Match        `FieldMatcher` scores each signature (user mapping → adapter → autocomplete →
- *                   heuristics), honouring the INV-4 thresholds from settings.
- *   5. Fill         `runFill` drives each strategy with human-ish pacing.
- *   6. Report       markers + the review panel; `FILL_REPORT` hands the run to the tracker.
- *   7. **Human submits. JobFill stops.** (INV-1)
- *
- * ── Flow B, AI screening answers ─────────────────────────────────────────────────────────────────
- * Owned by `content/overlay/SparkleButton.tsx`; this file only decides which fields deserve a ✨
- * and supplies the job context, the tone/length presets and a framework-safe writer.
- *
- * ── INV-1, stated as code ────────────────────────────────────────────────────────────────────────
- * There is no `.click()`, `.submit()` or `.requestSubmit()` call in this file. The only control we
- * ever *locate* is the wizard's next-step (or the submit) button, and the only thing we do with it
- * is draw a green outline around it so a human can find it. `core/fill` refuses submit controls,
- * the bridge refuses them again, and the MAIN-world script refuses them a third time.
- *
- * ── INV-2 ────────────────────────────────────────────────────────────────────────────────────────
- * Every AI request originates in a ✨ click inside the overlay's shadow DOM, which mints a
- * single-use 5 s gesture nonce over `GESTURE_MINT`. Nothing in the fill path, the observer, or the
- * auto-capture path can reach Gemini.
- *
- * ── SEC 9.2, no fingerprinting ───────────────────────────────────────────────────────────────────
- * The script runs on `<all_urls>` because career pages live everywhere, but it renders **nothing**
- * and stores **nothing** until a scan finds application-shaped fields (`looksLikeApplication`).
- * On an ordinary page it costs one `querySelectorAll` at `document_idle` and then goes quiet.
- * Page text — labels, headings, job descriptions — is read with `textContent` and rendered as text.
- *
- * ── Frames (SEC 4.4) ─────────────────────────────────────────────────────────────────────────────
- * The script is injected with `all_frames: true`. The TOP frame owns all UI and answers
- * `FILL_REQUEST`; child frames fill their own document and post a count-only summary up, never
- * drawing anything. Frames this scanner could not traverse are listed honestly in the panel.
- */
-
 import {
   DEFAULT_SETTINGS,
   FILL_THRESHOLD,
@@ -125,10 +81,6 @@ import { createElement as h } from 'react';
 
 const log = createLogger('content');
 
-/* ------------------------------------------------------------------------------------------------
- * Frame channel — child frame → top frame (untrusted, display-only)
- * ---------------------------------------------------------------------------------------------- */
-
 const FRAME_KEY = '__jobfillFrame';
 
 interface FrameReportMessage {
@@ -140,11 +92,6 @@ interface FrameReportMessage {
   errors: number;
 }
 
-/**
- * "This frame is showing a confirmation state" (SEC 6.7 step 4). iCIMS and Taleo run the whole
- * application — including the thank-you page — inside an iframe, so the top frame would otherwise
- * never see the submission land.
- */
 interface FrameConfirmedMessage {
   __jobfillFrame: 'confirmed';
   v: 1;
@@ -156,12 +103,6 @@ function isFrameConfirmation(data: unknown): boolean {
   return message[FRAME_KEY] === 'confirmed' && message['v'] === 1;
 }
 
-/**
- * Nothing that arrives on this channel is trusted: a hostile page can post the same shape. It is
- * therefore used for **display only** — counts shown in the review panel — and never to trigger a
- * fill, reveal profile data, or unlock anything. The reporting origin is taken from the browser's
- * own `event.origin`, never from the payload.
- */
 function parseFrameReport(data: unknown): FrameReportMessage | null {
   if (typeof data !== 'object' || data === null) return null;
   const message = data as Record<string, unknown>;
@@ -182,14 +123,9 @@ function parseFrameReport(data: unknown): FrameReportMessage | null {
   };
 }
 
-/* ------------------------------------------------------------------------------------------------
- * SEC 9.2 — is this an application, or just a page the user is reading?
- * ---------------------------------------------------------------------------------------------- */
-
 const APPLICATION_TEXT_RE =
   /\b(apply|application|applicant|candidate|resume|r[ée]sum[ée]|cv|cover letter|job|position|opening|vacancy|career)\b/i;
 
-/** Paths whose presence means "somebody is being asked who they are". */
 const IDENTITY_PATHS: ReadonlySet<ProfilePath> = new Set<ProfilePath>([
   'personal.email',
   'personal.firstName',
@@ -198,7 +134,6 @@ const IDENTITY_PATHS: ReadonlySet<ProfilePath> = new Set<ProfilePath>([
   'personal.phone',
 ]);
 
-/** Headings and the title, read with `textContent` only — never `innerHTML` (SEC 9.2). */
 function pageSignalText(doc: Document): string {
   const parts: string[] = [doc.title ?? ''];
   let seen = 0;
@@ -210,16 +145,6 @@ function pageSignalText(doc: Document): string {
   return parts.join(' ').slice(0, 2_000);
 }
 
-/**
- * "JobFill activates its UI only when a form scan finds application-shaped fields; it stores
- * nothing about pages that aren't applications" (SEC 9.2).
- *
- * A dedicated ATS adapter matching is evidence in itself — its `detect()` is a URL pattern plus a
- * DOM fingerprint (SEC 6.5). On the generic long tail we demand real evidence: somebody is being
- * asked who they are, plus either a file upload, a broad spread of matched profile paths, or
- * application vocabulary in the page's own headings. A login form (email + password) never
- * qualifies: the scanner refuses password inputs outright, leaving a single field.
- */
 function looksLikeApplication(
   scan: ScanResult,
   matches: readonly MatchResult[],
@@ -249,11 +174,6 @@ function looksLikeApplication(
   return APPLICATION_TEXT_RE.test(pageSignalText(doc));
 }
 
-/* ------------------------------------------------------------------------------------------------
- * Small helpers
- * ---------------------------------------------------------------------------------------------- */
-
-/** A stable, non-negative id for this frame. Never hashed into a signature (see core/signature). */
 function frameIdOf(isTop: boolean, href: string): number {
   if (isTop) return 0;
   let hash = 2_166_136_261;
@@ -264,7 +184,6 @@ function frameIdOf(isTop: boolean, href: string): number {
   return (hash >>> 0) % 1_000_000 || 1;
 }
 
-/** HTML documents only: SVG, XML and PDF viewers have no application forms. */
 function isSupportedDocument(): boolean {
   if (typeof document === 'undefined' || typeof window === 'undefined') return false;
   if (document.contentType !== 'text/html' && document.contentType !== 'application/xhtml+xml') {
@@ -300,19 +219,8 @@ const ATS_LABEL: Readonly<Record<AtsId, string>> = {
   generic: 'This site',
 };
 
-/** Marker id reserved for the located next-step / submit control (INV-1: outlined, never clicked). */
 const NEXT_MARKER_ID = '__jf_next_step';
 
-/* ------------------------------------------------------------------------------------------------
- * F-05 — turning a RESUME_GET reply back into a real File
- * ---------------------------------------------------------------------------------------------- */
-
-/**
- * `chrome.runtime` messaging is JSON, so the worker sends the resume bytes as base64 and this side
- * rebuilds them. `atob` exists in every content-script realm (it is a `WindowOrWorkerGlobalScope`
- * member), and the decode happens in the ISOLATED world — the host page can neither see nor reach
- * the resulting `Blob`.
- */
 function bytesFromBase64(base64: string): Uint8Array | null {
   try {
     const binary = atob(base64);
@@ -324,11 +232,9 @@ function bytesFromBase64(base64: string): Uint8Array | null {
   }
 }
 
-/** `ResumeBytes` (wire) → `ResumeAttachment` (what `core/fill/strategies/file.ts` consumes). */
 function attachmentFromBytes(resume: ResumeBytes): ResumeAttachment | null {
   const decoded = bytesFromBase64(resume.bytes);
   if (decoded === null || decoded.byteLength === 0) return null;
-  // A truncated transfer would attach a corrupt PDF, which is worse than attaching nothing.
   if (resume.size > 0 && decoded.byteLength !== resume.size) return null;
 
   const name = resume.name.trim().length > 0 ? resume.name.trim() : 'resume.pdf';
@@ -357,16 +263,11 @@ function readFillPayload(raw: unknown): { profileId: string | null; trigger: Fil
   };
 }
 
-/* ------------------------------------------------------------------------------------------------
- * The content script
- * ---------------------------------------------------------------------------------------------- */
-
 export default defineContentScript({
   matches: ['<all_urls>'],
   allFrames: true,
   runAt: 'document_idle',
   world: 'ISOLATED',
-  // Do not announce ourselves to the host page with WXT's legacy start-up postMessage (SEC 9.2).
   noScriptStartedPostMessage: true,
 
   main(ctx) {
@@ -375,8 +276,6 @@ export default defineContentScript({
     const isTop = window.top === window;
     const frameId = frameIdOf(isTop, location.href);
     const domain = location.hostname;
-
-    /* ---- mutable page state ---------------------------------------------------------------- */
 
     let settings: Settings = DEFAULT_SETTINGS;
     let adapterId: AtsId = 'generic';
@@ -388,7 +287,6 @@ export default defineContentScript({
     let aiAvailable = false;
     let keyCount = 0;
 
-    /** Tracker row opened by the last `FILL_REPORT` — the target of the SEC 6.7 status flip. */
     let applicationId: string | null = null;
     let confirmationHandled = false;
     let autoFilledUrl: string | null = null;
@@ -410,9 +308,6 @@ export default defineContentScript({
     let evaluateTimer: ReturnType<typeof setTimeout> | null = null;
     let unsubscribeSettings: (() => void) | null = null;
 
-    /* ---- overlay plumbing ------------------------------------------------------------------ */
-
-    /** Lazily create the overlay. Never called before `looksLikeApplication` says yes (SEC 9.2). */
     function ui(): OverlayHandle {
       if (overlay === null) {
         overlay = getOverlay();
@@ -444,13 +339,6 @@ export default defineContentScript({
       return markers;
     }
 
-    /* ---- configuration --------------------------------------------------------------------- */
-
-    /**
-     * `CONFIG_GET` (seed ⊕ remote, F-14). INV-3: when the service worker is unreachable we resolve
-     * the shipped seed locally instead of failing — the extension must work with the backend and
-     * even its own worker asleep.
-     */
     async function loadConfig(id: AtsId): Promise<ResolvedAdapterConfig> {
       const reply = await sendMessage('CONFIG_GET', { atsId: id });
       if (reply.ok) return reply.data;
@@ -467,11 +355,6 @@ export default defineContentScript({
       }
     }
 
-    /**
-     * SEC 5.6: with an empty vault the ✨ AI actions render disabled with the setup hint, while the
-     * offline Answer-Bank path keeps working. INV-5: the reply is masked metadata — this content
-     * script never sees, and never asks for, a key.
-     */
     async function refreshKeyAvailability(): Promise<void> {
       const reply = await sendMessage('KEYS_STATUS', {});
       if (!reply.ok) {
@@ -482,8 +365,6 @@ export default defineContentScript({
       keyCount = reply.data.keys.length;
       aiAvailable = reply.data.keys.some((key) => key.status !== 'DEAD');
     }
-
-    /* ---- scanning + the SEC 9.2 activation gate -------------------------------------------- */
 
     function scanPage(): ScanResult {
       return new FormScanner({ frameId }).scan();
@@ -502,7 +383,6 @@ export default defineContentScript({
       });
     }
 
-    /** SEC 6.7 steps 1-3 — JSON-LD → adapter selectors → og:/title heuristics, plus the JD. */
     function captureJob(): JobContext | null {
       if (!settings.autoCaptureJobContext) {
         return { title: '', company: '', jd: '', url: location.href };
@@ -515,14 +395,6 @@ export default defineContentScript({
       }
     }
 
-    /**
-     * SEC 6.5 `steps.nextButton` — "located, highlighted, NEVER auto-clicked (INV-1)".
-     *
-     * Returns the element *and* its description in one pass so the outline and the panel copy can
-     * never disagree about which control they are talking about. When the adapter declares no step
-     * navigator we fall back to locating the submit control, for the same reason: the most useful
-     * thing JobFill can do with the button it must never press is show the user where it is.
-     */
     function locateNextStep(): { info: NextStepInfo; el: Element } | null {
       try {
         const adapter = detectAts(location.href, document);
@@ -537,8 +409,6 @@ export default defineContentScript({
       return null;
     }
 
-    /* ---- ✨ targets (F-09) ------------------------------------------------------------------ */
-
     function collectSparkleTargets(fields: readonly FieldNode[], matches: readonly MatchResult[]): SparkleTarget[] {
       const filledPaths = new Map<string, number>();
       for (const match of matches) filledPaths.set(match.node.sig.hash, match.score);
@@ -548,7 +418,6 @@ export default defineContentScript({
 
       for (const node of fields) {
         if (!isOpenTextQuestion(node)) continue;
-        // A field the matcher can answer from the vault does not need a generated answer.
         if ((filledPaths.get(node.sig.hash) ?? 0) >= FILL_THRESHOLD) continue;
 
         const el = nodeElement(node);
@@ -589,8 +458,6 @@ export default defineContentScript({
       };
       ui().render('sparkles', h(SparkleLayer, { targets: sparkleTargets, ctx: context }));
     }
-
-    /* ---- the review panel (F-06) ----------------------------------------------------------- */
 
     function unreachableNotes(scan: ScanResult | null): UnreachableFrameNote[] {
       if (scan === null) return [];
@@ -651,22 +518,6 @@ export default defineContentScript({
       );
     }
 
-    /* ---- F-05 · resume auto-attach ---------------------------------------------------------- */
-
-    /**
-     * Fetch the file a `file` field should receive (F-05 · SEC 6.4 · SEC 4.3 Flow A step 5).
-     *
-     * Why over the bus: `platform/db` evaluated *here* is the HOST PAGE's IndexedDB, not the
-     * extension's, so the `resumes` table is simply not readable from a content script. The service
-     * worker is the only realm that owns our database, hence `RESUME_GET`.
-     *
-     * Handed to the engine as `resolveResume` rather than as `resume`, so it runs **only when a
-     * file field is actually reached** — the overwhelmingly common form with no attachment control
-     * never sends this message at all, and never moves a megabyte across the bus for nothing.
-     *
-     * INV-2 is untouched: this reads local IndexedDB, leases no key and contacts no network, so it
-     * carries no gesture nonce and is deliberately absent from `GESTURE_REQUIRED`.
-     */
     async function resolveResume(
       activeProfileId: string,
       path: ProfilePath | null,
@@ -674,9 +525,6 @@ export default defineContentScript({
       const reply = await sendMessage('RESUME_GET', { profileId: activeProfileId, path });
 
       if (!reply.ok) {
-        // Oversize file, unreadable blob, broken IndexedDB — all things the user can act on, and
-        // none of them something to swallow: the field is about to be reported as "attach this
-        // yourself" and they deserve to know why.
         log.warn(`RESUME_GET failed for ${path ?? 'resume'}: ${reply.error.code}`);
         pushToast({
           id: 'jf-resume-unavailable',
@@ -699,9 +547,6 @@ export default defineContentScript({
         return null;
       }
 
-      // F-05, "picker if ambiguous". Several stored files could have applied and none is marked
-      // default, so recency decided it. That is a guess, and INV-4's spirit says name it out loud
-      // rather than let the user assume they chose this file.
       if (how === 'most-recent' && alternatives.length > 0) {
         pushToast({
           id: `jf-resume-ambiguous-${resume.id}`,
@@ -716,8 +561,6 @@ export default defineContentScript({
 
       return attachment;
     }
-
-    /* ---- Flow A ---------------------------------------------------------------------------- */
 
     async function runFillFlow(trigger: FillTrigger, profileId: string | null): Promise<FillReport> {
       if (disposed) return emptyReport(adapterId, location.href);
@@ -754,8 +597,6 @@ export default defineContentScript({
         lastScan = scan;
         const matches = matcherFor(profile, mappings).match(scan.fields);
 
-        // The engine's per-field event carries the signature but not `FieldNode.required`; the
-        // panel marks required fields with a `*`, which is exactly where the user should look first.
         const requiredByHash = new Map<string, boolean>();
         for (const node of scan.fields) {
           if (node.required) requiredByHash.set(node.sig.hash, true);
@@ -816,7 +657,6 @@ export default defineContentScript({
         lastReport = report;
         lastRows = rows;
 
-        // Leave the page exactly as we found it: the bridge's addressing attribute goes away.
         try {
           unstampAll(document);
         } catch (error) {
@@ -828,8 +668,6 @@ export default defineContentScript({
           return report;
         }
 
-        // INV-1 — locate the control that moves the application forward and OUTLINE it. The green
-        // marker and the panel's "Show me" are the only things JobFill does with that button.
         const located = locateNextStep();
         nextStep = located?.info ?? null;
         if (located !== null) {
@@ -846,8 +684,6 @@ export default defineContentScript({
           fieldMarkers().set(specs);
           panelOpen = true;
         } else {
-          // The user turned the review panel off; they still get the honest headline number and
-          // the reminder that pressing Submit is theirs (F-06 / INV-1).
           pushToast(
             infoToast(
               `Filled ${report.filled} of ${report.perField.length} fields`,
@@ -878,7 +714,6 @@ export default defineContentScript({
       }
     }
 
-    /** SEC 4.3 Flow A step 6 — "Fill stats sent to TrackerService" (F-12). */
     async function logFillToTracker(report: FillReport, profileId: string): Promise<void> {
       if (!settings.autoLogApplications) return;
       const reply = await sendMessage('FILL_REPORT', {
@@ -908,8 +743,6 @@ export default defineContentScript({
       }
     }
 
-    /* ---- evaluation (runs on load and on every SPA/step change) ---------------------------- */
-
     async function evaluate(): Promise<void> {
       if (disposed) return;
 
@@ -936,14 +769,13 @@ export default defineContentScript({
       applicationLike = looksLikeApplication(scan, matches, adapterId, document);
 
       if (!applicationLike) {
-        // SEC 9.2 — no UI, no storage, no trace on a page that is not an application.
         sparkleTargets = [];
         pill?.hide();
         overlay?.clear('sparkles');
         return;
       }
 
-      if (!isTop) return; // child frames never draw (SEC 4.4)
+      if (!isTop) return;
 
       job = captureJob();
 
@@ -972,7 +804,6 @@ export default defineContentScript({
         pill?.hide();
       }
 
-      // Opt-in only, and it still never touches a submit control (INV-1).
       if (settings.autoFillOnLoad && autoFilledUrl !== location.href && !filling) {
         autoFilledUrl = location.href;
         void runFillFlow('auto', null);
@@ -987,8 +818,6 @@ export default defineContentScript({
       }, OBSERVER_DEBOUNCE_MS);
     }
 
-    /* ---- SEC 6.7 step 4 — status flip on an OBSERVED confirmation -------------------------- */
-
     function handleConfirmation(): void {
       if (disposed || confirmationHandled) return;
 
@@ -996,9 +825,6 @@ export default defineContentScript({
       if (!signal.confirmed) return;
       confirmationHandled = true;
 
-      // iCIMS / Taleo put the whole flow — thank-you page included — inside an iframe. A child
-      // frame therefore reports what it saw upward instead of writing to the tracker itself, which
-      // would open a second row keyed on the frame's own URL.
       if (!isTop) {
         const top = window.top;
         if (top !== null && top !== window) {
@@ -1041,24 +867,12 @@ export default defineContentScript({
       });
     }
 
-    /* ---- inbound bus traffic --------------------------------------------------------------- */
-
     type RuntimeListener = (
       message: unknown,
       sender: unknown,
       sendResponse: (response?: unknown) => void,
     ) => boolean | void;
 
-    /**
-     * The content script owns exactly one inbound message type. Everything else — including our own
-     * outbound replies — is left alone so other listeners in this context are not answered with
-     * `undefined`.
-     *
-     * SEC 4.4 frame model: `tabs.sendMessage` without a `frameId` reaches every frame, and only one
-     * response can win. The TOP frame therefore claims the channel and answers with the merged
-     * report; child frames do their own work and return `false`, which keeps the popup's promise
-     * deterministic instead of racing.
-     */
     const onRuntimeMessage: RuntimeListener = (message, _sender, sendResponse) => {
       if (!looksLikeEnvelope(message)) return false;
 
@@ -1082,12 +896,9 @@ export default defineContentScript({
 
     const onWindowMessage = (event: MessageEvent<unknown>): void => {
       if (!isTop || disposed) return;
-      if (event.source === window) return; // our own bridge traffic
+      if (event.source === window) return;
 
       if (isFrameConfirmation(event.data)) {
-        // Deliberately UPGRADE-ONLY. A page could forge this message, so it may only flip a row
-        // JobFill itself opened on this page; it can never create one. The worst a forgery can do
-        // is mark the user's own draft as applied, which they can edit back.
         if (applicationId !== null && !confirmationHandled) {
           confirmationHandled = true;
           void sendMessage('TRACKER_UPDATE', {
@@ -1101,7 +912,6 @@ export default defineContentScript({
       const report = parseFrameReport(event.data);
       if (report === null) return;
 
-      // `event.origin` is browser-supplied; the payload's own claims about itself are ignored.
       frameReports.set(event.origin || 'an embedded frame', {
         origin: event.origin || 'an embedded frame',
         filled: report.filled,
@@ -1110,8 +920,6 @@ export default defineContentScript({
       });
       renderPanel();
     };
-
-    /* ---- lifecycle ------------------------------------------------------------------------- */
 
     function teardown(): void {
       if (disposed) return;
@@ -1159,8 +967,6 @@ export default defineContentScript({
       config = await loadConfig(adapterId);
       if (disposed) return;
 
-      // The observer is armed for every frame: a child frame still needs to re-scan when its own
-      // wizard advances. Confirmation handling is gated to the top frame inside the callback.
       const observer = getPageObserver({
         confirmation: config.confirmation,
         debounceMs: OBSERVER_DEBOUNCE_MS,

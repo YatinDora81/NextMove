@@ -1,17 +1,5 @@
 "use client"
 
-/**
- * Step 3 — Experience. Two repeaters: work history and education.
- *
- * Entries are collapsed cards rather than a wall of inputs, so a five-role history reads as five
- * lines. Order is meaningful (application forms and resumes both expect most-recent-first), so each
- * card carries move-up/move-down buttons — keyboard-operable by construction, which a drag handle
- * would not have been without extra work and an extra dependency.
- *
- * Nothing here is required. Plenty of people apply with one role and no degree, and a wizard that
- * refuses to advance without a job history is a wizard people abandon.
- */
-
 import { useState } from "react"
 import type { EducationEntry, SharedProfile, WorkEntry } from "@repo/types/ProfileTypes"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -47,11 +35,9 @@ const EMPTY_EDUCATION: EducationEntry = {
     gpa: "",
 }
 
-/** `type="month"` gives Chrome a real month picker; elsewhere it degrades to a text box. */
 const MONTH_HINT = "Month and year"
 
 export function ExperienceStep({ draft, patch }: StepProps) {
-    // Which card is expanded is presentation, not profile data — it belongs here, not in the vault.
     const [openWork, setOpenWork] = useState<number | null>(draft.work.length === 0 ? null : 0)
     const [openEducation, setOpenEducation] = useState<number | null>(null)
 
@@ -67,7 +53,6 @@ export function ExperienceStep({ draft, patch }: StepProps) {
         setEducation(draft.education.map((entry, i) => (i === index ? { ...entry, ...next } : entry)))
     }
 
-    /** Keep the expanded card expanded after it moves, rather than following the slot it left. */
     const followMove = (open: number | null, index: number, delta: number): number | null => {
         if (open === index) return index + delta
         if (open === index + delta) return index
@@ -167,7 +152,6 @@ export function ExperienceStep({ draft, patch }: StepProps) {
                                         checked={entry.current}
                                         onCheckedChange={(checked) => {
                                             const current = checked === true
-                                            // A current role has no end date at all — null, not "".
                                             updateWork(index, { current, end: current ? null : "" })
                                         }}
                                     />
@@ -186,7 +170,6 @@ export function ExperienceStep({ draft, patch }: StepProps) {
                                         }
                                         onBlur={() =>
                                             updateWork(index, {
-                                                // Blank lines are typing artefacts; drop them once, on blur.
                                                 bullets: entry.bullets.filter((line) => line.trim() !== ""),
                                             })
                                         }

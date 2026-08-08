@@ -1,21 +1,3 @@
-/**
- * ui/panels/TrackerPanel.tsx — F-12 / SEC 6.7, the application tracker dashboard.
- *
- * Everything SEC 6.7 specifies for Options → Tracker:
- *   Stats strip   applied this week · total · active interviews · response rate · median days-to-response
- *   Table view    sortable/filterable: company, role, status, ATS, applied date, profile, fill score, link, notes
- *   Board view    kanban lanes draft → applied → interview → offer / rejected / ghosted; a drag appends to history[]
- *   Row actions   open posting · copy link · edit company/role · add note · view answers used · delete
- *   Export        one-click CSV (full) and JSON (backup/restore)
- *
- * Status changes always go through `TRACKER_UPDATE`, never through a local write, because the
- * tracker service owns `history[]` — the audit trail must be impossible to bypass from a UI.
- *
- * Export/import and row deletion talk to the tracker service directly: the SEC 6.6 protocol has no
- * message for them, and IndexedDB is shared across extension contexts, so this is a local read of
- * local data rather than a second source of truth.
- */
-
 import { useEffect, useMemo, useState } from 'react';
 import type { DragEvent, ReactElement } from 'react';
 
@@ -114,7 +96,6 @@ function sortRows(rows: readonly ApplicationRow[], sort: SortState<SortField>): 
 export function TrackerPanel({
   onOpenAnswers,
 }: {
-  /** Row action "view answers used" — deep-links into the Answer Bank filtered by employer. */
   onOpenAnswers: (search: string) => void;
 }): ReactElement {
   const rows = useTrackerStore((state) => state.rows);
@@ -137,7 +118,6 @@ export function TrackerPanel({
   const [dragOver, setDragOver] = useState<AppStatus | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // The search input stays instant; the query behind it waits for a pause in typing.
   const [searchInput, setSearchInput] = useState(filters.search);
   const debouncedSearch = useDebouncedValue(searchInput);
 
@@ -157,8 +137,6 @@ export function TrackerPanel({
     if (profile === undefined) return '—';
     return profile.label === '' ? 'Untitled' : profile.label;
   };
-
-  /* -- export / import ---------------------------------------------------------------------- */
 
   const onExportCsv = async (): Promise<void> => {
     setBusy(true);
@@ -207,8 +185,6 @@ export function TrackerPanel({
       setBusy(false);
     }
   };
-
-  /* -- row actions -------------------------------------------------------------------------- */
 
   const copyLink = async (row: ApplicationRow): Promise<void> => {
     if (row.url === '') return;
@@ -374,7 +350,6 @@ export function TrackerPanel({
     if (id === '') return;
     const row = rows.find((candidate) => candidate.id === id);
     if (row === undefined || row.status === status) return;
-    // The transition (and its history[] entry) is written by the tracker service, not here.
     void setStatus(id, status);
   };
 
@@ -594,7 +569,6 @@ export function TrackerPanel({
                               : `Applied ${formatRelative(row.appliedAt)}`}
                           </p>
                           <div className="mt-2 flex items-center gap-1.5">
-                            {/* Keyboard route to the same transition the drag performs. */}
                             <Select
                               aria-label={`Move ${row.company} ${row.role} to another lane`}
                               className="text-[11px]"
@@ -630,7 +604,6 @@ export function TrackerPanel({
         never clicks Submit for you.
       </Notice>
 
-      {/* -- row editor ----------------------------------------------------------------------- */}
       <Modal
         open={editing !== null}
         onClose={() => setEditing(null)}

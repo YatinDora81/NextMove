@@ -1,12 +1,3 @@
-/**
- * ui/panels/PreferencesPanel.tsx — the `jf.settings` editor (SEC 7.1).
- *
- * Fill behaviour, matcher thresholds (INV-4), AI defaults and the F-14 remote-config poll. The
- * thresholds are exposed because a user who trusts JobFill more, or less, should be able to say so
- * — but the copy is explicit about what lowering them costs, because "never guess-fill" is a
- * product promise, not a slider default.
- */
-
 import { useEffect, useState } from 'react';
 import type { ReactElement } from 'react';
 
@@ -58,7 +49,6 @@ export function PreferencesPanel(): ReactElement {
           : `Already on the newest data (${data.version}).`,
       );
     } catch (caught) {
-      // INV-3: a config fetch that fails changes nothing — the shipped seed keeps working.
       setConfigInfo(`Could not reach the config CDN: ${describeError(caught)}. Shipped selectors are still in use.`);
     } finally {
       setConfigBusy(false);

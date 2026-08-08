@@ -1,13 +1,3 @@
-/**
- * ui/components/ListEditor.tsx — the two repeating-input patterns the vault editor needs.
- *
- * `ChipList` handles `skills[]`, `links.other[]` and `authorization.authorizedIn[]`.
- * `Repeater` handles `work[]`, `education[]` and the custom Q&A list, including reordering.
- *
- * Both are fully keyboard operable: chips are added with Enter or comma and removed with
- * Backspace on an empty input; every repeater control is a real button with an accessible name.
- */
-
 import { useState } from 'react';
 import type { KeyboardEvent, ReactElement, ReactNode } from 'react';
 
@@ -90,17 +80,14 @@ export function ChipList({
 export interface RepeaterProps<T> {
   items: readonly T[];
   onChange: (next: T[]) => void;
-  /** Factory for a blank entry. */
   create: () => T;
   addLabel: string;
   emptyLabel: string;
-  /** Title shown in each entry's header, e.g. "Software Engineer · Acme". */
   title: (item: T, index: number) => ReactNode;
   children: (item: T, update: (patch: Partial<T>) => void, index: number) => ReactNode;
   className?: string;
 }
 
-/** An ordered list of editable records with add / remove / move-up / move-down. */
 export function Repeater<T>({
   items,
   onChange,

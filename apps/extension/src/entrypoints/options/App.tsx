@@ -1,29 +1,3 @@
-/**
- * entrypoints/options/App.tsx — the Options app shell.
- *
- * SEC 4.2: "Options app owns profile vault CRUD, resume manager, key manager, mappings editor,
- * tracker dashboard, privacy controls" and "must never run page-fill logic". This shell is the
- * embodiment of that split — a left rail over ten panels, every one of which reaches the service
- * worker through `platform/bus`. There is no scanner, no matcher and no fill engine anywhere in
- * this bundle; the Options page could not fill a form if it tried.
- *
- * Navigation is hash-based (`options.html#tracker`) so the popup can deep-link into a section and
- * so the browser's Back button does something sensible. That contract is load-bearing — the popup
- * calls `openOptionsAt('keys')` — so the hash is written on every navigation and read back on
- * `hashchange`, never held only in React state.
- *
- * ── Two layout decisions worth the words ──────────────────────────────────────────────────────
- *
- * The rail wraps into a grid below `lg` rather than scrolling sideways. A horizontally scrolling
- * nav hides its own tail: on a 900px window the last four sections (including Privacy & data) sat
- * off-screen behind a scrollbar most people never noticed. Wrapping costs two rows of height and
- * makes every destination visible at every width.
- *
- * The reading column is capped at 720px, which is where a 14px paragraph stops needing eye travel.
- * Two panels opt out: the tracker draws a six-lane kanban and the mappings editor a wide table, and
- * squeezing either into 720px trades a real loss of function for a typographic nicety.
- */
-
 import { useCallback, useEffect, useState } from 'react';
 import type { ReactElement } from 'react';
 
@@ -63,7 +37,6 @@ interface SectionDef {
   label: string;
   hint: string;
   icon: IconComponent;
-  /** Panels whose content is a board or a wide table, and which the 720px cap would break. */
   wide?: true;
 }
 
@@ -107,7 +80,6 @@ export function App(): ReactElement {
   const profiles = useProfilesStore((state) => state.profiles);
   const setAnswerSearch = useAnswersStore((state) => state.setSearch);
 
-  // Shared state every panel reads. Panel-local data loads inside the panel itself.
   useEffect(() => {
     void loadProfiles();
     void loadSettings();
@@ -153,7 +125,6 @@ export function App(): ReactElement {
 
       <header className="shrink-0 pt-6 lg:sticky lg:top-0 lg:h-screen lg:w-[220px] lg:overflow-y-auto lg:pb-8">
         <div className="flex items-center gap-2.5">
-          {/* Same asset as the toolbar icon — see the note in popup/App.tsx. */}
           <img
             src="/icons/128.png"
             alt=""
@@ -163,8 +134,6 @@ export function App(): ReactElement {
           />
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-[var(--jf-fg)]">NextMove Autofill</p>
-            {/* Wraps rather than truncates: at a 220px rail "never auto-submits" is exactly
-                the half of this line that gets cut, and it is the half that matters (INV-1). */}
             <p className="text-[11px] leading-snug text-[var(--jf-fg-subtle)]">
               Local-first · your keys · never auto-submits
             </p>
@@ -184,10 +153,6 @@ export function App(): ReactElement {
                     onClick={() => go(entry.id)}
                     className={cx(
                       'flex w-full items-center gap-2.5 rounded-[var(--jf-radius-md)] py-2 pr-2.5 pl-2 text-left text-sm',
-                      // The bar is a left border rather than a trailing element so it stays welded
-                      // to the item at the wide breakpoint, where a rail row is 300px+ and a
-                      // right-hand marker floats free of the label it belongs to. Transparent when
-                      // inactive keeps the text from shifting 2px on selection.
                       'border-l-2 transition-[background-color,border-color,color] duration-[var(--jf-duration-fast)] ease-[var(--jf-ease)]',
                       active
                         ? 'border-[var(--jf-accent)] bg-[var(--jf-accent-soft)] font-medium text-[var(--jf-accent)]'
@@ -198,8 +163,6 @@ export function App(): ReactElement {
                       size={16}
                       className={cx(
                         'shrink-0',
-                        // Colour is never the only carrier of "active": the left bar and
-                        // `aria-current` both say it too.
                         active ? 'text-[var(--jf-accent)]' : 'text-[var(--jf-fg-subtle)]',
                       )}
                     />
@@ -233,8 +196,6 @@ export function App(): ReactElement {
       </header>
 
       <main id="jf-main" tabIndex={-1} className="min-w-0 flex-1 py-6 outline-none lg:py-8">
-        {/* Keyed on the section so React remounts the wrapper and the enter animation replays on
-            every navigation. app.css pins `.jf-enter` to its end state under reduced motion. */}
         <div
           key={section}
           className={cx('jf-enter w-full', isWide(section) ? 'max-w-[1100px]' : 'max-w-[720px]')}
@@ -257,11 +218,6 @@ export function App(): ReactElement {
   );
 }
 
-/**
- * The tracker panel is the heaviest screen in the app (board view, CSV/JSON codecs, the whole
- * Dexie query surface), and most sessions never open it. Loading it on demand keeps the first
- * paint of the Options page — which is usually the vault — fast.
- */
 function TrackerSection({
   onOpenAnswers,
 }: {
@@ -285,7 +241,6 @@ function TrackerSection({
   return <Panel onOpenAnswers={onOpenAnswers} />;
 }
 
-/** A neutral block that stands in for real content. Never carries text — see `TrackerSkeleton`. */
 function Bar({ className }: { className?: string }): ReactElement {
   return (
     <div
@@ -297,14 +252,6 @@ function Bar({ className }: { className?: string }): ReactElement {
   );
 }
 
-/**
- * The tracker's own furniture, greyed out: header, stats strip, filter row, table.
- *
- * A skeleton that matches the real layout means the panel arriving does not move anything the eye
- * has already locked onto. The whole thing is `aria-hidden` behind one polite live region, because
- * ten pulsing rectangles announced individually is noise — the single word "Loading" is the
- * information.
- */
 function TrackerSkeleton(): ReactElement {
   return (
     <div className="flex flex-col gap-5">
@@ -320,8 +267,6 @@ function TrackerSkeleton(): ReactElement {
           <Bar className="h-9 w-28" />
         </div>
 
-        {/* Five stats, one filter row, one view switch — the tracker's exact furniture, so the
-            real panel lands on top of its own outline instead of shoving it aside. */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {[0, 1, 2, 3, 4].map((index) => (
             <div

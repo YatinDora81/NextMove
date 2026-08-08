@@ -1,30 +1,3 @@
-/**
- * sync/client.ts — the Phase-2 sync client (JF-001 Rev 3.0 SEC 8.2 / 8.3 / 8.4, F-15).
- *
- * A thin, fully-typed HTTP client against the existing NextMove API. It adds no new service and no
- * new host permission: `API_BASE_URL` is already in `wxt.config.ts` host_permissions because the
- * same origin serves `adapters.json` (SEC 8.2 step 5 — "CORS, not permissions").
- *
- * The rules this file exists to keep:
- *
- *   INV-3  **Local-first.** Every exported entry point returns a typed `not-paired` result when the
- *          user has never paired. v1 works with this entire module switched off; nothing here is on
- *          a path that a fill, a match, an answer or a tracker write can block on.
- *   INV-5  Nothing leaves this device until `assertSyncSafe` (sync/guard.ts) has approved the body.
- *          There is no way to reach `fetch` from here that skips the guard.
- *   INV-6  This module talks to the NextMove API only. It never imports `src/ai/**` and never sees
- *          a Gemini key; the AI lane is a different lane entirely.
- *   SEC 8.2 The device JWT is stored AES-GCM-encrypted (`sealDeviceToken`), never in plaintext.
- *   SEC 8.3 `PUT /api/sync/profile` carries an optimistic `version`. A 409 surfaces a typed
- *          `VersionConflictError` **carrying the remote envelope**, so the caller can decrypt and
- *          merge. This client never retries a conflicting write and never overwrites silently.
- *   SEC 8.4 A 401 (expired 7-day token, or a device revoked from web Settings) marks the device
- *          unpaired and asks for re-pairing instead of retrying forever.
- *
- * Every request and response body is one of the shared Zod contracts in `@repo/types/ExtensionTypes`
- * — the same objects the Express controllers parse. FE, BE and extension cannot drift.
- */
-
 import {
   jobApplicationPatchSchema,
   jobApplicationRowSchema,
@@ -54,57 +27,32 @@ import type { MappingStore, SyncState } from '@/shared/types';
 import { openDeviceToken, openVaultKey, sealDeviceToken, sealVaultKey } from '@/sync/e2e';
 import { assertSyncSafe, isSyncGuardError } from '@/sync/guard';
 
-/* ------------------------------------------------------------------------------------------------
- * Result / error vocabulary
- * ---------------------------------------------------------------------------------------------- */
-
 export type SyncErrorCode =
-  /** INV-3: the user never opted in. Not an error condition — the expected steady state in v1. */
   | 'not-paired'
-  /** 401/403. The device token expired or the device row was revoked; re-pairing is required. */
   | 'unauthorized'
-  /** `POST /api/devices/pair` rejected the code (expired, already used, or mistyped). */
   | 'invalid-code'
-  /** 409 from `PUT /api/sync/profile` — always a `VersionConflictError`. */
   | 'version-conflict'
-  /** 429. `retryAt` carries the Retry-After deadline when the server sent one. */
   | 'rate-limited'
-  /** 400, or a body this client refused to build. */
   | 'bad-request'
-  /** 404. */
   | 'not-found'
-  /** 5xx, or a `{ success: false }` envelope with no recognised code. */
   | 'server'
-  /** DNS / offline / CORS / TLS. INV-3 means this must never be fatal to anything but sync. */
   | 'network'
-  /** Exceeded `SYNC_TIMEOUT_MS`. */
   | 'timeout'
-  /** The server replied with something that does not match its own @repo/types contract. */
   | 'bad-response'
-  /** `sync/guard.ts` refused the outbound body (INV-5). */
   | 'guard'
-  /** The device token could not be sealed/opened. */
   | 'crypto';
 
 export interface SyncError {
   code: SyncErrorCode;
   message: string;
-  /** HTTP status, when there was one. */
   status?: number;
-  /** epoch ms; set for `rate-limited` when the server sent `Retry-After`. */
   retryAt?: number;
-  /** True when the UI must prompt the user to pair again (SEC 8.4). */
   repairRequired?: boolean;
 }
 
-/**
- * SEC 8.3 — a stale `PUT /api/sync/profile`. `remote` is the envelope currently on the server so
- * the caller can `openProfileVault` it and merge; this client never resolves the conflict for you.
- */
 export interface VersionConflictError extends SyncError {
   code: 'version-conflict';
   localVersion: number;
-  /** null when the remote envelope could not be re-read (offline mid-conflict). */
   remoteVersion: number | null;
   remote: profileBlobEnvelopeSchemaType | null;
 }
@@ -130,7 +78,6 @@ function notPaired<T>(): SyncResult<T> {
   return fail<T>({ code: 'not-paired', message: NOT_PAIRED_MESSAGE });
 }
 
-/** Bridges a `SyncError` onto the bus error vocabulary in `shared/messages.ts` (SEC 6.6). */
 export function toBusError(error: SyncError): BusError {
   const map: Readonly<Record<SyncErrorCode, BusErrorCode>> = {
     'not-paired': 'NOT_PAIRED',
@@ -154,10 +101,6 @@ export function toBusError(error: SyncError): BusError {
   return busError;
 }
 
-/* ------------------------------------------------------------------------------------------------
- * Routes (SEC 8.3)
- * ---------------------------------------------------------------------------------------------- */
-
 export const SYNC_ROUTES = {
   pair: '/api/devices/pair',
   devices: '/api/devices',
@@ -169,17 +112,10 @@ export const SYNC_ROUTES = {
     `/api/job-applications/${encodeURIComponent(clientId)}`,
 } as const;
 
-/* ------------------------------------------------------------------------------------------------
- * `jf.sync` state (SEC 7.1 / 8.2)
- * ---------------------------------------------------------------------------------------------- */
-
-/** Serialises read-modify-write cycles so two concurrent syncs cannot lose each other's updates. */
 let stateChain: Promise<unknown> = Promise.resolve();
 
-/** In-memory unwrapped device JWT — avoids re-opening the sealed blob on every single request. */
 let tokenCache: { ct: string; iv: string; token: string } | null = null;
 
-/** Same idea for the vault key. Both caches are per-service-worker-lifetime and never persisted. */
 let vaultKeyCache: { ct: string; iv: string; key: string } | null = null;
 
 export async function readSyncState(): Promise<SyncState> {
@@ -199,7 +135,6 @@ async function mutateSyncState(update: (current: SyncState) => SyncState): Promi
   return run;
 }
 
-/** SEC 8.3 — `SYNC_STATUS`. Safe to call at any time, paired or not. */
 export async function status(): Promise<SyncState> {
   return readSyncState();
 }
@@ -209,10 +144,6 @@ export async function isPaired(): Promise<boolean> {
   return state.paired && state.tokenCt !== null && state.tokenIv !== null;
 }
 
-/**
- * SEC 8.4 — a 401 means the 7-day token expired or the device was revoked in web Settings. We drop
- * the credential and surface `repairRequired` instead of hammering the API with a dead token.
- */
 async function markUnpaired(reason: string): Promise<SyncState> {
   tokenCache = null;
   vaultKeyCache = null;
@@ -222,10 +153,6 @@ async function markUnpaired(reason: string): Promise<SyncState> {
     deviceId: null,
     tokenCt: null,
     tokenIv: null,
-    // The vault key deliberately survives. A 401 means this device's 7-day JWT expired or was
-    // revoked — it says nothing about the account's vault, which is still sealed under the same
-    // key. Keeping it means re-pairing restores the profile without the web having to hand the key
-    // over a second time. An explicit `unpair()` does clear it, via DEFAULT_SYNC_STATE.
     profileVersion: 0,
     lastError: reason,
   }));
@@ -249,18 +176,6 @@ async function readDeviceToken(): Promise<string | null> {
   }
 }
 
-/* ------------------------------------------------------------------------------------------------
- * The E2E vault key (SEC 7.4)
- * ---------------------------------------------------------------------------------------------- */
-
-/**
- * This install's copy of the key that opens the account's `ProfileBlob`.
- *
- * `null` means one of two very different things and the caller has to care which: either this
- * device has never been handed a key (pair again from the web, which re-sends it), or the account
- * genuinely has no vault yet (mint one with `generateVaultKey()` and push). `pullProfileBlob()`
- * returning `null` is what distinguishes them.
- */
 export async function readVaultKey(): Promise<string | null> {
   const state = await readSyncState();
   if (state.vaultKeyCt === null || state.vaultKeyIv === null) return null;
@@ -274,8 +189,6 @@ export async function readVaultKey(): Promise<string | null> {
     vaultKeyCache = { ct: state.vaultKeyCt, iv: state.vaultKeyIv, key };
     return key;
   } catch {
-    // A key we cannot open is worse than no key: it would make every pull look like a wrong-key
-    // failure forever. Drop it and let the next pairing supply a fresh one.
     await mutateSyncState((current) => ({
       ...current,
       vaultKeyCt: null,
@@ -287,7 +200,6 @@ export async function readVaultKey(): Promise<string | null> {
   }
 }
 
-/** Seals `keyB64` at rest and stores it in `jf.sync`. Rejects anything that is not a 256-bit key. */
 export async function writeVaultKey(keyB64: string): Promise<SyncResult<true>> {
   let sealed: { ciphertext: string; nonce: string };
   try {
@@ -309,15 +221,10 @@ export async function writeVaultKey(keyB64: string): Promise<SyncResult<true>> {
   return ok(true);
 }
 
-/** True when this install holds a vault key. Cheap — does not open it. */
 export async function hasVaultKey(): Promise<boolean> {
   const state = await readSyncState();
   return state.vaultKeyCt !== null && state.vaultKeyIv !== null;
 }
-
-/* ------------------------------------------------------------------------------------------------
- * Transport
- * ---------------------------------------------------------------------------------------------- */
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -326,7 +233,6 @@ interface RequestSpec {
   path: string;
   auth: boolean;
   query?: Readonly<Record<string, string | number | null | undefined>>;
-  /** Passed through `assertSyncSafe` before it is serialised. */
   body?: unknown;
   timeoutMs?: number;
 }
@@ -367,7 +273,6 @@ function parseRetryAfter(header: string | null, now: number): number | null {
   return Number.isNaN(at) ? null : at;
 }
 
-/** The API's standard `{ success, data, message }` envelope (repo convention, SEC 8.4). */
 function readEnvelope(status: number, payload: unknown, retryAt: number | null): RawResponse {
   const httpOk = status >= 200 && status < 300;
 
@@ -390,7 +295,6 @@ function readEnvelope(status: number, payload: unknown, retryAt: number | null):
 
 function codeForStatus(status: number, serverCode: string | null, authed: boolean): SyncErrorCode {
   if (status === 401 || status === 403) {
-    // On the public pairing route a 401 means the *code* was bad, not that we lost a credential.
     if (!authed) return 'invalid-code';
     return 'unauthorized';
   }
@@ -427,7 +331,6 @@ async function send(spec: RequestSpec): Promise<Attempt> {
 
   let bodyText: string | undefined;
   if (spec.body !== undefined) {
-    // INV-5 / SEC 7.4 — the only path to the network, and it goes through the allowlist.
     try {
       assertSyncSafe(spec.body);
     } catch (error) {
@@ -508,11 +411,6 @@ async function send(spec: RequestSpec): Promise<Attempt> {
   return { ok: false, error, res };
 }
 
-/* ------------------------------------------------------------------------------------------------
- * SEC 8.2 — pairing
- * ---------------------------------------------------------------------------------------------- */
-
-/** "Chrome · macOS" — capped at the 60 chars `pairRequestSchema` allows. */
 export function defaultDeviceName(): string {
   const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent;
   const engine = /Edg\//.test(ua)
@@ -538,11 +436,6 @@ export function defaultDeviceName(): string {
   return `${engine} · ${platform}`.slice(0, 60);
 }
 
-/**
- * SEC 8.2 steps 3–4. Exchanges the 8-char code the user copied out of NextMove web for a
- * device-bound 7-day JWT, then stores that JWT **AES-GCM-encrypted** — `chrome.storage.local` never
- * holds it in plaintext. Returns the new `SyncState`; the caller flips `settings.syncEnabled`.
- */
 export async function requestPairing(
   code: string,
   deviceName: string = defaultDeviceName(),
@@ -580,8 +473,6 @@ export async function requestPairing(
 
   tokenCache = { ct: sealed.ciphertext, iv: sealed.nonce, token: parsed.data.token };
 
-  // profileVersion resets: this install has not yet seen the account's ProfileBlob, so the first
-  // pull establishes the true optimistic-lock baseline (SEC 8.3).
   const next = await mutateSyncState((current) => ({
     ...current,
     paired: true,
@@ -597,10 +488,6 @@ export async function requestPairing(
   return ok(next);
 }
 
-/**
- * Revokes this install. Best-effort `DELETE /api/devices/:id` first — but the local credential is
- * dropped either way, so "disconnect" always succeeds from the user's point of view (INV-3).
- */
 export async function unpair(): Promise<SyncState> {
   const current = await readSyncState();
   if (current.paired && current.deviceId !== null) {
@@ -610,11 +497,6 @@ export async function unpair(): Promise<SyncState> {
   return mutateSyncState(() => ({ ...DEFAULT_SYNC_STATE, deviceName: current.deviceName }));
 }
 
-/* ------------------------------------------------------------------------------------------------
- * SEC 8.3 — profile blob (E2E, optimistic locking)
- * ---------------------------------------------------------------------------------------------- */
-
-/** Accepts the envelope bare or wrapped, and validates it against the shared contract. */
 function coerceEnvelope(data: unknown): profileBlobEnvelopeSchemaType | null {
   const candidates: unknown[] = [data];
   if (isPlainObject(data)) {
@@ -627,11 +509,6 @@ function coerceEnvelope(data: unknown): profileBlobEnvelopeSchemaType | null {
   return null;
 }
 
-/**
- * `GET /api/sync/profile`. `null` means the account has no ProfileBlob yet (first device).
- * Decrypt the result with `openProfileVault(envelope, passphrase)` — this client never holds the
- * passphrase and cannot read what it just downloaded.
- */
 export async function pullProfileBlob(): Promise<SyncResult<profileBlobEnvelopeSchemaType | null>> {
   if (!(await isPaired())) return notPaired();
 
@@ -665,7 +542,6 @@ async function buildVersionConflict(
 ): Promise<VersionConflictError> {
   let remote = res === null ? null : coerceEnvelope(res.data);
   if (remote === null) {
-    // The 409 body did not carry the winning envelope — fetch it so the caller can still merge.
     const pulled = await pullProfileBlob();
     if (pulled.ok) remote = pulled.data;
   }
@@ -679,14 +555,6 @@ async function buildVersionConflict(
   };
 }
 
-/**
- * `PUT /api/sync/profile` with the SEC 8.3 optimistic lock.
- *
- * Build `envelope` with `sealProfileVault(vault, passphrase, state.profileVersion + 1)`. A stale
- * version comes back as a `VersionConflictError` carrying the server's current envelope — decrypt,
- * merge, re-seal at `remoteVersion + 1`, push again. This function never retries on your behalf and
- * never overwrites the server copy blindly.
- */
 export async function pushProfileBlob(
   envelope: profileBlobEnvelopeSchemaType,
 ): Promise<SyncResult<{ version: number }>> {
@@ -743,11 +611,6 @@ export async function pushProfileBlob(
   return ok({ version: reported });
 }
 
-/* ------------------------------------------------------------------------------------------------
- * SEC 8.3 — site mappings (F-13 roams with the user, last-write-wins per (domain, sigHash))
- * ---------------------------------------------------------------------------------------------- */
-
-/** `jf.mappings` (domain → sigHash → path) flattened into the wire rows. */
 export function flattenMappingStore(store: MappingStore): siteMappingRowSchemaType[] {
   const rows: siteMappingRowSchemaType[] = [];
   for (const [domain, bySignature] of Object.entries(store)) {
@@ -759,7 +622,6 @@ export function flattenMappingStore(store: MappingStore): siteMappingRowSchemaTy
   return rows;
 }
 
-/** Folds wire rows back into a `MappingStore`; later rows win, mirroring the server's semantics. */
 export function foldMappingRows(
   rows: readonly siteMappingRowSchemaType[],
   into: MappingStore = {},
@@ -778,11 +640,6 @@ export async function readLocalMappings(): Promise<MappingStore> {
   return parsed.success ? parsed.data : {};
 }
 
-/**
- * `PUT /api/sync/mappings`. With no argument it flattens the local `jf.mappings` store. Batched at
- * `SYNC_MAX_MAPPINGS` because `siteMappingsPutSchema` caps a single body at 5 000 rows; the server
- * merges per (domain, sigHash), so several PUTs are equivalent to one large one.
- */
 export async function pushMappings(
   rows?: readonly siteMappingRowSchemaType[],
 ): Promise<SyncResult<{ pushed: number }>> {
@@ -813,7 +670,6 @@ export async function pushMappings(
   return ok({ pushed });
 }
 
-/** `GET /api/sync/mappings`. Returns wire rows; merging into `jf.mappings` is a separate step. */
 export async function pullMappings(): Promise<SyncResult<siteMappingRowSchemaType[]>> {
   if (!(await isPaired())) return notPaired();
 
@@ -839,7 +695,6 @@ export async function pullMappings(): Promise<SyncResult<siteMappingRowSchemaTyp
   return ok(rows);
 }
 
-/** Merges pulled rows into `jf.mappings` (last-write-wins) and returns the merged store. */
 export async function applyPulledMappings(
   rows: readonly siteMappingRowSchemaType[],
 ): Promise<MappingStore> {
@@ -848,13 +703,8 @@ export async function applyPulledMappings(
   return merged;
 }
 
-/* ------------------------------------------------------------------------------------------------
- * SEC 8.3 — job applications (CRUD, idempotent on clientId, cursor-paginated)
- * ---------------------------------------------------------------------------------------------- */
-
 export interface ApplicationPage {
   rows: jobApplicationRowSchemaType[];
-  /** Opaque cursor for the next page; `null` when the last page has been read. */
   nextCursor: string | null;
 }
 
@@ -868,10 +718,6 @@ function coerceApplicationRow(data: unknown): jobApplicationRowSchemaType | null
   return null;
 }
 
-/**
- * `POST /api/job-applications`. **Idempotent on `clientId`** (SEC 8.3): the extension's row id is
- * the natural key, so replaying a push after a dropped connection updates rather than duplicates.
- */
 export async function pushApplication(
   row: jobApplicationRowSchemaType,
 ): Promise<SyncResult<jobApplicationRowSchemaType>> {
@@ -898,10 +744,6 @@ export async function pushApplication(
   return ok(saved);
 }
 
-/**
- * Sequential because `clientId` idempotency makes retries cheap and the API is rate-limited to
- * 60/min/user (SEC 8.4). Stops at the first fatal error and reports what actually landed.
- */
 export async function pushApplications(
   rows: readonly jobApplicationRowSchemaType[],
 ): Promise<SyncResult<{ pushed: number; rows: jobApplicationRowSchemaType[] }>> {
@@ -919,7 +761,6 @@ export async function pushApplications(
   return ok({ pushed: saved.length, rows: saved });
 }
 
-/** `PATCH /api/job-applications/:clientId`. Only the keys you pass are written. */
 export async function patchApplication(
   clientId: string,
   patch: jobApplicationPatchSchemaType,
@@ -962,14 +803,12 @@ export async function deleteApplication(clientId: string): Promise<SyncResult<{ 
     auth: true,
   });
   if (!attempt.ok) {
-    // Already gone on the server is the outcome the caller wanted.
     if (attempt.error.code === 'not-found') return ok({ deleted: true });
     return fail(attempt.error);
   }
   return ok({ deleted: true });
 }
 
-/** `GET /api/job-applications?cursor=&limit=` — one cursor-paginated page (SEC 8.3). */
 export async function listApplications(
   options: { cursor?: string | null; limit?: number } = {},
 ): Promise<SyncResult<ApplicationPage>> {
@@ -1013,10 +852,6 @@ export async function listApplications(
   return ok({ rows, nextCursor });
 }
 
-/**
- * Walks every page. `maxPages` is a hard stop so a server that always returns a cursor cannot spin
- * the service worker forever.
- */
 export async function listAllApplications(
   options: { pageSize?: number; maxPages?: number } = {},
 ): Promise<SyncResult<jobApplicationRowSchemaType[]>> {

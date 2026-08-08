@@ -1,18 +1,5 @@
 "use client"
 
-/**
- * Step 6 — AI setup, and the only optional step in the wizard.
- *
- * This reuses the Settings components verbatim (`AddAiKeyForm`, `AuthKeyNotice`,
- * `HonestLimitsNotice`) rather than restating them: a key added here and a key added in Settings
- * must go through exactly the same validate-then-store path, and two copies of that form would
- * eventually disagree about what a valid key looks like.
- *
- * Skipping is genuinely free — every non-AI feature works without a key, and the 402
- * AI_SETUP_REQUIRED card links back here when someone reaches for an AI feature later. The Skip
- * control lives in the wizard footer next to Continue, at the same visual weight, on purpose.
- */
-
 import { CheckCircle2, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AddAiKeyForm } from "@/components/settings/AddAiKeyForm"

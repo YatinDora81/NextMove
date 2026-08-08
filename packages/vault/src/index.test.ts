@@ -1,9 +1,3 @@
-/**
- * The whole point of this package is that a vault sealed in one runtime opens in another. These
- * tests pin the properties that make that true: the wire format, the format-byte discrimination,
- * and the fact that a tampered byte fails loudly rather than decoding to garbage.
- */
-
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -26,7 +20,6 @@ import {
 import { PROFILE_VAULT_SCHEMA_VERSION, createEmptyProfile } from '@repo/types/ProfileTypes';
 import type { SyncProfileVault } from '@repo/types/ProfileTypes';
 
-// PBKDF2 at 210 000 iterations is the slow path; the tests that exercise it use a low count.
 const FAST_ITERATIONS = 1_000;
 
 function vaultFixture(): SyncProfileVault {
