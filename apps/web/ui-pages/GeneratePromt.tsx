@@ -1,5 +1,5 @@
 "use client"
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
     Card,
     CardContent,
@@ -41,7 +41,6 @@ function GeneratePromt({ allRoles , predefinedTemplates }: { allRoles: Role[], p
     const [firstName, setFirstName] = useState('')
     const [lastName, setLastName] = useState('')
     const { getToken } = useAuth()
-    const editBtnRef = useRef<HTMLButtonElement>(null)
     const { isLaptop } = useDevice()
     const [isAlreadyFilledForm, setIsAlreadyFilledForm] = useState<boolean>(false);
 

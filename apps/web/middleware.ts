@@ -3,7 +3,21 @@ import type { NextRequest } from 'next/server'
 
 const AUTH_COOKIE_NAME = "nextmove_auth_token"
 
-const protectedRoutes = ['/dashboard', '/forum', '/generate', '/on-boarding', '/templates', '/applied', '/ai-chat']
+// `/extension` itself stays public — it is the pre-install marketing page and a signed-out
+// visitor must be able to read it. `/extension/connect` is the handshake and needs an account, so
+// the exact subpath is listed instead. Adding '/extension' here would break the public page,
+// because the check below is a prefix match.
+const protectedRoutes = [
+    '/dashboard',
+    '/forum',
+    '/generate',
+    '/on-boarding',
+    '/onboarding',
+    '/templates',
+    '/applied',
+    '/ai-chat',
+    '/extension/connect',
+]
 
 export function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl

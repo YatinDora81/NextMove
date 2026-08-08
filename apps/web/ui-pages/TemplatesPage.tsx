@@ -1,6 +1,6 @@
 "use client"
 import React, { useEffect, useState } from 'react'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from '@/components/ui/button'
 import { Copy, Edit, Plus, Trash, FileText } from 'lucide-react'
 import {
@@ -32,7 +32,8 @@ function TemplatesPage({ allRoles }: { allRoles: Role[] }) {
         }
     ]
 
-    const [filter, setFilter] = useState('All')
+    // Write-only: <Tabs> owns the visible selection; the value is never read back here.
+    const [, setFilter] = useState('All')
     const { templates: orignalTemplates, deleteTemplate , isTemplateLoading } = useTemplates()
     const [renderTemplates, setRenderTemplates] = useState<TemplateType[]>([]);
 

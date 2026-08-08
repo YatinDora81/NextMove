@@ -3,7 +3,7 @@
 import { TemplateType } from "@/utils/api_types";
 import { GET_ALL_TEMPLATES, DELETE_TEMPLATE } from "@/utils/url";
 import { useAuth } from "@/hooks/useAuth";
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useCallback, useContext, useEffect, useState } from "react"
 import toast from "react-hot-toast";
 
 type TemplateContextType = {
@@ -23,7 +23,7 @@ export const TemplateProvider = ({ children }: { children: React.ReactNode }) =>
     const [isTemplateLoading, setIsTemplateLoading] = useState(false);
     const { getToken } = useAuth()
 
-    const fetchTemplates = async () => {
+    const fetchTemplates = useCallback(async () => {
         try {
             setIsTemplateLoading(true);
             const token = await getToken()
@@ -48,7 +48,10 @@ export const TemplateProvider = ({ children }: { children: React.ReactNode }) =>
         finally {
             setIsTemplateLoading(false);
         }
-    }
+        // `getToken` is a useCallback([]) from AuthProvider, so this identity is stable for the
+        // life of the provider — the mount-time effect below still runs exactly once, and
+        // consumers reading `fetchTemplates` off the context stop re-rendering on every change.
+    }, [getToken])
 
     const deleteTemplate = async (templateId: string) => {
         try {
@@ -81,7 +84,7 @@ export const TemplateProvider = ({ children }: { children: React.ReactNode }) =>
 
     useEffect(() => {
         fetchTemplates()
-    }, [])
+    }, [fetchTemplates])
 
     return (
         <TemplateContext.Provider value={{ templates, setTemplates, isTemplateLoading, setIsTemplateLoading, fetchTemplates, deleteTemplate }}>

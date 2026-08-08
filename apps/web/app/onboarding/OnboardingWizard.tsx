@@ -1,0 +1,603 @@
+"use client"
+
+/**
+ * JF-001 SEC 7.2 — the profile onboarding wizard.
+ *
+ * This is where a NextMove profile is *authored*. The extension never asks for any of it: it opens
+ * the sealed vault this wizard writes and fills forms from it, so everything below is really one
+ * long-form editor for a single `SharedProfile`.
+ *
+ * Three decisions shape the machinery:
+ *
+ *   1. One reducer, not a field-per-`useState`. Seven steps editing one deeply nested object means
+ *      the interesting state is the *draft*, and a reducer keeps the draft, the step, the blur
+ *      errors and the in-flight transition in a single atomic update.
+ *   2. The vault is written on step transition, never on keystroke. `PUT /api/sync/profile` shares
+ *      a 60/min limit with every other sync call, and an autosave-per-character wizard would spend
+ *      that budget on the first paragraph of a job history.
+ *   3. The current step lives in `?step=`, so a refresh, a deep link from the 402 AI card, or a
+ *      bookmark all land where the user was. Combined with (2), reloading mid-wizard loses at most
+ *      the step you were typing in.
+ */
+
+import { useCallback, useEffect, useMemo, useReducer, useRef } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { AnimatePresence, motion, useReducedMotion } from "motion/react"
+import toast from "react-hot-toast"
+import { ArrowLeft, ArrowRight, CloudOff, Loader2, RotateCw, ShieldAlert } from "lucide-react"
+import type { SharedProfile } from "@repo/types/ProfileTypes"
+import { Button } from "@/components/ui/button"
+import { StepIndicator } from "@/components/onboarding/StepIndicator"
+import { useAuth } from "@/hooks/useAuth"
+import { useProfileVault } from "@/hooks/useProfileVault"
+import { cn } from "@/lib/utils"
+import type { FieldErrors } from "@/app/onboarding/steps/fields"
+import { WelcomeStep } from "@/app/onboarding/steps/WelcomeStep"
+import { AboutYouStep } from "@/app/onboarding/steps/AboutYouStep"
+import { ExperienceStep } from "@/app/onboarding/steps/ExperienceStep"
+import { LinksSkillsStep } from "@/app/onboarding/steps/LinksSkillsStep"
+import { EligibilityStep } from "@/app/onboarding/steps/EligibilityStep"
+import { AiSetupStep } from "@/app/onboarding/steps/AiSetupStep"
+import { ConnectStep } from "@/app/onboarding/steps/ConnectStep"
+
+/* ------------------------------------------------------------------------------------------------
+ * Steps
+ * ---------------------------------------------------------------------------------------------- */
+
+export const STEP_IDS = [
+    "welcome",
+    "about",
+    "experience",
+    "links",
+    "eligibility",
+    "ai",
+    "connect",
+] as const
+
+export type StepId = (typeof STEP_IDS)[number]
+
+type StepMeta = {
+    /** Shown in the progress rail — short enough to survive a five-column grid. */
+    label: string
+    /** The CTA that leaves this step. Named for the destination, never "Next". */
+    forwardLabel: string
+}
+
+const STEP_META: Record<StepId, StepMeta> = {
+    welcome: { label: "Welcome", forwardLabel: "Start with the basics" },
+    about: { label: "About you", forwardLabel: "Continue to experience" },
+    experience: { label: "Experience", forwardLabel: "Continue to links & skills" },
+    links: { label: "Links & skills", forwardLabel: "Continue to work eligibility" },
+    eligibility: { label: "Eligibility", forwardLabel: "Continue to AI setup" },
+    ai: { label: "AI setup", forwardLabel: "Finish and connect" },
+    connect: { label: "Connect", forwardLabel: "" },
+}
+
+/** The rail covers the steps that actually collect something; welcome and connect are bookends. */
+const RAIL_STEPS = STEP_IDS.slice(1, -1).map((id) => ({ id, label: STEP_META[id].label }))
+
+const STEP_NAMES: readonly string[] = STEP_IDS
+
+export function parseStepId(value: string | null | undefined): StepId | null {
+    if (value === null || value === undefined) return null
+    return STEP_NAMES.includes(value) ? (value as StepId) : null
+}
+
+function stepIndex(step: StepId): number {
+    return STEP_IDS.indexOf(step)
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Validation
+ * ---------------------------------------------------------------------------------------------- */
+
+/**
+ * Deliberately loose. This is a job-application profile, not an identity document — the only thing
+ * worth blocking on is data an employer's form will reject outright, and everything else is the
+ * user's business.
+ */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
+
+function urlProblem(value: string): string | null {
+    const trimmed = value.trim()
+    if (trimmed === "") return null
+    let parsed: URL
+    try {
+        parsed = new URL(trimmed)
+    } catch {
+        return "That doesn’t look like a web address — try pasting the full link."
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        return "Links have to start with http:// or https://."
+    }
+    return null
+}
+
+function validateValue(field: string, value: string): string | null {
+    switch (field) {
+        case "personal.firstName":
+            return value.trim() === "" ? "Application forms always ask for a first name." : null
+        case "personal.lastName":
+            return value.trim() === "" ? "Application forms always ask for a last name." : null
+        case "personal.email": {
+            const trimmed = value.trim()
+            if (trimmed === "") return "This is the one field no application form will let you skip."
+            return EMAIL_PATTERN.test(trimmed) ? null : "That doesn’t look like an email address."
+        }
+        case "links.linkedin":
+        case "links.github":
+        case "links.portfolio":
+            return urlProblem(value)
+        default:
+            return null
+    }
+}
+
+/** Fields that block forward movement, and how to read each one off the draft. */
+const BLOCKING_FIELDS: Partial<Record<StepId, Record<string, (draft: SharedProfile) => string>>> = {
+    about: {
+        "personal.firstName": (draft) => draft.personal.firstName,
+        "personal.lastName": (draft) => draft.personal.lastName,
+        "personal.email": (draft) => draft.personal.email,
+    },
+    links: {
+        "links.linkedin": (draft) => draft.links.linkedin,
+        "links.github": (draft) => draft.links.github,
+        "links.portfolio": (draft) => draft.links.portfolio,
+    },
+}
+
+function validateStep(step: StepId, draft: SharedProfile): FieldErrors {
+    const errors: FieldErrors = {}
+    const fields = BLOCKING_FIELDS[step]
+    if (!fields) return errors
+    for (const [field, read] of Object.entries(fields)) {
+        const problem = validateValue(field, read(draft))
+        if (problem !== null) errors[field] = problem
+    }
+    return errors
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Reducer
+ * ---------------------------------------------------------------------------------------------- */
+
+type WizardState = {
+    step: StepId
+    draft: SharedProfile | null
+    errors: FieldErrors
+    /** Non-null while a step transition is waiting on the vault write that precedes it. */
+    pendingStep: StepId | null
+    furthestIndex: number
+    skippedAi: boolean
+    lastSaveFailed: boolean
+}
+
+type WizardAction =
+    | { type: "hydrate"; profile: SharedProfile }
+    | { type: "patch"; patch: Partial<SharedProfile> }
+    | { type: "fieldError"; field: string; message: string | null }
+    | { type: "blockWith"; errors: FieldErrors }
+    | { type: "requestStep"; step: StepId }
+    | { type: "commitStep"; saved: boolean }
+    | { type: "syncStep"; step: StepId }
+    | { type: "skipAi" }
+
+function reducer(state: WizardState, action: WizardAction): WizardState {
+    switch (action.type) {
+        case "hydrate":
+            return { ...state, draft: action.profile }
+        case "patch":
+            return state.draft === null
+                ? state
+                : { ...state, draft: { ...state.draft, ...action.patch } }
+        case "fieldError": {
+            const errors = { ...state.errors }
+            if (action.message === null) delete errors[action.field]
+            else errors[action.field] = action.message
+            return { ...state, errors }
+        }
+        case "blockWith":
+            return { ...state, errors: { ...state.errors, ...action.errors } }
+        case "requestStep":
+            return { ...state, pendingStep: action.step }
+        case "commitStep": {
+            const step = state.pendingStep ?? state.step
+            return {
+                ...state,
+                step,
+                pendingStep: null,
+                // Errors belong to the step you just left; carrying them forward is noise.
+                errors: {},
+                furthestIndex: Math.max(state.furthestIndex, stepIndex(step)),
+                lastSaveFailed: !action.saved,
+            }
+        }
+        case "syncStep":
+            return {
+                ...state,
+                step: action.step,
+                pendingStep: null,
+                errors: {},
+                furthestIndex: Math.max(state.furthestIndex, stepIndex(action.step)),
+            }
+        case "skipAi":
+            return { ...state, skippedAi: true }
+    }
+}
+
+function initialState(step: StepId): WizardState {
+    return {
+        step,
+        draft: null,
+        errors: {},
+        pendingStep: null,
+        furthestIndex: stepIndex(step),
+        skippedAi: false,
+        lastSaveFailed: false,
+    }
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Draft helpers
+ * ---------------------------------------------------------------------------------------------- */
+
+type AuthUser = { firstName: string | null; lastName: string | null; email: string }
+
+/**
+ * Seed the identity fields from the account the user already created, but never overwrite what the
+ * vault holds — the vault is the newer, hand-edited copy by definition.
+ */
+function withIdentityPrefill(profile: SharedProfile, user: AuthUser | null): SharedProfile {
+    if (user === null) return profile
+    const personal = { ...profile.personal }
+    if (personal.firstName.trim() === "" && user.firstName) personal.firstName = user.firstName
+    if (personal.lastName.trim() === "" && user.lastName) personal.lastName = user.lastName
+    if (personal.email.trim() === "" && user.email) personal.email = user.email
+    return { ...profile, personal }
+}
+
+/** Exactly the slice of the profile this wizard owns. Answers and compensation are edited elsewhere. */
+function wizardPatch(draft: SharedProfile): Partial<SharedProfile> {
+    return {
+        summary: draft.summary,
+        personal: draft.personal,
+        links: draft.links,
+        work: draft.work,
+        education: draft.education,
+        skills: draft.skills,
+        authorization: draft.authorization,
+        eeo: draft.eeo,
+        updatedAt: Date.now(),
+    }
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Wizard
+ * ---------------------------------------------------------------------------------------------- */
+
+export function OnboardingWizard({ initialStep }: { initialStep: StepId }) {
+    const router = useRouter()
+    const pathname = usePathname()
+    const searchParams = useSearchParams()
+    const reduceMotion = useReducedMotion()
+    const { user } = useAuth()
+    const {
+        status,
+        profile,
+        vaultKey,
+        error,
+        errorKind,
+        ensureVaultKey,
+        load,
+        update,
+        save,
+        exportRecoveryKey,
+    } = useProfileVault()
+
+    const [state, dispatch] = useReducer(reducer, initialStep, initialState)
+
+    /*
+     * `update` and `save` are read through a ref so the transition effect below can depend on
+     * `pendingStep` alone. Without it the effect would re-run on every context change — and the
+     * whole point of the two-phase transition is that `save()` must be the *post-update* closure.
+     * This effect has no dependency array on purpose: it must refresh on every render.
+     */
+    const vaultActions = useRef({ update, save })
+    useEffect(() => {
+        vaultActions.current = { update, save }
+    })
+
+    const bootstrapped = useRef(false)
+    useEffect(() => {
+        if (bootstrapped.current) return
+        bootstrapped.current = true
+        void (async () => {
+            try {
+                // The key has to exist before a GET can be decrypted into anything.
+                await ensureVaultKey()
+                await load()
+            } catch {
+                // Failure is already reflected in `status`/`error`; the retry card renders from those.
+            }
+        })()
+    }, [ensureVaultKey, load])
+
+    const hydrated = state.draft !== null
+    useEffect(() => {
+        if (hydrated || status !== "ready" || profile === null) return
+        dispatch({ type: "hydrate", profile: withIdentityPrefill(profile, user) })
+    }, [hydrated, status, profile, user])
+
+    /* URL → state: deep links, the 402 card's `?step=ai`, and hand-edited addresses. */
+    const urlStep = searchParams.get("step")
+    const stepRef = useRef(state.step)
+    stepRef.current = state.step
+    useEffect(() => {
+        const parsed = parseStepId(urlStep)
+        if (parsed !== null && parsed !== stepRef.current) dispatch({ type: "syncStep", step: parsed })
+    }, [urlStep])
+
+    /* state → URL. `replace`, not `push`: the wizard's own Back button owns intra-wizard history. */
+    useEffect(() => {
+        if (parseStepId(urlStep) === state.step) return
+        router.replace(`${pathname}?step=${state.step}`, { scroll: false })
+    }, [state.step, urlStep, pathname, router])
+
+    /* Phase two of a transition: seal and PUT, then move. */
+    const savingRef = useRef(false)
+    useEffect(() => {
+        const target = state.pendingStep
+        if (target === null || savingRef.current) return
+        savingRef.current = true
+        void (async () => {
+            const saved = await vaultActions.current.save()
+            savingRef.current = false
+            if (!saved) {
+                toast.error(
+                    "We couldn’t reach your vault just then. Nothing is lost — we’ll try again on the next step.",
+                )
+            }
+            dispatch({ type: "commitStep", saved })
+        })()
+    }, [state.pendingStep])
+
+    useEffect(() => {
+        window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" })
+    }, [state.step, reduceMotion])
+
+    const patch = useCallback((next: Partial<SharedProfile>) => {
+        dispatch({ type: "patch", patch: next })
+    }, [])
+
+    const onBlurField = useCallback((field: string, value: string) => {
+        dispatch({ type: "fieldError", field, message: validateValue(field, value) })
+    }, [])
+
+    const draft = state.draft
+    const goTo = useCallback(
+        (target: StepId) => {
+            if (state.pendingStep !== null || draft === null) return
+            // Blocking errors stop forward movement only. Going back to fix something must never
+            // be the thing that is blocked.
+            if (stepIndex(target) > stepIndex(state.step)) {
+                const problems = validateStep(state.step, draft)
+                if (Object.keys(problems).length > 0) {
+                    dispatch({ type: "blockWith", errors: problems })
+                    return
+                }
+            }
+            vaultActions.current.update(wizardPatch(draft))
+            dispatch({ type: "requestStep", step: target })
+        },
+        [state.pendingStep, state.step, draft],
+    )
+
+    const currentIndex = stepIndex(state.step)
+    const previousStep = currentIndex > 0 ? STEP_IDS[currentIndex - 1] : undefined
+    const nextStep = currentIndex < STEP_IDS.length - 1 ? STEP_IDS[currentIndex + 1] : undefined
+    const busy = state.pendingStep !== null
+
+    const stepBody = useMemo(() => {
+        if (draft === null) return null
+        const stepProps = { draft, errors: state.errors, patch, onBlurField }
+        switch (state.step) {
+            case "welcome":
+                return (
+                    <WelcomeStep
+                        firstName={draft.personal.firstName || user?.firstName || ""}
+                        busy={busy}
+                        onStart={() => goTo("about")}
+                    />
+                )
+            case "about":
+                return <AboutYouStep {...stepProps} />
+            case "experience":
+                return <ExperienceStep {...stepProps} />
+            case "links":
+                return <LinksSkillsStep {...stepProps} />
+            case "eligibility":
+                return <EligibilityStep {...stepProps} />
+            case "ai":
+                return <AiSetupStep />
+            case "connect":
+                return (
+                    <ConnectStep
+                        draft={draft}
+                        vaultKey={vaultKey}
+                        skippedAi={state.skippedAi}
+                        saving={busy}
+                        saveFailed={state.lastSaveFailed}
+                        onSaveAgain={() => goTo("connect")}
+                        onExportRecoveryKey={exportRecoveryKey}
+                    />
+                )
+        }
+    }, [
+        draft,
+        state.errors,
+        state.step,
+        state.skippedAi,
+        state.lastSaveFailed,
+        patch,
+        onBlurField,
+        goTo,
+        busy,
+        user,
+        vaultKey,
+        exportRecoveryKey,
+    ])
+
+    if (status === "error" && !hydrated) {
+        // The heading has to match the cause. A dropped connection and an unreadable vault are the
+        // same code path but very different news, and telling someone their vault won't open when
+        // their wifi blinked is how you convince them they lost their data.
+        const offline = errorKind === "network"
+        return (
+            <WizardShell>
+                <div
+                    className={cn(
+                        "flex flex-col items-start gap-4 rounded-xl border p-6",
+                        offline ? "border-border bg-muted/40" : "border-destructive/40 bg-destructive/5",
+                    )}
+                >
+                    {offline ? (
+                        <CloudOff className="size-5 text-muted-foreground" />
+                    ) : (
+                        <ShieldAlert className="size-5 text-destructive" />
+                    )}
+                    <div className="flex flex-col gap-1">
+                        <h1 className="font-mono text-lg font-semibold">
+                            {offline ? "We couldn’t reach NextMove" : "We couldn’t open your vault"}
+                        </h1>
+                        <p className="max-w-xl text-sm leading-relaxed text-muted-foreground">
+                            {error ??
+                                "Your profile is stored encrypted, and the key lives in this browser. If you started onboarding somewhere else, open this page there — or start fresh here and import later."}
+                        </p>
+                    </div>
+                    <Button variant="outline" onClick={() => void load()}>
+                        <RotateCw className="size-4" />
+                        Try again
+                    </Button>
+                </div>
+            </WizardShell>
+        )
+    }
+
+    if (!hydrated) {
+        return (
+            <WizardShell>
+                <div
+                    role="status"
+                    aria-label="Opening your profile vault"
+                    className="flex min-h-64 items-center justify-center rounded-xl border border-border bg-card"
+                >
+                    <span className="flex items-center gap-2 font-mono text-sm text-muted-foreground">
+                        <Loader2 className="size-4 animate-spin" />
+                        Opening your vault…
+                    </span>
+                </div>
+            </WizardShell>
+        )
+    }
+
+    const showRail = currentIndex > 0 && currentIndex < STEP_IDS.length - 1
+    const showFooter = showRail
+
+    return (
+        <WizardShell>
+            {showRail ? (
+                <StepIndicator
+                    steps={RAIL_STEPS}
+                    currentIndex={currentIndex - 1}
+                    furthestIndex={state.furthestIndex - 1}
+                    onSelect={(id) => {
+                        const parsed = parseStepId(id)
+                        if (parsed !== null) goTo(parsed)
+                    }}
+                />
+            ) : null}
+
+            {/*
+             * A non-fatal vault warning — most often "this browser won't persist your key", which
+             * `materializeKey()` reports without failing the load. It is exactly the situation where
+             * the user has to act before they close the tab, so it cannot live only in a toast.
+             */}
+            {error !== null ? (
+                <div
+                    role="status"
+                    className="flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4"
+                >
+                    <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <p className="text-xs leading-relaxed">{error}</p>
+                </div>
+            ) : null}
+
+            <div className="rounded-xl border border-border bg-card p-6 text-card-foreground shadow-sm md:p-8">
+                <AnimatePresence mode="wait" initial={false}>
+                    <motion.div
+                        key={state.step}
+                        initial={{ opacity: 0, y: reduceMotion ? 0 : 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: reduceMotion ? 0 : -8 }}
+                        transition={{ duration: reduceMotion ? 0 : 0.18, ease: "easeOut" }}
+                    >
+                        {stepBody}
+                    </motion.div>
+                </AnimatePresence>
+
+                {showFooter ? (
+                    <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-6">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            disabled={busy || previousStep === undefined}
+                            onClick={() => previousStep && goTo(previousStep)}
+                        >
+                            <ArrowLeft className="size-4" />
+                            {previousStep ? `Back to ${STEP_META[previousStep].label}` : "Back"}
+                        </Button>
+
+                        <div className="flex flex-wrap items-center gap-3">
+                            {state.step === "ai" ? (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    disabled={busy}
+                                    onClick={() => {
+                                        dispatch({ type: "skipAi" })
+                                        goTo("connect")
+                                    }}
+                                >
+                                    Skip for now
+                                </Button>
+                            ) : null}
+                            <Button
+                                type="button"
+                                disabled={busy || nextStep === undefined}
+                                onClick={() => nextStep && goTo(nextStep)}
+                            >
+                                {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+                                {busy ? "Saving…" : STEP_META[state.step].forwardLabel}
+                                {busy ? null : <ArrowRight className="size-4" />}
+                            </Button>
+                        </div>
+                    </div>
+                ) : null}
+            </div>
+
+            <p className={cn("text-center text-xs text-muted-foreground", !showRail && "sr-only")}>
+                Everything here is encrypted in this browser before it is stored. We hold the
+                ciphertext; only you hold the key.
+            </p>
+        </WizardShell>
+    )
+}
+
+function WizardShell({ children }: { children: React.ReactNode }) {
+    return (
+        <div className="flex min-h-screen w-full items-start justify-center pt-[8vh] md:pt-[12vh]">
+            <div className="flex w-[90%] max-w-3xl flex-col gap-6 pb-16">{children}</div>
+        </div>
+    )
+}

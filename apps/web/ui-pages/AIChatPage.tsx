@@ -1,7 +1,6 @@
 "use client"
 import React, { useState, useEffect, useRef } from "react"
 import { Copy, Check, RotateCcw, Plus, MessageSquare, Menu, X } from "lucide-react"
-import { useToast, ToastContainer } from "@/lib/toast"
 import {
   Card,
   CardContent,
@@ -180,7 +179,7 @@ export default function AiChatPage() {
                     <h3 className="font-medium text-sm truncate">New Chat</h3>
 
                     <p className="text-xs text-muted-foreground mt-1 line-clamp-1 italic">
-                      Welcome! Let's start by choosing your message format:
+                      Welcome! Let&apos;s start by choosing your message format:
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
                       Created: {new Date().toLocaleDateString()}
@@ -298,7 +297,7 @@ export default function AiChatPage() {
                           AI Assistant
                         </p>
                         <p>
-                          Welcome! Let's start by choosing your message format:
+                          Welcome! Let&apos;s start by choosing your message format:
                         </p>
 
                         <div>
@@ -339,7 +338,7 @@ export default function AiChatPage() {
                           AI Assistant
                         </p>
                         <p>
-                          Great! Now choose what you'd like to do:
+                          Great! Now choose what you&apos;d like to do:
                         </p>
 
                         <div>
@@ -386,7 +385,7 @@ export default function AiChatPage() {
                             AI Assistant
                           </p>
                           <p>
-                            Welcome! Let's start by choosing your message format:
+                            Welcome! Let&apos;s start by choosing your message format:
                           </p>
 
                           <div>
@@ -433,7 +432,7 @@ export default function AiChatPage() {
                             AI Assistant
                           </p>
                           <p>
-                            Great! Now choose what you'd like to do:
+                            Great! Now choose what you&apos;d like to do:
                           </p>
 
                           <div>

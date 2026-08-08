@@ -27,7 +27,14 @@ function AutoCompleteSearch({ setOpen, searchFor = "String" }: { setOpen?: (v: b
                     className=" px-8 h-12 "
 
                 />
-                <IoMdClose className=' absolute right-3 hover:text-red-500 transition-colors duration-150 top-1/2 h-5 w-5 -translate-y-1/2 transform' />
+                <button
+                    type='button'
+                    aria-label='Close search'
+                    onClick={() => setOpen?.(false)}
+                    className=' absolute right-3 hover:text-red-500 transition-colors duration-150 top-1/2 -translate-y-1/2 transform'
+                >
+                    <IoMdClose className=' h-5 w-5' />
+                </button>
             </div>
 
             <Card className=' w-full flex-1 flex flex-col '>

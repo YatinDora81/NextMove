@@ -192,6 +192,11 @@ export const AIProvider = ({ children }: { children: React.ReactNode }) => {
             setIsNewRoomFocused(true)
             setNewRoomDetails(null)
         }
+        // Mount-only, deliberately. `rooms` is read here as its *initial* value: `fetchRooms()`
+        // above is async and cannot have resolved yet, so the session-restore branch is evaluated
+        // against the empty first render. Adding `rooms` to the dependency array would re-run the
+        // restore every time the room list changes, which is a different feature, not a lint fix.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     useEffect(() => {

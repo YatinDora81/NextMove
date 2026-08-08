@@ -289,7 +289,7 @@ export default function LandingPage() {
             <div className="w-full md:w-[70rem] gap-8 sm:gap-10 md:gap-12 mx-auto h-fit min-h-[45rem] flex flex-col justify-center items-start px-4 sm:px-6 mt-[4rem] sm:mt-0" >
                 <div className="flex flex-col items-center w-full justify-center gap-3 sm:gap-4 md:gap-5">
                     <div className=" w-full text-center text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold px-4">Built For Every Job Seeker</div>
-                    <div className=" dark:text-zinc-200/50 poppins-medium text-base sm:text-lg md:text-xl w-full sm:w-[90%] md:w-[60%] mx-auto text-center px-4">Whether you're starting out or advancing your career, NextMoveApp adapts to your needs</div>
+                    <div className=" dark:text-zinc-200/50 poppins-medium text-base sm:text-lg md:text-xl w-full sm:w-[90%] md:w-[60%] mx-auto text-center px-4">Whether you&apos;re starting out or advancing your career, NextMoveApp adapts to your needs</div>
                 </div>
 
                 <div className=" grid grid-cols-1 sm:grid-cols-2 items-center justify-center mx-auto gap-4 sm:gap-5 w-full">
@@ -412,13 +412,13 @@ export default function LandingPage() {
                             © {new Date().getFullYear()} NextMoveApp. All rights reserved.
                         </p>
                         <div className="flex gap-4">
-                            <a target="_blank" href="https://x.com/YatinDora" className="text-muted-foreground hover:text-primary">
+                            <a target="_blank" rel="noreferrer" href="https://x.com/YatinDora" className="text-muted-foreground hover:text-primary">
                                 <Twitter className="w-5 h-5" />
                             </a>
-                            <a target="_blank" href="https://www.linkedin.com/in/yatin-dora/" className="text-muted-foreground hover:text-primary">
+                            <a target="_blank" rel="noreferrer" href="https://www.linkedin.com/in/yatin-dora/" className="text-muted-foreground hover:text-primary">
                                 <Linkedin className="w-5 h-5" />
                             </a>
-                            <a target="_blank" href="https://github.com/YatinDora81" className="text-muted-foreground hover:text-primary">
+                            <a target="_blank" rel="noreferrer" href="https://github.com/YatinDora81" className="text-muted-foreground hover:text-primary">
                                 <Github className="w-5 h-5" />
                             </a>
                         </div>

@@ -14,11 +14,23 @@ import { Textarea } from '../ui/textarea'
 import { Button } from '../ui/button'
 import { Label } from '../ui/label'
 import { Roles_AutoComplete } from '../Roles_AutoComplete'
-import { Role, Template_Operation_Type, TemplateType } from '@/utils/api_types'
+import { Role, Template_Operation_Type } from '@/utils/api_types'
 import { toast } from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
 import { GENERATE_AI_TEMPLATE } from '@/utils/url'
 import { Loader2 } from 'lucide-react'
+
+/**
+ * `data.data.ai_data` from `POST /api/templates/generate-ai-template` — the raw JSON the model
+ * produced (see `template-instruction.ts`), forwarded by the server without re-validation. Every
+ * field is optional on purpose: it is model output, so each read below carries a fallback.
+ */
+type AiGeneratedTemplate = {
+    message?: string
+    rules?: string[]
+    templateName?: string
+    templateDescription?: string
+}
 
 function Gen_AI_Template({ selectedRole, setSelectedRole, allRoles, templateData, setTemplateData }: { selectedRole: Role | null, setSelectedRole: (role: Role | null) => void, allRoles: Role[], templateData: Template_Operation_Type, setTemplateData: (templateData: Template_Operation_Type) => void }) {
     const [showResult, setShowResult] = useState(false)
@@ -28,7 +40,7 @@ function Gen_AI_Template({ selectedRole, setSelectedRole, allRoles, templateData
     const [history, setHistory] = useState<string[]>([]);
     const [prompt, setPrompt] = useState('');
     const [loading, setLoading] = useState(false);
-    const [newData, setNewData] = useState<{ [key: string]: any } | null>(null);
+    const [newData, setNewData] = useState<AiGeneratedTemplate | null>(null);
     useEffect(() => {
         const timer = setTimeout(() => {
             setIsCollapsed(true)
@@ -70,7 +82,7 @@ function Gen_AI_Template({ selectedRole, setSelectedRole, allRoles, templateData
                 return
             }
 
-            setNewData(data.data.ai_data as TemplateType)
+            setNewData(data.data.ai_data as AiGeneratedTemplate)
 
             setShowResult(true)
             setHistory([...history, prompt, JSON.stringify(data.data.ai_data)])
@@ -211,13 +223,13 @@ function Gen_AI_Template({ selectedRole, setSelectedRole, allRoles, templateData
                                         className="absolute top-2 right-2 p-1.5 rounded-md hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors"
                                         title="Copy to clipboard"
                                         onClick={() => {
-                                            navigator.clipboard.writeText(newData?.message as unknown as string || '')
+                                            navigator.clipboard.writeText(newData?.message || '')
                                             toast.success("Copied to clipboard")
                                         }}
                                     >
                                         <Copy className="w-4 h-4" />
                                     </button>
-                                    {newData?.message as unknown as string || ''}
+                                    {newData?.message || ''}
                                 </div>
                             </div>
 
@@ -249,10 +261,10 @@ function Gen_AI_Template({ selectedRole, setSelectedRole, allRoles, templateData
                                 onClick={() => {
                                     setTemplateData({
                                         ...templateData,
-                                        content: newData?.message as unknown as string || '',
-                                        rules: newData?.rules as unknown as string[] || [],
-                                        name: newData?.templateName as unknown as string || '',
-                                        description: newData?.templateDescription as unknown as string || '',
+                                        content: newData?.message || '',
+                                        rules: newData?.rules || [],
+                                        name: newData?.templateName || '',
+                                        description: newData?.templateDescription || '',
                                     })
                                     setIsOpen(false)
                                 }} className="w-full flex items-center justify-center gap-2">

@@ -24,7 +24,27 @@ import { useAuth } from '@/hooks/useAuth'
 import { useTemplates } from '@/hooks/useTemplates'
 import Gen_AI_Template from './Gen_AI_Template'
 
-function TemplateOpeartion({ children, isUpdate = false, currData = null, allRoles }: { children: ReactNode, isUpdate?: boolean, currData?: any, allRoles: Role[] }) {
+/**
+ * The placeholder toggles offered by the form. Static configuration, so it lives at module scope:
+ * as a value recreated on every render it could never be an honest `useEffect` dependency — the
+ * effects below read it *and* call `setTemplateData`, so a fresh array each render would loop.
+ */
+const rules = [
+    {
+        name: "[Recruiter Name]",
+        defaultValue: true
+    },
+    {
+        name: "[Company Name]",
+        defaultValue: true
+    },
+    // {
+    //     name: "[Gender]",
+    //     defaultValue: false
+    // }
+]
+
+function TemplateOpeartion({ children, isUpdate = false, currData = null, allRoles }: { children: ReactNode, isUpdate?: boolean, currData?: TemplateType | null, allRoles: Role[] }) {
 
     const { getToken } = useAuth();
     const { setTemplates, templates } = useTemplates()
@@ -79,21 +99,6 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
         }
     }, [selectedRole])
 
-    const rules = [
-        {
-            name: "[Recruiter Name]",
-            defaultValue: true
-        },
-        {
-            name: "[Company Name]",
-            defaultValue: true
-        },
-        // {
-        //     name: "[Gender]",
-        //     defaultValue: false
-        // }
-    ]
-
     const submitHandler = async () => {
         try {
 
@@ -121,6 +126,16 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
                 toast.error("Type is required")
                 return
             }
+            // Update mode is always handed the row being edited; create mode never reads an id.
+            // Guarding keeps the id out of the type system's "possibly null" hole without changing
+            // what a caller sees: previously this threw a TypeError that the catch below turned
+            // into exactly this toast.
+            if (isUpdate && !currData) {
+                toast.error("Something went wrong")
+                return
+            }
+            const updateTargetId = currData?.id
+
             const token = await getToken()
 
             const res = await fetch(!isUpdate ? ADD_NEW_TEMPLATE : UPDATE_TEMPLATE, {
@@ -131,7 +146,7 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
                 },
                 body: JSON.stringify(!isUpdate ? templateData : {
                     ...templateData,
-                    templateId: currData.id,
+                    templateId: updateTargetId,
                     isRulesChanged: true,
                 })
             })
@@ -148,11 +163,11 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
                 setTemplates([newTemplate, ...templates])
             } else {
                 // Preserve roleRelation from existing template if new template doesn't have it
-                const existingTemplate = templates.find((t) => t.id === currData.id)
+                const existingTemplate = templates.find((t) => t.id === updateTargetId)
                 const updatedTemplate = existingTemplate && !newTemplate.roleRelation
                     ? { ...newTemplate, roleRelation: existingTemplate.roleRelation }
                     : newTemplate
-                setTemplates(templates.map((t) => t.id === currData.id ? updatedTemplate : t))
+                setTemplates(templates.map((t) => t.id === updateTargetId ? updatedTemplate : t))
             }
             toast.success(data.message || (isUpdate ? "Template updated successfully" : "Template added successfully"))
 
@@ -185,8 +200,6 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
                 setTemplateData(prev => ({ ...prev, rules: [...prev.rules, r.name] }))
             }
         })
-
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     // Reset form when dialog closes (only for create mode)
@@ -202,7 +215,6 @@ function TemplateOpeartion({ children, isUpdate = false, currData = null, allRol
             })
             setSelectedRole(null)
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, isUpdate])
 
     // Cycle through example messages
