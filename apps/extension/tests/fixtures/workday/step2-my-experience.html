@@ -1,0 +1,141 @@
+<!doctype html>
+<!--
+  Workday step 2 ("My Experience"), same tenant and same URL as fixtures/workday/step1-my-information.html.
+  Workday swaps this subtree in over step 1 without touching location.href, so every control here
+  carries a different label / id / data-automation-id and the two steps share no signature hash.
+  The shell and the [data-automation-id="jobApplicationPage"] swap point mirror step 1 so a test can
+  lift this subtree straight into a live step-1 document.
+  Invented tenant, invented employer, no real personal data, action="#".
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Apply - Data Engineer II - Grimsby Aerospace</title>
+    <meta property="og:site_name" content="Grimsby Aerospace" />
+    <meta property="og:title" content="Data Engineer II" />
+  </head>
+  <body>
+    <div data-automation-id="brandingHeader">
+      <span data-automation-id="companyName">Grimsby Aerospace</span>
+    </div>
+
+    <div data-automation-id="jobApplicationPage">
+      <h2 data-automation-id="jobPostingHeader">Data Engineer II</h2>
+
+      <div data-automation-id="applyFlowPage">
+        <ol data-automation-id="progressBar">
+          <li>My Information</li>
+          <li data-automation-id="progressBarActiveStep" aria-current="step">My Experience</li>
+          <li>Application Questions</li>
+          <li>Voluntary Disclosures</li>
+          <li>Self Identify</li>
+          <li>Review</li>
+        </ol>
+
+        <h2 data-automation-id="pageHeader">My Experience</h2>
+
+        <form action="#" method="post" novalidate>
+          <fieldset data-automation-id="workExperienceSection">
+            <legend>Work Experience</legend>
+
+            <div data-automation-id="formField-workExperience_jobTitle">
+              <label for="exp-1">Job Title</label>
+              <input
+                type="text"
+                id="exp-1"
+                data-automation-id="workExperience_jobTitle"
+                aria-required="true"
+              />
+            </div>
+
+            <div data-automation-id="formField-workExperience_companyName">
+              <label for="exp-2">Company</label>
+              <input
+                type="text"
+                id="exp-2"
+                data-automation-id="workExperience_companyName"
+                aria-required="true"
+              />
+            </div>
+
+            <div data-automation-id="formField-workExperience_location">
+              <label for="exp-3">Location</label>
+              <input type="text" id="exp-3" data-automation-id="workExperience_location" />
+            </div>
+
+            <div data-automation-id="formField-workExperience_startDate">
+              <label for="exp-4">From</label>
+              <input type="text" id="exp-4" data-automation-id="workExperience_startDate" placeholder="MM/YYYY" />
+            </div>
+
+            <div data-automation-id="formField-workExperience_endDate">
+              <label for="exp-5">To</label>
+              <input type="text" id="exp-5" data-automation-id="workExperience_endDate" placeholder="MM/YYYY" />
+            </div>
+
+            <div data-automation-id="formField-workExperience_roleDescription">
+              <label for="exp-6">Role Description</label>
+              <textarea id="exp-6" data-automation-id="workExperience_roleDescription"></textarea>
+            </div>
+          </fieldset>
+
+          <fieldset data-automation-id="educationSection">
+            <legend>Education</legend>
+
+            <div data-automation-id="formField-education_schoolName">
+              <label for="edu-1">School or University</label>
+              <input type="text" id="edu-1" data-automation-id="education_schoolName" />
+            </div>
+
+            <div data-automation-id="formField-education_degree">
+              <label for="edu-2">Degree</label>
+              <input type="text" id="edu-2" data-automation-id="education_degree" />
+            </div>
+
+            <div data-automation-id="formField-education_fieldOfStudy">
+              <label for="edu-3">Field of Study</label>
+              <input type="text" id="edu-3" data-automation-id="education_fieldOfStudy" />
+            </div>
+
+            <div data-automation-id="formField-education_gradeAverage">
+              <label for="edu-4">Overall Result</label>
+              <input type="text" id="edu-4" data-automation-id="education_gradeAverage" />
+            </div>
+          </fieldset>
+
+          <fieldset data-automation-id="websiteSection">
+            <legend>Websites</legend>
+
+            <div data-automation-id="formField-website_linkedin">
+              <label for="web-1">LinkedIn Profile</label>
+              <input type="text" id="web-1" data-automation-id="website_linkedin" />
+            </div>
+
+            <div data-automation-id="formField-website_portfolio">
+              <label for="web-2">Personal Website</label>
+              <input type="text" id="web-2" data-automation-id="website_portfolio" />
+            </div>
+          </fieldset>
+
+          <fieldset data-automation-id="skillsSection">
+            <legend>Skills</legend>
+
+            <div data-automation-id="formField-skills_summary">
+              <label for="skill-1">Skills</label>
+              <textarea id="skill-1" data-automation-id="skills_summary"></textarea>
+            </div>
+          </fieldset>
+
+          <!--
+            INV-1: "Save and Continue" commits the step. Located and highlighted, never clicked.
+          -->
+          <div data-automation-id="bottom-navigation">
+            <button type="button" data-automation-id="bottom-navigation-next-button">
+              Save and Continue
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </body>
+</html>

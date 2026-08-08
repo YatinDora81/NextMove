@@ -83,6 +83,14 @@ export function PreferencesPanel(): ReactElement {
             hint="Off by default. Even on, NextMove only fills — it never presses Submit or Next."
           />
           <Switch
+            checked={settings.autoFillNextSteps}
+            onChange={(autoFillNextSteps) => {
+              void patch({ autoFillNextSteps });
+            }}
+            label="Keep filling as you move through multi-step applications"
+            hint="After you fill once, each step you open gets filled automatically. You still press Next and Submit yourself."
+          />
+          <Switch
             checked={settings.highlightFilled}
             onChange={(highlightFilled) => {
               void patch({ highlightFilled });

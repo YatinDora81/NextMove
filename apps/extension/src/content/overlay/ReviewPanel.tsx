@@ -1,7 +1,9 @@
 import {
   createElement as h,
   useCallback,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactElement,
   type ReactNode,
@@ -62,6 +64,8 @@ export interface ReviewPanelProps {
   onRevealRow: (id: string) => void;
   onRevealNextStep: () => void;
   onMapField: (row: ReviewRow, path: string) => Promise<boolean>;
+  onSaveAnswer?: (row: ReviewRow) => Promise<boolean>;
+  focusedHash?: string | null;
   onRefill: () => void;
   onClose: () => void;
 }
@@ -76,6 +80,8 @@ function reasonCopy(reason: string | undefined): string | null {
   switch (reason) {
     case undefined:
       return null;
+    case 'new-field':
+      return 'You’re on this field now — map it once and NextMove fills it here from then on.';
     case 'no-value':
       return 'Your profile has nothing for this field yet.';
     case 'no-option-match':
@@ -187,23 +193,82 @@ function FieldMapper({ row, paths, domain, onMapField }: FieldMapperProps): Reac
   );
 }
 
+interface SaveAnswerButtonProps {
+  row: ReviewRow;
+  onSaveAnswer: (row: ReviewRow) => Promise<boolean>;
+}
+
+function SaveAnswerButton({ row, onSaveAnswer }: SaveAnswerButtonProps): ReactElement {
+  const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+
+  const save = useCallback(() => {
+    if (state === 'saving') return;
+    setState('saving');
+    void onSaveAnswer(row).then(
+      (ok) => setState(ok ? 'saved' : 'failed'),
+      () => setState('failed'),
+    );
+  }, [onSaveAnswer, row, state]);
+
+  if (state === 'saved') {
+    return h(
+      'div',
+      { className: 'jf-map jf-muted' },
+      'Saved to your Answer Bank — ✨ will offer it whenever this question appears again.',
+    );
+  }
+
+  return h(
+    'div',
+    { className: 'jf-map' },
+    h(
+      'button',
+      {
+        type: 'button',
+        className: 'jf-btn jf-btn--tiny',
+        disabled: state === 'saving',
+        onClick: save,
+      },
+      state === 'saving' ? 'Saving…' : 'Save what I typed as a reusable answer',
+    ),
+    state === 'failed'
+      ? h('span', { className: 'jf-row__meta' }, 'Could not save — is the field empty?')
+      : null,
+  );
+}
+
 interface RowProps {
   row: ReviewRow;
   paths: readonly string[];
   domain: string;
+  focused: boolean;
   onRevealRow: (id: string) => void;
   onMapField: (row: ReviewRow, path: string) => Promise<boolean>;
+  onSaveAnswer?: (row: ReviewRow) => Promise<boolean>;
 }
 
-function Row({ row, paths, domain, onRevealRow, onMapField }: RowProps): ReactElement {
+function Row({
+  row,
+  paths,
+  domain,
+  focused,
+  onRevealRow,
+  onMapField,
+  onSaveAnswer,
+}: RowProps): ReactElement {
+  const rowRef = useRef<HTMLDivElement | null>(null);
   const reason = reasonCopy(row.reason);
   const meta: string[] = [];
   if (row.path !== null) meta.push(prettyPath(row.path));
   if (row.section.length > 0) meta.push(row.section);
 
+  useEffect(() => {
+    if (focused) rowRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [focused]);
+
   return h(
     'div',
-    { className: `jf-row jf-row--${row.tone}` },
+    { ref: rowRef, className: `jf-row jf-row--${row.tone}${focused ? ' jf-row--focused' : ''}` },
     h('span', { className: 'jf-row__bar' }),
     h(
       'div',
@@ -217,8 +282,11 @@ function Row({ row, paths, domain, onRevealRow, onMapField }: RowProps): ReactEl
       meta.length > 0 ? h('div', { className: 'jf-row__meta' }, meta.join(' · ')) : null,
       row.value.length > 0 ? h('div', { className: 'jf-row__value' }, `→ ${row.value}`) : null,
       reason === null ? null : h('div', { className: 'jf-row__meta' }, reason),
-      row.tone === 'unmatched'
+      row.tone === 'unmatched' || focused
         ? h(FieldMapper, { row, paths, domain, onMapField })
+        : null,
+      (row.tone === 'unmatched' || focused) && onSaveAnswer !== undefined
+        ? h(SaveAnswerButton, { row, onSaveAnswer })
         : null,
     ),
     h(
@@ -256,6 +324,8 @@ export function ReviewPanel(props: ReviewPanelProps): ReactElement {
     onRevealRow,
     onRevealNextStep,
     onMapField,
+    onSaveAnswer,
+    focusedHash,
     onRefill,
     onClose,
   } = props;
@@ -439,7 +509,16 @@ export function ReviewPanel(props: ReviewPanelProps): ReactElement {
               : `Nothing in “${TONE_LABEL[active]}”.`,
           )
         : visible.map((row) =>
-            h(Row, { key: row.id, row, paths: profilePaths, domain, onRevealRow, onMapField }),
+            h(Row, {
+              key: row.id,
+              row,
+              paths: profilePaths,
+              domain,
+              focused: focusedHash != null && row.hash === focusedHash,
+              onRevealRow,
+              onMapField,
+              onSaveAnswer,
+            }),
           ),
     ),
 

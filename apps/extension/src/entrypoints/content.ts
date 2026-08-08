@@ -29,7 +29,14 @@ import { sendMessage } from '@/platform/bus';
 import { createLogger } from '@/platform/logger';
 import { getSettings, subscribeSlot } from '@/platform/storage';
 
-import { FieldMatcher, FormScanner, knownProfilePaths, nodeElement } from '@/core';
+import {
+  FieldMatcher,
+  FormScanner,
+  buildFieldSignature,
+  isFillableControl,
+  knownProfilePaths,
+  nodeElement,
+} from '@/core';
 import type { ScanResult } from '@/core/scanner';
 import {
   SUBMIT_TEXT_PATTERN,
@@ -289,7 +296,13 @@ export default defineContentScript({
 
     let applicationId: string | null = null;
     let confirmationHandled = false;
-    let autoFilledUrl: string | null = null;
+    let stepKey = '';
+    const filledStepKeys = new Set<string>();
+    let chainActive = false;
+    let stepDirty = true;
+    let lastFieldHashes: Set<string> | null = null;
+    let focusedHash: string | null = null;
+    let lastFocusScanAt = 0;
 
     let overlay: OverlayHandle | null = null;
     let markers: FieldMarkers | null = null;
@@ -477,8 +490,46 @@ export default defineContentScript({
       return true;
     }
 
+    function elementByHash(hash: string): HTMLElement | null {
+      for (const node of lastScan?.fields ?? []) {
+        if (node.sig.hash !== hash) continue;
+        const el = nodeElement(node);
+        if (el instanceof HTMLElement) return el;
+      }
+      return null;
+    }
+
+    async function saveAsAnswer(row: ReviewRow): Promise<boolean> {
+      const el = elementByHash(row.hash);
+      const answer = (el === null ? row.value : currentValue(el) || row.value).trim();
+      const qRaw = row.label.trim();
+      if (answer.length === 0 || qRaw.length === 0) return false;
+
+      const company = job !== null && job.company.length > 0 ? job.company : null;
+      const reply = await sendMessage('ANSWERS_SAVE', {
+        qRaw,
+        answer,
+        source: 'user',
+        profileId: settings.activeProfileId,
+        company,
+      });
+      if (!reply.ok) {
+        log.warn(`ANSWERS_SAVE failed: ${reply.error.message}`);
+        return false;
+      }
+      return true;
+    }
+
+    function nodeForElement(el: HTMLElement): FieldNode | null {
+      for (const node of lastScan?.fields ?? []) {
+        if (nodeElement(node) === el) return node;
+      }
+      return null;
+    }
+
     function closePanel(): void {
       panelOpen = false;
+      focusedHash = null;
       overlay?.clear('panel');
       markers?.clear();
     }
@@ -512,6 +563,8 @@ export default defineContentScript({
           onRevealRow: (id: string) => fieldMarkers().reveal(id),
           onRevealNextStep: () => fieldMarkers().reveal(NEXT_MARKER_ID),
           onMapField: saveMapping,
+          onSaveAnswer: saveAsAnswer,
+          focusedHash,
           onRefill: () => void runFillFlow('pill', null),
           onClose: closePanel,
         }),
@@ -656,6 +709,10 @@ export default defineContentScript({
 
         lastReport = report;
         lastRows = rows;
+        if (report.filled > 0 || report.suggested > 0) {
+          chainActive = true;
+          if (scan.fields.length > 0) filledStepKeys.add(scanKey(scan.fields));
+        }
 
         try {
           unstampAll(document);
@@ -757,6 +814,15 @@ export default defineContentScript({
       const scan = scanPage();
       lastScan = scan;
 
+      if (scan.fields.length > 0) {
+        const hashes = new Set(scan.fields.map((field) => field.sig.hash));
+        if (lastFieldHashes !== null && overlapRatio(hashes, lastFieldHashes) < 0.4) {
+          resetStepState();
+        }
+        lastFieldHashes = hashes;
+        stepKey = scanKey(scan.fields);
+      }
+
       if (scan.fields.length === 0) {
         applicationLike = false;
         sparkleTargets = [];
@@ -804,9 +870,63 @@ export default defineContentScript({
         pill?.hide();
       }
 
-      if (settings.autoFillOnLoad && autoFilledUrl !== location.href && !filling) {
-        autoFilledUrl = location.href;
+      if (panelOpen) renderPanel();
+
+      const wantsAuto = settings.autoFillOnLoad || (chainActive && settings.autoFillNextSteps);
+      if (wantsAuto && stepDirty && !filling && !filledStepKeys.has(stepKey)) {
+        stepDirty = false;
+        filledStepKeys.add(stepKey);
+
+        await waitForFormSettle();
+        if (disposed || filling) return;
+
+        const settled = scanPage().fields;
+        if (settled.length > 0) filledStepKeys.add(scanKey(settled));
         void runFillFlow('auto', null);
+      }
+    }
+
+    function scanKey(fields: readonly FieldNode[]): string {
+      const hashes = fields.map((field) => field.sig.hash).sort();
+      const first = hashes[0] ?? '';
+      const last = hashes[hashes.length - 1] ?? '';
+      return `${location.href}::${String(hashes.length)}:${first}:${last}`;
+    }
+
+    function overlapRatio(a: ReadonlySet<string>, b: ReadonlySet<string>): number {
+      if (a.size === 0 || b.size === 0) return 1;
+      let shared = 0;
+      for (const value of a) {
+        if (b.has(value)) shared += 1;
+      }
+      return shared / Math.min(a.size, b.size);
+    }
+
+    function resetStepState(): void {
+      lastRows = [];
+      lastReport = null;
+      nextStep = null;
+      focusedHash = null;
+      frameReports.clear();
+      sparkleTargets = [];
+      stepDirty = true;
+      markers?.clear();
+      overlay?.clear('sparkles');
+      if (panelOpen) renderPanel();
+    }
+
+    async function waitForFormSettle(maxMs = 3_000, pollMs = 200): Promise<void> {
+      const deadline = Date.now() + maxMs;
+      let previous: string | null = null;
+
+      while (!disposed && Date.now() < deadline) {
+        const fields = scanPage().fields;
+        const key = fields.length > 0 ? scanKey(fields) : '';
+        if (key.length > 0 && key === previous) return;
+        previous = key;
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, pollMs);
+        });
       }
     }
 
@@ -824,6 +944,7 @@ export default defineContentScript({
       const signal = detectConfirmation(document, location.href, config?.confirmation ?? null);
       if (!signal.confirmed) return;
       confirmationHandled = true;
+      chainActive = false;
 
       if (!isTop) {
         const top = window.top;
@@ -901,6 +1022,7 @@ export default defineContentScript({
       if (isFrameConfirmation(event.data)) {
         if (applicationId !== null && !confirmationHandled) {
           confirmationHandled = true;
+          chainActive = false;
           void sendMessage('TRACKER_UPDATE', {
             id: applicationId,
             patch: { status: 'applied', appliedAt: Date.now() },
@@ -921,6 +1043,47 @@ export default defineContentScript({
       renderPanel();
     };
 
+    const onFocusIn = (event: FocusEvent): void => {
+      if (!isTop || disposed || filling || !applicationLike) return;
+
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (overlay !== null && overlay.host.contains(target)) return;
+      if (!isFillableControl(target)) return;
+
+      let node = nodeForElement(target);
+      if (node === null) {
+        const now = Date.now();
+        if (now - lastFocusScanAt >= 1_000) {
+          lastFocusScanAt = now;
+          lastScan = scanPage();
+          node = nodeForElement(target);
+        }
+      }
+
+      const sig = node?.sig ?? buildFieldSignature(target, frameId);
+      focusedHash = sig.hash;
+
+      if (!lastRows.some((row) => row.hash === sig.hash)) {
+        const synthetic: ReviewRow = {
+          id: `${sig.hash}-focus`,
+          hash: sig.hash,
+          tone: 'unmatched',
+          label: sig.label,
+          section: sig.sectionHeading,
+          path: null,
+          value: '',
+          score: 0,
+          required: node?.required ?? target.hasAttribute('required'),
+          reason: 'new-field',
+        };
+        lastRows = [synthetic, ...lastRows];
+        panelOpen = true;
+      }
+
+      if (panelOpen) renderPanel();
+    };
+
     function teardown(): void {
       if (disposed) return;
       disposed = true;
@@ -935,6 +1098,7 @@ export default defineContentScript({
         // The extension context is already gone; nothing left to detach from.
       }
       window.removeEventListener('message', onWindowMessage);
+      document.removeEventListener('focusin', onFocusIn, true);
       unsubscribeSettings?.();
       disposePageObserver();
       markers?.dispose();
@@ -950,6 +1114,7 @@ export default defineContentScript({
       onRuntimeMessage as unknown as Parameters<typeof browser.runtime.onMessage.addListener>[0],
     );
     if (isTop) window.addEventListener('message', onWindowMessage);
+    if (isTop) document.addEventListener('focusin', onFocusIn, true);
     ctx.onInvalidated(teardown);
 
     async function boot(): Promise<void> {
@@ -971,7 +1136,10 @@ export default defineContentScript({
         confirmation: config.confirmation,
         debounceMs: OBSERVER_DEBOUNCE_MS,
       });
-      observer.onPageChanged(() => scheduleEvaluate());
+      observer.onPageChanged((event) => {
+        if (event.reason !== 'mutation' && event.reason !== 'initial') resetStepState();
+        scheduleEvaluate();
+      });
       observer.onConfirmationLikely(() => handleConfirmation());
 
       if (isTop) void refreshKeyAvailability();

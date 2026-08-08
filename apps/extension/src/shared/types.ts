@@ -332,6 +332,7 @@ export interface Settings {
   suggestThreshold: number;
 
   autoFillOnLoad: boolean;
+  autoFillNextSteps: boolean;
   showFloatingPill: boolean;
   highlightFilled: boolean;
   humanPacing: boolean;

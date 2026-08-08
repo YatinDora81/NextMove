@@ -156,6 +156,7 @@ export const DEFAULT_SETTINGS: Settings = {
   suggestThreshold: SUGGEST_THRESHOLD,
 
   autoFillOnLoad: false,
+  autoFillNextSteps: true,
   showFloatingPill: true,
   highlightFilled: true,
   humanPacing: true,

@@ -133,6 +133,7 @@ export const settingsSchema = z.object({
   suggestThreshold: score.default(DEFAULT_SETTINGS.suggestThreshold),
 
   autoFillOnLoad: z.boolean().default(DEFAULT_SETTINGS.autoFillOnLoad),
+  autoFillNextSteps: z.boolean().default(DEFAULT_SETTINGS.autoFillNextSteps),
   showFloatingPill: z.boolean().default(DEFAULT_SETTINGS.showFloatingPill),
   highlightFilled: z.boolean().default(DEFAULT_SETTINGS.highlightFilled),
   humanPacing: z.boolean().default(DEFAULT_SETTINGS.humanPacing),

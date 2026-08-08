@@ -285,6 +285,8 @@ button {
 .jf-row--filled .jf-row__bar { background: var(--jf-accent); }
 .jf-row--suggested .jf-row__bar { background: var(--jf-warn); }
 .jf-row--unmatched .jf-row__bar { background: var(--jf-danger); }
+.jf-row--focused { background: color-mix(in srgb, var(--jf-accent) 9%, transparent); border-radius: 8px; }
+.jf-row--focused .jf-row__bar { background: var(--jf-accent); }
 .jf-row__main { min-width: 0; flex: 1; }
 .jf-row__label { font-size: 12.5px; font-weight: 600; overflow-wrap: anywhere; }
 .jf-row__meta { font-size: 11px; color: var(--jf-fg-muted); overflow-wrap: anywhere; }
