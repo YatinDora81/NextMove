@@ -1,7 +1,8 @@
 "use client"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
-import { createContext, useContext } from "react"
+import { createContext, useContext, useEffect } from "react"
 import AuthModal from "../components/modals/AuthModal"
+import { useAuth } from "./useAuth"
 
 /**
  * Popup values:
@@ -29,9 +30,20 @@ export const PopUpProvider = ({ children }: { children: React.ReactNode }) => {
     const searchParams = useSearchParams()
     const router = useRouter()
     const pathname = usePathname()
+    const { isSignedIn, isLoaded } = useAuth()
 
-    const popup = (searchParams.get("popup") as PopUpType) || null
+    const requestedPopup = (searchParams.get("popup") as PopUpType) || null
     const redirectUrl = searchParams.get("redirect_url")
+
+    const alreadyAuthed =
+        isLoaded && isSignedIn && (requestedPopup === "login" || requestedPopup === "signup")
+
+    const popup = alreadyAuthed ? null : requestedPopup
+
+    useEffect(() => {
+        if (!alreadyAuthed) return
+        router.replace(redirectUrl && redirectUrl.startsWith("/") ? redirectUrl : pathname)
+    }, [alreadyAuthed, redirectUrl, pathname, router])
 
     const setPopup = (value: PopUpType) => {
         const params = new URLSearchParams()
