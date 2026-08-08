@@ -5,7 +5,7 @@ import logger from "@/config/logger.js";
 class GenerateMessageRepo {
     async generateMessage(userId: string, parsedData: generateMessageSchemaType) {
         try {
-            const data = await prismaClient.$transaction(async (tx: any) => {
+            const data = await prismaClient.$transaction(async (tx) => {
                 let newCompanyData;
                 if (parsedData.isNewCompany) {
                     newCompanyData = await tx.company.create({
@@ -19,7 +19,7 @@ class GenerateMessageRepo {
                 const generatedMessage = await tx.generatedMessages.create({
                     data: {
                         user: userId,
-                        company: parsedData.isNewCompany ? newCompanyData?.id! : parsedData.company!,
+                        company: parsedData.isNewCompany ? newCompanyData!.id : parsedData.company!,
                         role: parsedData.role,
                         recruiterName: parsedData.recruiterName,
                         template: parsedData.template,

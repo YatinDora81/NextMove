@@ -62,7 +62,7 @@ class TemplateRepo {
         try {
             await clearRedis(`templates:${userId}`)
 
-            const res = await prismaClient.$transaction(async (tx: any) => {
+            const res = await prismaClient.$transaction(async (tx) => {
                 const template = await tx.templates.create({
                     data: {
                         name: data.name,
@@ -101,7 +101,7 @@ class TemplateRepo {
                 })
 
                 const rules = await tx.templateRules.createManyAndReturn({
-                    data: data.rules.map((rule: any) => ({
+                    data: data.rules.map((rule) => ({
                         rule: rule,
                         templateId: template.id,
                     }))
@@ -141,7 +141,7 @@ class TemplateRepo {
     async updateTemplate(data: updateTemplateSchemaType, userId: string) {
         try {
             await clearRedis(`templates:${userId}`)
-            const res = await prismaClient.$transaction(async (tx: any) => {
+            const res = await prismaClient.$transaction(async (tx) => {
                 const template = await tx.templates.update({
                     where: {
                         user: userId,
@@ -163,7 +163,7 @@ class TemplateRepo {
                     })
                 }
                 const rules = await tx.templateRules.createManyAndReturn({
-                    data: data.rules.map((rule: any) => ({
+                    data: data.rules.map((rule) => ({
                         rule: rule,
                         templateId: data.templateId
                     }))
@@ -181,9 +181,9 @@ class TemplateRepo {
     async createTemplateBulk(data: createTemplateBulkSchemaType, userId: string) {
         try {
             await clearRedis('common-templates')
-            const res = await prismaClient.$transaction(async (tx: any) => {
+            const res = await prismaClient.$transaction(async (tx) => {
                 const templates = await tx.templates.createManyAndReturn({
-                    data: data.map((template: any) => ({
+                    data: data.map((template) => ({
                         name: template.name,
                         description: template.description,
                         type: template.type,
@@ -214,13 +214,13 @@ class TemplateRepo {
                 })
 
                 const allRules = await Promise.all(
-                    templates.map(async (template: any, index: number) => {
+                    templates.map(async (template, index) => {
                         const templateData = data[index];
                         if (!templateData) {
                             throw new Error(`Template data not found for index ${index}`);
                         }
                         const rules = await tx.templateRules.createManyAndReturn({
-                            data: templateData.rules.map((rule: any) => ({
+                            data: templateData.rules.map((rule) => ({
                                 rule: rule,
                                 templateId: template.id,
                             }))
@@ -228,7 +228,7 @@ class TemplateRepo {
                         return { template: { ...template, rules }, rules };
                     })
                 );
-                return templates.map((t: any, i: number) => { return { ...t, rules: allRules[i]?.rules } });
+                return templates.map((t, i) => { return { ...t, rules: allRules[i]?.rules } });
             })
 
             return res
@@ -300,7 +300,7 @@ class TemplateRepo {
             cleanedResponse = cleanedResponse.trim()
             
             const jsonData = await JSON.parse(cleanedResponse)
-            // const db_data = await prismaClient.$transaction(async (tx: any) => {
+            // const db_data = await prismaClient.$transaction(async (tx) => {
             //     const template = await tx.templates.create({
             //         data: {
             //             name: jsonData.templateName,

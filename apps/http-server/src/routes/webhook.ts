@@ -8,6 +8,25 @@ import { Webhook } from 'svix';
 
 const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
 
+/**
+ * The subset of Clerk's `user.*` webhook payload this handler actually reads.
+ *
+ * Svix's `verify()` returns `unknown` — it authenticates the envelope, it does not know the
+ * body's shape — so something has to assert the shape. Naming the fields is strictly better than
+ * the `any` that used to sit here: a typo in `email_addresses` is now a compile error, and the
+ * nullability of `last_name` is documented where it is relied on two lines below.
+ */
+interface ClerkUserEvent {
+    type: string;
+    data: {
+        id: string;
+        email_addresses: { email_address: string }[];
+        first_name: string;
+        last_name: string | null;
+        image_url: string;
+    };
+}
+
 router.post('/clerk', express.raw({ type: 'application/json' }), async (req: Request, res: Response) => {
     try {
         const payload = req.body;
@@ -23,20 +42,18 @@ router.post('/clerk', express.raw({ type: 'application/json' }), async (req: Req
 
         const wh = new Webhook(WEBHOOK_SECRET!);
 
-        let event: any;
-
-        event = wh.verify(payload, {
+        const event = wh.verify(payload, {
             'svix-id': svixId as string,
             'svix-timestamp': svixTimestamp as string,
             'svix-signature': svixSignature as string,
-        });
+        }) as ClerkUserEvent;
 
 
         switch (event.type) {
-            case 'user.created':
+            case 'user.created': {
                 console.log('New user created:', event?.data);
                 const data: createUserSchemaType = {
-                    email: event.data.email_addresses[0].email_address,
+                    email: event.data.email_addresses[0]!.email_address,
                     id: event.data.id,
                     firstName: event.data.first_name,
                     lastName: event.data.last_name!==null ? event.data.last_name : '',
@@ -45,7 +62,8 @@ router.post('/clerk', express.raw({ type: 'application/json' }), async (req: Req
                 }
                 await userService.createUser(data);
                 break;
-            case 'user.updated':
+            }
+            case 'user.updated': {
                 console.log('User updated:', event.data);
                 // Example: Update user data in your database
                 const data2: updateUserDetailsSchemaType = {
@@ -56,7 +74,8 @@ router.post('/clerk', express.raw({ type: 'application/json' }), async (req: Req
                 }
                 await userService.updateUserByClerk(data2);
                 break;
-            case 'user.deleted':
+            }
+            case 'user.deleted': {
                 console.log('User deleted:', event.data);
                 const data3: deleteUserSchemaType = {
                     userId: event.data.id,
@@ -64,6 +83,7 @@ router.post('/clerk', express.raw({ type: 'application/json' }), async (req: Req
                 await userService.deleteUserByClerk(data3);
                 // Example: Remove user data from your database
                 break;
+            }
             default:
                 console.log('Unhandled event type:', event.type);
         }

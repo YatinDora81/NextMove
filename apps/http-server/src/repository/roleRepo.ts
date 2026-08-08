@@ -22,7 +22,7 @@ class RoleRepo {
     async createRole(roles : createRoleSchemaType){
         try {
             const data = await prismaClient.role.createManyAndReturn({
-                data : roles.map((r: any) => ({
+                data : roles.map((r) => ({
                     name : r,
                 }))
             })

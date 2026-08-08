@@ -4,17 +4,20 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
     "start": "node ./dist/index.js",
     "build": "tsc -b && pnpm exec tsc-alias -p tsconfig.json",
     "dev": "pnpm run build && pnpm run start",
-    "prisma:generate": "cd .. && cd .. && cd packages/db && npx prisma generate && cd .. && cd .. && cd apps/http-server"
+    "prisma:generate": "cd .. && cd .. && cd packages/db && npx prisma generate && cd .. && cd .. && cd apps/http-server",
+    "check-types": "tsc --noEmit -p tsconfig.check.json",
+    "lint": "eslint . --max-warnings 0"
   },
   "dependencies": {
     "@clerk/backend": "^2.15.0",
     "@clerk/clerk-sdk-node": "^5.1.6",
     "@google/genai": "^1.22.0",
     "@repo/db": "workspace:*",
+    "@repo/rotation": "workspace:*",
     "@repo/types": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@types/bcrypt": "^6.0.0",
@@ -38,6 +41,9 @@
   "license": "ISC",
   "type": "module",
   "devDependencies": {
-    "tsc-alias": "^1.8.16"
+    "@repo/eslint-config": "workspace:*",
+    "eslint": "^9.34.0",
+    "tsc-alias": "^1.8.16",
+    "vitest": "^4.1.10"
   }
 }

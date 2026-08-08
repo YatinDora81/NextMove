@@ -2,6 +2,7 @@ import { Request, Response } from "express"
 import authRepo from "@/repository/authRepo.js"
 import logger from "@/config/logger.js"
 import jwt from "jsonwebtoken"
+import Prisma from "@repo/db/db"
 import { 
     signUpSchema, 
     signInSchema, 
@@ -87,8 +88,8 @@ class AuthController {
             let user
             try {
                 user = await authRepo.createUser({ firstName, lastName, email, password })
-            } catch (error: any) {
-                if (error.code === "P2002") {
+            } catch (error) {
+                if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
                     return res.status(400).json({
                         success: false,
                         message: "Email already exists"

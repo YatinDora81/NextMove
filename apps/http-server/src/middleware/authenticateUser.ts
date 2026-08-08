@@ -33,17 +33,17 @@ export const authenticateUser = (req: Request, res: Response, next: NextFunction
 
             // Proceed to next middleware or route handler
             next();
-        } catch (error: any) {
+        } catch (error) {
             console.error("JWT Error:", error);
 
-            if (error.name === "TokenExpiredError") {
+            if (error instanceof jwt.TokenExpiredError) {
                 res.status(401).json({
                     success: false,
                     error: "Token expired",
                     message: "Your session has expired. Please login again."
                 });
                 return 
-            } else if (error.name === "JsonWebTokenError") {
+            } else if (error instanceof jwt.JsonWebTokenError) {
                 res.status(401).json({
                     success: false,
                     error: "Invalid token",

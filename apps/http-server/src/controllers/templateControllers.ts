@@ -1,5 +1,4 @@
 import { Request, Response } from "express";
-import { prismaClient } from '@repo/db/db'
 import templateRepo from "../repository/templateRepo.js";
 import { createTemplateBulkSchema, createTemplateSchema, deleteTemplateSchema, makeTemplateUsingGeminiSchema, updateTemplateSchema } from "@repo/types/ZodTypes";
 import logger from "@/config/logger.js";

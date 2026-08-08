@@ -62,7 +62,6 @@ const wrappedLogger: Logger = new Proxy(logger, {
       };
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return original;
   },
 });

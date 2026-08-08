@@ -1,4 +1,3 @@
-import { prismaClient } from '@repo/db/db'
 import { createUserSchema, updatePremiumSchema, updateUserDetailsSchema } from '@repo/types/ZodTypes'
 import { Request, Response } from 'express'
 import { clearRedis, getRedis, setRedis } from '../utils/redisCommon.js'
@@ -20,7 +19,7 @@ class UserControllers {
                 return
             }
 
-            const { user, message } = await userService.createUser(parsedData.data) as { user: any, message: string }
+            const { user, message } = await userService.createUser(parsedData.data) as { user: unknown, message: string }
 
             res.status(200).json({
                 success: true,
@@ -127,7 +126,7 @@ class UserControllers {
         }
 
         const user = await userRepo.updatePremium(parsedData.data)
-        await Promise.all(user.map(async (user : any) => {
+        await Promise.all(user.map(async (user) => {
             await clearRedis(`premium:${user.id}`)
         }))
         res.status(200).json({

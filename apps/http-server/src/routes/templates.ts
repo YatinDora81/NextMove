@@ -1,4 +1,4 @@
-import express, { Request, Response, Router } from 'express'
+import express, { Router } from 'express'
 import Templates from '../controllers/templateControllers.js'
 import { authenticateUser } from '@/middleware/authenticateUser.js'
 import { isAdmin } from '@/middleware/isAdmin.js'
