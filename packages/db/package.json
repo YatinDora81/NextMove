@@ -4,9 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "vitest run",
     "check-types": "tsc --noEmit -p tsconfig.check.json",
-    "lint": "eslint . --max-warnings 0"
+    "generate": "prisma generate",
+    "lint": "eslint . --max-warnings 0",
+    "migrate:deploy": "prisma migrate deploy",
+    "migrate:status": "prisma migrate status",
+    "test": "vitest run"
   },
   "exports": {
     "./db": "./src/index.ts"
