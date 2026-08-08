@@ -1,0 +1,90 @@
+# Monorepo gates — JF-001 Rev 3.0 SEC 14.2.
+#
+# All three steps are UNFILTERED on purpose. Turborepo already skips any workspace that does not
+# define the script, so a `--filter` list here buys nothing and costs everything: it silently
+# excludes whatever was added after the filter was written, and the exclusion is invisible in a
+# green build.
+#
+# This job used to carry two filters and both had rotted:
+#
+#   * `test` was pinned to `extension`, `@repo/rotation` and `http-server`, on the theory that
+#     http-server shipped a placeholder test script that exited non-zero. That stopped being true
+#     (`http-server#test` is `vitest run`, 18 passing) — and in the meantime the filter was
+#     excluding `@repo/db#test`, the PGlite suite that executes every `migration.sql` against a
+#     real PostgreSQL. A bogus column sat in a shipped migration for exactly as long as that
+#     filter did.
+#
+#   * `lint` was pinned to `extension` and `@repo/ui` because apps/web had a backlog of warnings.
+#     apps/web is clean now, so the filter only served to make sure it could get dirty again.
+#
+# What the unfiltered commands resolve to today (`pnpm turbo run <task> --dry=json`):
+#
+#   check-types  @repo/db · @repo/rotation · @repo/ui · extension · http-server · web
+#   lint         @repo/db · @repo/ui · extension · http-server · web
+#   test         @repo/db · @repo/rotation · @repo/types · extension · http-server · web
+#
+# If you are ever tempted to add a `--filter` back, add a workspace-level `--max-warnings`
+# exception or an `it.skip` instead: it will at least be visible in a diff.
+#
+# The extension's browser-level suite runs in `extension.yml`, not here — it needs a real Chromium
+# download and has its own cadence.
+#
+# NOT gated here, deliberately and with the gap stated rather than hidden: `pnpm turbo run build`.
+# `web#build` is `next build`, which needs Clerk keys and the NEXT_PUBLIC_* set at build time, and
+# `http-server#build`/`@repo/db` want DATABASE_URL. Those live in untracked `.env` files, so a
+# build step here would be red on every run until someone wires repository secrets — which is a
+# real task, just not one that can be verified from a checkout. What is covered in the meantime:
+# `check-types` compiles every workspace including the test trees, and `extension.yml` does run a
+# full `wxt build` + `wxt zip`, so the one artifact that ships from this repo is built on every
+# push. Add the build step here the day the secrets exist.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: check-types · lint · test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # `@prisma/client` ships a `postinstall` that generates `.prisma/client`, and pnpm 10 blocks
+      # dependency lifecycle scripts by default. `pnpm-workspace.yaml` allowlists it, but this step
+      # is kept explicit so the pipeline does not silently depend on that allowlist surviving:
+      # without a generated client, @repo/db / http-server / web all fail `check-types`.
+      - name: Generate Prisma client
+        run: pnpm --filter @repo/db exec prisma generate
+
+      - name: Typecheck
+        run: pnpm turbo run check-types
+
+      - name: Lint
+        run: pnpm turbo run lint
+
+      - name: Test
+        run: pnpm turbo run test

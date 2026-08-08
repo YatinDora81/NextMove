@@ -1,0 +1,121 @@
+# JF-001 Rev 3.0 · SEC 14.1 R-4 (release isolation) + SEC 11 (release gate).
+#
+# The extension ships on the Chrome Web Store's cadence. This job runs beside the web/API
+# pipelines and never blocks them: typecheck -> lint -> unit -> e2e -> zip -> upload artifact.
+# Store uploads are boring, reproducible artifacts.
+#
+# The e2e step is the point of this file. happy-dom cannot render a typeahead listbox, run a
+# MAIN-world content script, execute a service worker or lay a form out, so the claims that matter
+# most are only provable in a browser: INV-1 (no code path ever presses submit), that a typeahead
+# option is really committed, and F-17's "an accepted AI draft costs zero extra Gemini calls".
+# Until this step existed those 36 tests were developer-run only, which means they were run when
+# someone remembered to.
+name: extension
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/extension/**"
+      - "packages/rotation/**"
+      - "packages/Types/**"
+      - "packages/typescript-config/**"
+      - "turbo.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/extension.yml"
+  pull_request:
+    paths:
+      - "apps/extension/**"
+      - "packages/rotation/**"
+      - "packages/Types/**"
+      - "packages/typescript-config/**"
+      - "turbo.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/extension.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: extension-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: typecheck · lint · unit · e2e · zip
+    runs-on: ubuntu-latest
+    # The e2e suite is serial by construction (workers: 1, one Chrome per test) and allows up to
+    # 120s per test, so the old 20-minute budget no longer covers a bad day.
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Reads the pinned pnpm version from the root package.json "packageManager" field.
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm turbo run check-types --filter=extension
+
+      - name: Lint
+        run: pnpm turbo run lint --filter=extension
+
+      - name: Unit tests
+        run: pnpm turbo run test --filter=extension
+
+      # A FULL Chromium build, not `chrome-headless-shell`.
+      #
+      # This is not a preference. `chrome-headless-shell` has no extensions subsystem at all — it
+      # cannot load an unpacked MV3 build, so every e2e test would fail at launch. `playwright
+      # install chromium` fetches both, and tests/e2e/helpers/paths.ts deliberately ignores any
+      # `chromium_headless_shell-*` directory when it resolves a binary.
+      #
+      # `--with-deps` pulls the shared libraries a headful Chromium needs on a bare ubuntu runner.
+      - name: Install Chromium for Playwright
+        run: pnpm --filter extension exec playwright install --with-deps chromium
+
+      # Runs outside the turbo graph on purpose: turbo can neither cache a browser-driving suite
+      # nor usefully describe its inputs. `globalSetup` runs `wxt build` first, so this also
+      # proves the unpacked build the store artifact is cut from actually loads in Chrome.
+      - name: E2E tests
+        run: pnpm --filter extension e2e
+
+      # The HTML report is the only way to read a CI e2e failure without reproducing it: it
+      # carries the retained trace and the failure screenshot for each test (see `use.trace` /
+      # `use.screenshot` in playwright.config.ts). Uploaded on failure only — a green run's report
+      # is 20MB of nothing.
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.sha }}
+          path: |
+            apps/extension/playwright-report
+            apps/extension/test-results
+          if-no-files-found: warn
+          retention-days: 14
+
+      # `wxt zip` produces the store-ready artifact in apps/extension/build/ (see `outDir` in wxt.config.ts).
+      - name: Build store artifact
+        run: pnpm turbo run zip --filter=extension
+
+      - name: Upload store artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nextmove-autofill-${{ github.sha }}
+          path: apps/extension/build/*.zip
+          if-no-files-found: error
+          retention-days: 30
