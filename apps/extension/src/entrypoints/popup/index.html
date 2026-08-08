@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NextMove Autofill</title>
+  </head>
+  <!--
+    `jf-popup` is set here rather than from main.tsx so the sheet is 360px wide on the very first
+    paint. Chrome measures the popup document as it loads and then sizes its own window to it; a
+    class added after React mounts means the window is measured against an unstyled, full-width
+    body and the popup opens at the wrong size for a frame.
+
+    A browser-action popup is a dialog in every sense that matters to a screen reader: it is a
+    transient surface over the page, focus starts inside it, and Escape dismisses it. Naming it as
+    one is what makes it announce as "NextMove Autofill, dialog" instead of an unnamed document.
+  -->
+  <body class="jf-popup" role="dialog" aria-label="NextMove Autofill">
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,185 @@
+<!doctype html>
+<!--
+  JF-001 Rev 3.0 SEC 11 — e2e-only fixture (NOT part of the `fixtures/` corpus).
+
+  WHY THIS FILE EXISTS
+  `fixtures/workday/step1-my-information.html` is a faithful snapshot of ONE step: step 2 is
+  present but `display: none` and nothing can ever reveal it, because the corpus is static html.
+  The SEC 11 e2e row asks for a "multi-step Workday fixture walk", which needs a wizard that
+  actually advances.
+
+  This page is that wizard. It is the same Workday furniture — `applyFlowPage`, `progressBar` with
+  `aria-current="step"`, `data-automation-id` on every control, a `bottom-navigation-next-button`
+  — plus the ~30 lines of script that swap the visible step and update the progress bar when the
+  Next control is pressed.
+
+  INV-1 is the point of the file. JobFill must LOCATE and OUTLINE "Save and Continue" and must
+  never press it. The page records every press in `#nav-press-log`, so `workday-steps.spec.ts` can
+  assert the log is empty after a full fill and only gains an entry when the TEST — standing in for
+  the human — presses the button itself.
+
+  Invented tenant, invented employer, no real personal data, `action="#"`.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Apply - Data Engineer II - Grimsby Aerospace</title>
+    <meta property="og:site_name" content="Grimsby Aerospace" />
+    <meta property="og:title" content="Data Engineer II" />
+  </head>
+  <body>
+    <div data-automation-id="brandingHeader">
+      <span data-automation-id="companyName">Grimsby Aerospace</span>
+    </div>
+
+    <div data-automation-id="jobApplicationPage">
+      <h2 data-automation-id="jobPostingHeader">Data Engineer II</h2>
+
+      <div data-automation-id="applyFlowPage">
+        <ol data-automation-id="progressBar">
+          <li id="step-marker-1" data-automation-id="progressBarActiveStep" aria-current="step">
+            My Information
+          </li>
+          <li id="step-marker-2">My Experience</li>
+          <li>Application Questions</li>
+          <li>Review</li>
+        </ol>
+
+        <h2 data-automation-id="pageHeader" id="page-header">My Information</h2>
+
+        <form action="#" method="post" novalidate>
+          <section id="step-1">
+            <fieldset data-automation-id="legalNameSection">
+              <legend>Legal Name</legend>
+
+              <div data-automation-id="formField-legalNameSection_firstName">
+                <label for="input-first">First Name</label>
+                <input
+                  type="text"
+                  id="input-first"
+                  data-automation-id="legalNameSection_firstName"
+                  aria-required="true"
+                />
+              </div>
+
+              <div data-automation-id="formField-legalNameSection_lastName">
+                <label for="input-last">Last Name</label>
+                <input
+                  type="text"
+                  id="input-last"
+                  data-automation-id="legalNameSection_lastName"
+                  aria-required="true"
+                />
+              </div>
+            </fieldset>
+
+            <fieldset data-automation-id="addressSection">
+              <legend>Address</legend>
+
+              <div data-automation-id="formField-addressSection_addressLine1">
+                <label for="input-line1">Address Line 1</label>
+                <input type="text" id="input-line1" data-automation-id="addressSection_addressLine1" />
+              </div>
+
+              <div data-automation-id="formField-addressSection_city">
+                <label for="input-city">City</label>
+                <input type="text" id="input-city" data-automation-id="addressSection_city" />
+              </div>
+
+              <div data-automation-id="formField-addressSection_postalCode">
+                <label for="input-postal">Postal Code</label>
+                <input type="text" id="input-postal" data-automation-id="addressSection_postalCode" />
+              </div>
+            </fieldset>
+
+            <fieldset data-automation-id="contactInformationSection">
+              <legend>Contact Information</legend>
+
+              <div data-automation-id="formField-email">
+                <label for="input-email">Email Address</label>
+                <input type="text" id="input-email" data-automation-id="email" aria-required="true" />
+              </div>
+
+              <div data-automation-id="formField-phone-number">
+                <label for="input-phone">Phone Number</label>
+                <input type="text" id="input-phone" data-automation-id="phone-number" />
+              </div>
+            </fieldset>
+          </section>
+
+          <!--
+            Step 2 is not merely hidden — it is not in the document at all until the human advances,
+            which is how a real Workday flow behaves and what forces `core/observer.ts` to re-scan.
+          -->
+          <section id="step-2" hidden></section>
+
+          <template id="step-2-template">
+            <fieldset data-automation-id="workExperienceSection">
+              <legend>Work Experience</legend>
+
+              <div data-automation-id="formField-jobTitle">
+                <label for="input-title">Job Title</label>
+                <input type="text" id="input-title" data-automation-id="jobTitle" />
+              </div>
+
+              <div data-automation-id="formField-company">
+                <label for="input-company">Company</label>
+                <input type="text" id="input-company" data-automation-id="company" />
+              </div>
+
+              <div data-automation-id="formField-location">
+                <label for="input-work-location">Location</label>
+                <input type="text" id="input-work-location" data-automation-id="location" />
+              </div>
+            </fieldset>
+          </template>
+
+          <!--
+            INV-1: "Save and Continue" commits this page's answers and advances the application, so
+            it is exactly as untouchable as a Submit button.
+          -->
+          <div data-automation-id="bottom-navigation">
+            <button type="button" data-automation-id="bottom-navigation-next-button">
+              Save and Continue
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Tamper-evidence for INV-1: every press of the Next control lands here, in page DOM. -->
+    <div id="nav-press-log" data-presses="0"></div>
+
+    <script>
+      (function () {
+        var next = document.querySelector('[data-automation-id="bottom-navigation-next-button"]');
+        var log = document.getElementById('nav-press-log');
+        var step1 = document.getElementById('step-1');
+        var step2 = document.getElementById('step-2');
+        var template = document.getElementById('step-2-template');
+        var marker1 = document.getElementById('step-marker-1');
+        var marker2 = document.getElementById('step-marker-2');
+        var header = document.getElementById('page-header');
+        var presses = 0;
+
+        next.addEventListener('click', function () {
+          presses += 1;
+          log.setAttribute('data-presses', String(presses));
+          log.textContent = 'next pressed ' + presses + ' time(s)';
+
+          if (presses !== 1) return;
+
+          step1.hidden = true;
+          step2.appendChild(template.content.cloneNode(true));
+          step2.hidden = false;
+
+          marker1.removeAttribute('aria-current');
+          marker1.removeAttribute('data-automation-id');
+          marker2.setAttribute('aria-current', 'step');
+          marker2.setAttribute('data-automation-id', 'progressBarActiveStep');
+          header.textContent = 'My Experience';
+        });
+      })();
+    </script>
+  </body>
+</html>

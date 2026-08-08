@@ -1,0 +1,296 @@
+/**
+ * ui/tokens.css — the design tokens, and the ONLY place their values are written.
+ *
+ * This file exists because there are two rendering contexts and they used to disagree. The popup
+ * and Options page are ordinary documents styled by `app.css`; the in-page overlay lives inside a
+ * CLOSED shadow root that `app.css` cannot reach, so it carried a hand-typed copy of every token in
+ * a template literal in `content/overlay/mount.ts`. The copies drifted, exactly as copies do —
+ * `--jf-warn` was `#b8730a` in the overlay against `#d9880a` on the pages, and the accessibility
+ * retune of the page palette never reached the overlay at all. The surface the user actually stares
+ * at while filling a form was the one wearing the old, lower-contrast colours.
+ *
+ * Every selector below is doubled as `:root, :host`. `:host` is valid syntax in a normal stylesheet
+ * and simply matches nothing outside a shadow tree, so one declaration block serves both:
+ *
+ *   app.css                    `@import "./ui/tokens.css"`      → matches `:root`
+ *   content/overlay/mount.ts   `import … from './tokens.css?inline'` → matches `:host`
+ *
+ * Add a colour here or it does not exist. Nothing downstream may write a literal.
+ */
+
+:root,
+:host {
+  color-scheme: light dark;
+
+  /* ==========================================================================================
+   * Ramps — the only place a colour literal appears.
+   * ========================================================================================== */
+
+  /* Light ramp. Surfaces run sunken → base → raised → overlay; in light, elevation is shadow, so
+     the raised tiers stay pure white and let the shadow do the lifting. */
+  --jf-l-surface-sunken: #f5f7fa;
+  --jf-l-surface-base: #ffffff;
+  --jf-l-surface-e1: #ffffff;
+  --jf-l-surface-e2: #ffffff;
+  --jf-l-surface-e3: #ffffff;
+
+  --jf-l-border: #e3e7ec;
+  --jf-l-border-strong: #858e9a; /* 3.3:1 on white — this is a control boundary, not a divider */
+
+  --jf-l-fg: #0f141a; /* 18.5:1 */
+  --jf-l-fg-muted: #4b5563; /* 7.6:1 */
+  --jf-l-fg-subtle: #646e7c; /* 5.2:1 — was 3.05:1 */
+
+  --jf-l-accent: #2563eb; /* 5.2:1 on white, and white on it is 5.2:1 — works both ways */
+  --jf-l-accent-contrast: #ffffff;
+  --jf-l-warn: #9a6200; /* 5.1:1 — #d9880a was 2.8:1 and carried Notice copy */
+  --jf-l-danger: #c4302f; /* 5.5:1 */
+  --jf-l-ok: #127a45; /* 5.4:1 */
+
+  --jf-l-shadow-rgb: 16 21 28;
+
+  /* Dark ramp. Never pure black, never pure white: #000 backgrounds make OLED smearing and halo
+     the type, and #fff text on a dark field blooms. Elevation here is LIGHTNESS — e1/e2/e3 step
+     up, and the shadows shrink to a hairline (see --jf-shadow-* in the swap blocks). */
+  --jf-d-surface-sunken: #080b0f;
+  --jf-d-surface-base: #0b0f14;
+  --jf-d-surface-e1: #141a21;
+  --jf-d-surface-e2: #1b222b;
+  --jf-d-surface-e3: #222b36;
+
+  --jf-d-border: #2a323d;
+  --jf-d-border-strong: #727c88; /* 3.7:1 on the overlay tier, the worst case */
+
+  --jf-d-fg: #ecedee; /* 14.9:1 on the raised tier */
+  --jf-d-fg-muted: #b3bac2; /* 8.9:1 */
+  --jf-d-fg-subtle: #9ba1a6; /* 6.7:1 */
+
+  --jf-d-accent: #78a6ff;
+  --jf-d-accent-contrast: #0b0f14; /* white on this blue is 2.4:1 — the ink has to be dark */
+  --jf-d-warn: #e0a93e;
+  --jf-d-danger: #ff8a8a;
+  --jf-d-ok: #54d08c;
+
+  --jf-d-shadow-rgb: 0 0 0;
+
+  /* ==========================================================================================
+   * Semantic colour tokens — light by default. Dark mode remaps these and nothing else.
+   * ========================================================================================== */
+
+  /* Four surface tiers. `sunken` is the page well, `base` the page, `e1` a card, `e2` a popover or
+     modal, `e3` the highest thing on screen (a menu over a modal). */
+  --jf-surface-sunken: var(--jf-l-surface-sunken);
+  --jf-surface-base: var(--jf-l-surface-base);
+  --jf-surface-e1: var(--jf-l-surface-e1);
+  --jf-surface-e2: var(--jf-l-surface-e2);
+  --jf-surface-e3: var(--jf-l-surface-e3);
+  --jf-surface-raised: var(--jf-surface-e1);
+  --jf-surface-overlay: var(--jf-surface-e2);
+
+  /* Legacy names, unchanged for the ~40 files that already reference them. */
+  --jf-bg: var(--jf-surface-base);
+  --jf-bg-subtle: var(--jf-surface-sunken);
+  --jf-surface: var(--jf-surface-e1);
+  --jf-surface-subtle: var(--jf-surface-sunken);
+
+  --jf-border: var(--jf-l-border);
+  --jf-border-strong: var(--jf-l-border-strong);
+
+  /* Three text tiers: primary / secondary / tertiary. All three clear 4.5:1 on all four
+     surfaces — there is no "decorative" text tier in a 360px popup. */
+  --jf-fg: var(--jf-l-fg);
+  --jf-fg-muted: var(--jf-l-fg-muted);
+  --jf-fg-subtle: var(--jf-l-fg-subtle);
+
+  --jf-accent: var(--jf-l-accent);
+  --jf-accent-contrast: var(--jf-l-accent-contrast);
+  --jf-warn: var(--jf-l-warn);
+  --jf-danger: var(--jf-l-danger);
+  --jf-ok: var(--jf-l-ok);
+
+  /* Key-pool status (SEC 5.4). Separate names from the intent colours because the pool legend is
+     a fixed vocabulary the popup and the Options page must render identically — but the values
+     ride the intent ramps so a re-tune cannot desync them. EXHAUSTED is deliberately the tertiary
+     text colour: "used up", not "broken". */
+  --jf-key-active: var(--jf-ok);
+  --jf-key-cooldown: var(--jf-warn);
+  --jf-key-exhausted: var(--jf-fg-subtle);
+  --jf-key-dead: var(--jf-danger);
+
+  /* Soft fills — tinted washes for Notice/marker/tag backgrounds. Derived, so they follow a
+     ramp change automatically. The alpha is a token because a light ink on a dark field needs
+     more of it to read as a fill; the dark swap raises it. */
+  --jf-soft-alpha: 12%;
+  --jf-accent-soft: color-mix(in srgb, var(--jf-accent) var(--jf-soft-alpha), transparent);
+  --jf-warn-soft: color-mix(in srgb, var(--jf-warn) var(--jf-soft-alpha), transparent);
+  --jf-danger-soft: color-mix(in srgb, var(--jf-danger) var(--jf-soft-alpha), transparent);
+  --jf-ok-soft: color-mix(in srgb, var(--jf-ok) var(--jf-soft-alpha), transparent);
+
+  /* ==========================================================================================
+   * Elevation — hairline ring + a tight shadow, never a big soft blur.
+   *
+   * A 24px-blur shadow on a 360px popup reads as fog; the ring is what actually separates a card
+   * from the page, and the 1–2px shadow only says "this is in front". `--jf-elevation-*` bundles
+   * the ring with the shadow for new code; `--jf-shadow-*` is the shadow alone, for elements that
+   * already draw their own border (Toast does) and would otherwise show a doubled edge.
+   * ========================================================================================== */
+
+  --jf-shadow-1: 0 1px 2px rgb(var(--jf-l-shadow-rgb) / 6%);
+  --jf-shadow-2: 0 1px 2px rgb(var(--jf-l-shadow-rgb) / 5%), 0 2px 6px -1px rgb(var(--jf-l-shadow-rgb) / 8%);
+  --jf-shadow-3: 0 1px 2px rgb(var(--jf-l-shadow-rgb) / 5%), 0 6px 16px -4px rgb(var(--jf-l-shadow-rgb) / 12%);
+
+  --jf-elevation-1: 0 0 0 1px var(--jf-border), var(--jf-shadow-1);
+  --jf-elevation-2: 0 0 0 1px var(--jf-border), var(--jf-shadow-2);
+  --jf-elevation-3: 0 0 0 1px var(--jf-border), var(--jf-shadow-3);
+
+  /* Legacy name — the four `shadow-[var(--jf-shadow)]` call sites all draw their own border. */
+  --jf-shadow: var(--jf-shadow-3);
+
+  /* ==========================================================================================
+   * Space, type, radius, motion — theme-independent, declared once.
+   * ========================================================================================== */
+
+  /* Space. The step number is the multiple of 4px, so --jf-space-6 is 24px. */
+  --jf-space-1: 4px;
+  --jf-space-2: 8px;
+  --jf-space-3: 12px;
+  --jf-space-4: 16px;
+  --jf-space-6: 24px;
+  --jf-space-8: 32px;
+  --jf-space-12: 48px;
+  --jf-gap: var(--jf-space-3);
+
+  /* Type. 11px is a label floor, not a body size — it is only legal on all-caps/tabular metadata,
+     and never on --jf-fg-subtle in a paragraph. */
+  --jf-text-2xs: 11px;
+  --jf-text-xs: 12px;
+  --jf-text-sm: 13px;
+  --jf-text-md: 14px;
+  --jf-text-lg: 16px;
+  --jf-text-xl: 20px;
+  --jf-text-2xl: 24px;
+
+  --jf-leading-tight: 1.2;
+  --jf-leading-snug: 1.35;
+  --jf-leading-normal: 1.5;
+  --jf-leading-relaxed: 1.6;
+
+  --jf-weight-normal: 400;
+  --jf-weight-medium: 500;
+  --jf-weight-semibold: 600;
+
+  /* Radius. --jf-radius is the card/input default; --jf-radius-sm is controls and the focus ring. */
+  --jf-radius-sm: 6px;
+  --jf-radius-md: 8px;
+  --jf-radius-lg: 12px;
+  --jf-radius-xl: 16px;
+  --jf-radius-full: 999px;
+  --jf-radius: var(--jf-radius-lg);
+
+  /* Focus. 2px ring at 2px offset: the offset is what keeps the ring legible on a filled button,
+     where a flush ring would read as part of the fill. */
+  --jf-ring: var(--jf-accent);
+  --jf-ring-width: 2px;
+  --jf-ring-offset: 2px;
+
+  /* Motion. Everything in the UI is 150–200ms on the same curve — long enough to be seen as
+     movement, short enough that a popup that lives for four seconds never feels slow. */
+  --jf-duration-fast: 150ms;
+  --jf-duration: 180ms;
+  --jf-duration-slow: 200ms;
+  --jf-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --jf-ease-out: cubic-bezier(0, 0, 0.2, 1);
+
+  /* Shell metrics. 360px is the Chrome popup sweet spot — 380 pushed the two-column key rows into
+     wrapping on a 100% zoom Windows install. Chrome caps popups at 600px tall; stopping at 560
+     leaves the sheet visibly short of the cap so the scroll is understood as ours. */
+  --jf-popup-width: 360px;
+  --jf-popup-max-height: 560px;
+
+  --jf-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --jf-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Dark mode — swap block #1: the OS preference.
+ *
+ * `:not([data-theme="light"])` is what lets an in-app toggle force light on a dark OS. Keep the two
+ * swap blocks byte-identical below the selector; they are var() remaps precisely so that diffing
+ * them is trivial.
+ * ---------------------------------------------------------------------------------------------- */
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]),
+  :host(:not([data-theme="light"])) {
+    --jf-surface-sunken: var(--jf-d-surface-sunken);
+    --jf-surface-base: var(--jf-d-surface-base);
+    --jf-surface-e1: var(--jf-d-surface-e1);
+    --jf-surface-e2: var(--jf-d-surface-e2);
+    --jf-surface-e3: var(--jf-d-surface-e3);
+
+    --jf-border: var(--jf-d-border);
+    --jf-border-strong: var(--jf-d-border-strong);
+
+    --jf-fg: var(--jf-d-fg);
+    --jf-fg-muted: var(--jf-d-fg-muted);
+    --jf-fg-subtle: var(--jf-d-fg-subtle);
+
+    --jf-accent: var(--jf-d-accent);
+    --jf-accent-contrast: var(--jf-d-accent-contrast);
+    --jf-warn: var(--jf-d-warn);
+    --jf-danger: var(--jf-d-danger);
+    --jf-ok: var(--jf-d-ok);
+
+    --jf-soft-alpha: 18%;
+
+    --jf-shadow-1: 0 1px 2px rgb(var(--jf-d-shadow-rgb) / 30%);
+    --jf-shadow-2: 0 1px 3px rgb(var(--jf-d-shadow-rgb) / 40%);
+    --jf-shadow-3: 0 2px 8px -2px rgb(var(--jf-d-shadow-rgb) / 50%);
+  }
+}
+
+/* Dark mode — swap block #2: the explicit override, for a toggle that must beat the OS. */
+:root[data-theme="dark"],
+:host([data-theme="dark"]) {
+  color-scheme: dark;
+
+  --jf-surface-sunken: var(--jf-d-surface-sunken);
+  --jf-surface-base: var(--jf-d-surface-base);
+  --jf-surface-e1: var(--jf-d-surface-e1);
+  --jf-surface-e2: var(--jf-d-surface-e2);
+  --jf-surface-e3: var(--jf-d-surface-e3);
+
+  --jf-border: var(--jf-d-border);
+  --jf-border-strong: var(--jf-d-border-strong);
+
+  --jf-fg: var(--jf-d-fg);
+  --jf-fg-muted: var(--jf-d-fg-muted);
+  --jf-fg-subtle: var(--jf-d-fg-subtle);
+
+  --jf-accent: var(--jf-d-accent);
+  --jf-accent-contrast: var(--jf-d-accent-contrast);
+  --jf-warn: var(--jf-d-warn);
+  --jf-danger: var(--jf-d-danger);
+  --jf-ok: var(--jf-d-ok);
+
+  --jf-soft-alpha: 18%;
+
+  --jf-shadow-1: 0 1px 2px rgb(var(--jf-d-shadow-rgb) / 30%);
+  --jf-shadow-2: 0 1px 3px rgb(var(--jf-d-shadow-rgb) / 40%);
+  --jf-shadow-3: 0 2px 8px -2px rgb(var(--jf-d-shadow-rgb) / 50%);
+}
+
+/* Light is the `:root` default, so forcing it only needs the native-widget hint. */
+:root[data-theme="light"],
+:host([data-theme="light"]) {
+  color-scheme: light;
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Tailwind theme bridge.
+ *
+ * `inline` matters: it substitutes the var() reference into the generated utility instead of
+ * re-declaring a frozen copy in :root, so `bg-jf-surface` still follows the dark swap above.
+ * Existing code uses the arbitrary form (`bg-[var(--jf-surface)]`) and stays valid — this only
+ * gives new code a shorter spelling of the same token.
+ * ---------------------------------------------------------------------------------------------- */

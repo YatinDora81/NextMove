@@ -1,0 +1,833 @@
+{
+  "_note": "JF-001 Rev 3.0 F-14 / SEC 8.3 — shipped default adapter config for NextMove Autofill (JobFill). This file is DATA, never code: it is Zod-validated against remoteAdapterConfigSchema (@repo/types/ExtensionTypes) and semver-gated before the CDN copy at apps/web/public/extension/adapters.json may replace it, which is what makes remote selector fixes MV3-legal. Layer keys are 'generic' (inherited by every adapter), the AtsId, and optionally '<atsId>:<tenant>' — Workday uses 'workday:<tenant-slug>' for per-tenant variance (SEC 6.5). Within fieldMap an empty value deletes the selector; selector LISTS are unioned with the higher-authority entry first. submitSelectors is union-only by construction: INV-1 means these controls are located and highlighted, never filled and never clicked. modelBudgets are APPROXIMATE, config-driven soft ceilings — Google revises free-tier limits without notice (SEC 5.2).",
+
+  "version": "1.0.0",
+  "updatedAt": "2026-08-07T00:00:00.000Z",
+
+  "modelBudgets": {
+    "gemini-2.5-flash-lite": { "rpm": 15, "rpd": 1000 },
+    "gemini-2.5-flash": { "rpm": 10, "rpd": 250 },
+    "gemini-2.0-flash": { "rpm": 15, "rpd": 200 }
+  },
+
+  "synonyms": {
+    "personal.fullName": [
+      "full name",
+      "your name",
+      "name",
+      "applicant name",
+      "candidate name",
+      "legal name",
+      "nombre completo",
+      "nom complet",
+      "vollständiger name"
+    ],
+    "personal.firstName": [
+      "first name",
+      "given name",
+      "forename",
+      "fname",
+      "first",
+      "prénom",
+      "vorname",
+      "nombre"
+    ],
+    "personal.lastName": [
+      "last name",
+      "surname",
+      "family name",
+      "lname",
+      "second name",
+      "nom",
+      "nachname",
+      "apellido"
+    ],
+    "personal.email": [
+      "email",
+      "e-mail",
+      "email address",
+      "work email",
+      "contact email",
+      "correo electrónico",
+      "courriel",
+      "e-mail-adresse"
+    ],
+    "personal.phone": [
+      "phone",
+      "phone number",
+      "mobile",
+      "mobile number",
+      "cell",
+      "cell phone",
+      "telephone",
+      "contact number",
+      "teléfono",
+      "téléphone",
+      "telefonnummer"
+    ],
+    "personal.address.line1": [
+      "address",
+      "street address",
+      "address line 1",
+      "addressline1",
+      "mailing address",
+      "adresse"
+    ],
+    "personal.address.line2": [
+      "address line 2",
+      "addressline2",
+      "apartment",
+      "suite",
+      "unit",
+      "apt"
+    ],
+    "personal.address.city": [
+      "city",
+      "town",
+      "location",
+      "current location",
+      "city of residence",
+      "ciudad",
+      "ville",
+      "stadt"
+    ],
+    "personal.address.state": [
+      "state",
+      "province",
+      "region",
+      "county",
+      "state / province",
+      "estado"
+    ],
+    "personal.address.postalCode": [
+      "zip",
+      "zip code",
+      "postal code",
+      "postcode",
+      "pin code",
+      "código postal"
+    ],
+    "personal.address.country": ["country", "country of residence", "país", "pays", "land"],
+    "links.linkedin": [
+      "linkedin",
+      "linkedin profile",
+      "linkedin url",
+      "linkedin profile url",
+      "li profile"
+    ],
+    "links.github": ["github", "github profile", "github url", "git profile"],
+    "links.portfolio": [
+      "portfolio",
+      "website",
+      "personal website",
+      "personal site",
+      "portfolio url",
+      "web profile",
+      "other website"
+    ],
+    "links.other[0]": ["other url", "other link", "additional link", "other website"],
+    "work[0].title": ["current title", "job title", "most recent title", "current role", "position"],
+    "work[0].company": [
+      "current company",
+      "current employer",
+      "most recent company",
+      "employer",
+      "organization",
+      "company"
+    ],
+    "work[0].location": ["work location", "job location", "employer location"],
+    "education[0].school": ["school", "university", "college", "institution", "alma mater"],
+    "education[0].degree": ["degree", "qualification", "education level", "highest degree"],
+    "education[0].field": ["field of study", "major", "discipline", "programme", "program"],
+    "education[0].gpa": ["gpa", "grade point average", "cgpa", "percentage", "marks"],
+    "skills[0]": ["skills", "key skills", "technical skills", "core competencies"],
+    "summary": ["summary", "about you", "professional summary", "profile summary", "bio"],
+    "eeo.gender": ["gender", "gender identity", "sex"],
+    "eeo.ethnicity": ["ethnicity", "race", "race/ethnicity", "racial identity", "hispanic or latino"],
+    "eeo.veteran": ["veteran", "veteran status", "protected veteran", "military service"],
+    "eeo.disability": ["disability", "disability status", "self identify disability"],
+    "authorization.visaStatus": ["visa status", "work authorization", "work permit", "immigration status"],
+    "authorization.willingToRelocate": ["relocate", "willing to relocate", "open to relocation"],
+    "authorization.remotePreference": ["remote preference", "work preference", "onsite or remote"],
+    "compensation.expected.amount": [
+      "expected salary",
+      "salary expectation",
+      "desired salary",
+      "expected compensation",
+      "expected ctc"
+    ],
+    "compensation.noticePeriodDays": ["notice period", "availability", "earliest start date"],
+    "resume": ["resume", "cv", "curriculum vitae", "upload resume", "attach resume", "resume/cv"],
+    "coverLetter": ["cover letter", "covering letter", "motivation letter", "letter of interest"]
+  },
+
+  "adapters": {
+    "generic": {
+      "fieldMap": {},
+      "quirks": {
+        "dateFormat": "MM/DD/YYYY",
+        "typeaheadDelayMs": 45,
+        "listboxWaitMs": 3000,
+        "stepContainerSelector": "form",
+        "dropzoneSelectors": [
+          "[class*=\"dropzone\" i]",
+          "[class*=\"drop-zone\" i]",
+          "[class*=\"file-upload\" i]",
+          "[data-testid*=\"dropzone\" i]",
+          "[data-testid*=\"upload\" i]",
+          "[aria-label*=\"drag\" i]"
+        ],
+        "submitSelectors": [
+          "button[type=\"submit\"]",
+          "input[type=\"submit\"]",
+          "input[type=\"image\"]",
+          "button[id*=\"submit\" i]",
+          "button[name*=\"submit\" i]",
+          "button[class*=\"submit\" i]",
+          "[role=\"button\"][id*=\"submit\" i]",
+          "[data-testid*=\"submit\" i]",
+          "[data-test*=\"submit\" i]",
+          "[data-automation-id*=\"submit\" i]",
+          "button[id*=\"apply\" i][type=\"submit\"]",
+          "button[class*=\"next\" i]",
+          "button[id*=\"next\" i]",
+          "[role=\"button\"][class*=\"next\" i]"
+        ]
+      },
+      "capture": {
+        "company": [
+          "meta[property=\"og:site_name\"]",
+          "[itemprop=\"hiringOrganization\"] [itemprop=\"name\"]",
+          "[itemprop=\"hiringOrganization\"]",
+          "[data-testid*=\"company\" i]",
+          "[class*=\"company-name\" i]",
+          "[class*=\"employer-name\" i]",
+          "header [class*=\"logo\" i] img"
+        ],
+        "role": [
+          "[itemprop=\"title\"]",
+          "[data-testid*=\"job-title\" i]",
+          "[class*=\"job-title\" i]",
+          "[class*=\"posting-title\" i]",
+          "meta[property=\"og:title\"]",
+          "h1"
+        ]
+      },
+      "confirmation": {
+        "urlPatterns": [
+          "thank-you",
+          "thankyou",
+          "/thanks",
+          "confirmation",
+          "application-received",
+          "application-submitted",
+          "applicationsubmitted",
+          "re:/apply\\/(complete|success|done)/"
+        ],
+        "selectors": [
+          "[class*=\"thank-you\" i]",
+          "[class*=\"thankyou\" i]",
+          "[class*=\"application-confirmation\" i]",
+          "[class*=\"application-complete\" i]",
+          "[id*=\"confirmation\" i]",
+          "[data-testid*=\"application-submitted\" i]"
+        ]
+      }
+    },
+
+    "greenhouse": {
+      "fieldMap": {
+        "#first_name": "personal.firstName",
+        "input[name=\"first_name\"]": "personal.firstName",
+        "input[name=\"job_application[first_name]\"]": "personal.firstName",
+        "#last_name": "personal.lastName",
+        "input[name=\"last_name\"]": "personal.lastName",
+        "input[name=\"job_application[last_name]\"]": "personal.lastName",
+        "#email": "personal.email",
+        "input[name=\"email\"]": "personal.email",
+        "input[name=\"job_application[email]\"]": "personal.email",
+        "#phone": "personal.phone",
+        "input[name=\"phone\"]": "personal.phone",
+        "input[name=\"job_application[phone]\"]": "personal.phone",
+        "#job_application_location": "personal.address.city",
+        "input[name=\"job_application[location]\"]": "personal.address.city",
+        "input[name=\"location\"]": "personal.address.city",
+        "#candidate-location": "personal.address.city",
+        "#auto_complete_input": "personal.address.city",
+        "#resume_fieldset input[type=\"file\"]": "resume",
+        "input#resume[type=\"file\"]": "resume",
+        "input[type=\"file\"][name=\"resume\"]": "resume",
+        "input[type=\"file\"][name=\"job_application[resume]\"]": "resume",
+        "#s3_upload_for_resume input[type=\"file\"]": "resume",
+        "#cover_letter_fieldset input[type=\"file\"]": "coverLetter",
+        "input#cover_letter[type=\"file\"]": "coverLetter",
+        "input[type=\"file\"][name=\"cover_letter\"]": "coverLetter",
+        "input[type=\"file\"][name=\"job_application[cover_letter]\"]": "coverLetter",
+        "#s3_upload_for_cover_letter input[type=\"file\"]": "coverLetter",
+        "#job_application_gender": "eeo.gender",
+        "select[name=\"job_application[gender]\"]": "eeo.gender",
+        "select[name=\"gender\"]": "eeo.gender",
+        "#job_application_race": "eeo.ethnicity",
+        "select[name=\"job_application[race]\"]": "eeo.ethnicity",
+        "select[name=\"race\"]": "eeo.ethnicity",
+        "#job_application_hispanic_ethnicity": "eeo.ethnicity",
+        "select[name=\"hispanic_ethnicity\"]": "eeo.ethnicity",
+        "#job_application_veteran_status": "eeo.veteran",
+        "select[name=\"job_application[veteran_status]\"]": "eeo.veteran",
+        "select[name=\"veteran_status\"]": "eeo.veteran",
+        "#job_application_disability_status": "eeo.disability",
+        "select[name=\"job_application[disability_status]\"]": "eeo.disability",
+        "select[name=\"disability_status\"]": "eeo.disability"
+      },
+      "quirks": {
+        "dateFormat": "MM/DD/YYYY",
+        "typeaheadDelayMs": 40,
+        "listboxWaitMs": 2500,
+        "stepContainerSelector": "#application_form",
+        "dropzoneSelectors": [
+          "#resume_fieldset .dropzone",
+          "#cover_letter_fieldset .dropzone",
+          "#s3_upload_for_resume",
+          "#s3_upload_for_cover_letter",
+          "[data-testid=\"resume-drop-zone\"]",
+          "[class*=\"file-upload\" i][class*=\"drop\" i]"
+        ],
+        "submitSelectors": [
+          "#submit_app",
+          "#btn-submit",
+          "input[type=\"submit\"][value*=\"Submit\" i]",
+          "button[type=\"submit\"]",
+          "button[data-testid=\"submit-application\"]"
+        ]
+      },
+      "capture": {
+        "company": [
+          "#header .company-name",
+          ".company-name",
+          ".job__company",
+          "[data-testid=\"company-name\"]",
+          "meta[property=\"og:site_name\"]",
+          "#logo img"
+        ],
+        "role": [
+          "h1.app-title",
+          ".app-title",
+          ".job__title h1",
+          "[data-testid=\"job-title\"]",
+          "#header h1"
+        ]
+      },
+      "confirmation": {
+        "urlPatterns": [
+          "application_confirmation",
+          "/confirmation",
+          "/thank-you",
+          "re:gh_src=[^&]*&?.*(confirm|thank)"
+        ],
+        "selectors": [
+          "#application_confirmation",
+          ".application-confirmation",
+          "[data-testid=\"application-confirmation\"]",
+          "#confirmation_message"
+        ]
+      }
+    },
+
+    "lever": {
+      "fieldMap": {
+        "input[name=\"name\"]": "personal.fullName",
+        "input[name=\"email\"]": "personal.email",
+        "input[name=\"phone\"]": "personal.phone",
+        "input[name=\"location\"]": "personal.address.city",
+        "#location-input": "personal.address.city",
+        "input[name=\"org\"]": "work[0].company",
+        "input[name=\"urls[LinkedIn]\"]": "links.linkedin",
+        "input[name=\"urls[Linkedin]\"]": "links.linkedin",
+        "input[name=\"urls[GitHub]\"]": "links.github",
+        "input[name=\"urls[Github]\"]": "links.github",
+        "input[name=\"urls[Portfolio]\"]": "links.portfolio",
+        "input[name=\"urls[Website]\"]": "links.portfolio",
+        "input[name=\"urls[Other]\"]": "links.other[0]",
+        "input[type=\"file\"][name=\"resume\"]": "resume",
+        "#resume-upload-input": "resume",
+        ".application-file-input input[type=\"file\"]": "resume",
+        "select[name=\"eeo[gender]\"]": "eeo.gender",
+        "input[name=\"eeo[gender]\"]": "eeo.gender",
+        "select[name=\"eeo[race]\"]": "eeo.ethnicity",
+        "input[name=\"eeo[race]\"]": "eeo.ethnicity",
+        "select[name=\"eeo[veteran]\"]": "eeo.veteran",
+        "input[name=\"eeo[veteran]\"]": "eeo.veteran",
+        "select[name=\"eeo[disability]\"]": "eeo.disability",
+        "input[name=\"eeo[disability]\"]": "eeo.disability"
+      },
+      "quirks": {
+        "dateFormat": "MM/DD/YYYY",
+        "typeaheadDelayMs": 40,
+        "listboxWaitMs": 2500,
+        "stepContainerSelector": ".application-form",
+        "dropzoneSelectors": [
+          ".application-file-input",
+          ".resume-upload-dropzone",
+          "[data-qa=\"resume-upload\"]",
+          ".filename-drop",
+          ".application-question .file-upload"
+        ],
+        "submitSelectors": [
+          ".template-btn-submit",
+          "button[data-qa=\"btn-submit\"]",
+          "#btn-submit",
+          "button[type=\"submit\"]"
+        ]
+      },
+      "capture": {
+        "company": [
+          ".main-header-logo img",
+          ".main-header-content .company-name",
+          "[data-qa=\"company-name\"]",
+          "meta[property=\"og:site_name\"]"
+        ],
+        "role": [
+          ".posting-headline h2",
+          "h2.posting-headline",
+          "[data-qa=\"posting-name\"]",
+          ".posting-header h2",
+          "meta[property=\"og:title\"]"
+        ]
+      },
+      "confirmation": {
+        "urlPatterns": ["/thanks", "/thank-you", "/applied", "/confirmation"],
+        "selectors": [
+          ".application-confirmation",
+          "[data-qa=\"thanks\"]",
+          ".postings-wrapper .thanks",
+          ".thanks-header"
+        ]
+      }
+    },
+
+    "workday": {
+      "fieldMap": {
+        "[data-automation-id=\"legalNameSection_firstName\"]": "personal.firstName",
+        "[data-automation-id=\"legalNameSection_lastName\"]": "personal.lastName",
+        "[data-automation-id=\"firstName\"]": "personal.firstName",
+        "[data-automation-id=\"lastName\"]": "personal.lastName",
+        "[data-automation-id=\"email\"]": "personal.email",
+        "[data-automation-id=\"userName\"]": "personal.email",
+        "[data-automation-id=\"phone-number\"]": "personal.phone",
+        "[data-automation-id=\"phoneNumber\"]": "personal.phone",
+        "[data-automation-id=\"addressSection_addressLine1\"]": "personal.address.line1",
+        "[data-automation-id=\"addressSection_addressLine2\"]": "personal.address.line2",
+        "[data-automation-id=\"addressSection_city\"]": "personal.address.city",
+        "[data-automation-id=\"addressSection_countryRegion\"]": "personal.address.state",
+        "[data-automation-id=\"addressSection_postalCode\"]": "personal.address.postalCode",
+        "[data-automation-id=\"countryDropdown\"]": "personal.address.country",
+        "[data-automation-id=\"country\"]": "personal.address.country",
+        "[data-automation-id=\"jobTitle\"]": "work[0].title",
+        "[data-automation-id=\"company\"]": "work[0].company",
+        "[data-automation-id=\"location\"]": "work[0].location",
+        "[data-automation-id=\"roleDescription\"]": "work[0].bullets[0]",
+        "[data-automation-id=\"school\"]": "education[0].school",
+        "[data-automation-id=\"degree\"]": "education[0].degree",
+        "[data-automation-id=\"fieldOfStudy\"]": "education[0].field",
+        "[data-automation-id=\"formField-fieldOfStudy\"]": "education[0].field",
+        "[data-automation-id=\"gpa\"]": "education[0].gpa",
+        "[data-automation-id=\"formField-skills\"]": "skills[0]",
+        "[data-automation-id=\"linkedinQuestion\"]": "links.linkedin",
+        "[data-automation-id=\"linkedInQuestion\"]": "links.linkedin",
+        "[data-automation-id=\"website\"]": "links.portfolio",
+        "[data-automation-id=\"websiteUrl\"]": "links.portfolio",
+        "[data-automation-id=\"file-upload-input-ref\"]": "resume",
+        "[data-automation-id=\"resumeUpload\"] input[type=\"file\"]": "resume",
+        "[data-automation-id=\"gender\"]": "eeo.gender",
+        "[data-automation-id=\"genderDropdown\"]": "eeo.gender",
+        "[data-automation-id=\"ethnicityDropdown\"]": "eeo.ethnicity",
+        "[data-automation-id=\"hispanicOrLatino\"]": "eeo.ethnicity",
+        "[data-automation-id=\"veteranStatus\"]": "eeo.veteran",
+        "[data-automation-id=\"veteranStatusDropdown\"]": "eeo.veteran",
+        "[data-automation-id=\"disability\"]": "eeo.disability",
+        "[data-automation-id=\"selfIdentifiedDisabilityData--disabilityStatus\"]": "eeo.disability"
+      },
+      "quirks": {
+        "dateFormat": "MM/DD/YYYY",
+        "typeaheadDelayMs": 60,
+        "listboxWaitMs": 3000,
+        "stepContainerSelector": "[data-automation-id=\"applyFlowPage\"]",
+        "dropzoneSelectors": [
+          "[data-automation-id=\"quickApplyDropZone\"]",
+          "[data-automation-id=\"fileUploadDropZone\"]",
+          "[data-automation-id=\"select-files\"]",
+          "[data-automation-id=\"resumeUpload\"]",
+          "[data-automation-id=\"attachments\"]"
+        ],
+        "submitSelectors": [
+          "[data-automation-id=\"bottom-navigation-next-button\"]",
+          "[data-automation-id=\"bottom-navigation-submit-button\"]",
+          "[data-automation-id=\"pageFooterNextButton\"]",
+          "[data-automation-id=\"wd-CommandButton_uic_saveAndContinueButton\"]",
+          "[data-automation-id=\"quickApplySubmitButton\"]"
+        ]
+      },
+      "capture": {
+        "company": [
+          "[data-automation-id=\"companyName\"]",
+          "[data-automation-id=\"brandingHeader\"] img",
+          "[data-automation-id=\"logo\"] img",
+          "meta[property=\"og:site_name\"]",
+          "header img"
+        ],
+        "role": [
+          "[data-automation-id=\"jobPostingHeader\"]",
+          "h2[data-automation-id=\"jobPostingHeader\"]",
+          "[data-automation-id=\"jobPostingTitle\"]",
+          "meta[property=\"og:title\"]"
+        ]
+      },
+      "confirmation": {
+        "urlPatterns": [
+          "/thankyou",
+          "/thank-you",
+          "/applications",
+          "submitted",
+          "applicationsubmitted"
+        ],
+        "selectors": [
+          "[data-automation-id=\"thankYouPage\"]",
+          "[data-automation-id=\"applicationSubmitted\"]",
+          "[data-automation-id=\"successBanner\"]",
+          "[data-automation-id=\"myApplicationsHeader\"]"
+        ]
+      }
+    },
+
+    "icims": {
+      "fieldMap": {
+        "#firstname": "personal.firstName",
+        "input[name=\"firstname\"]": "personal.firstName",
+        "input[id$=\"_firstname\"]": "personal.firstName",
+        "#lastname": "personal.lastName",
+        "input[name=\"lastname\"]": "personal.lastName",
+        "input[id$=\"_lastname\"]": "personal.lastName",
+        "#email": "personal.email",
+        "input[name=\"email\"]": "personal.email",
+        "input[id$=\"_email\"]": "personal.email",
+        "#phone": "personal.phone",
+        "input[name=\"phone\"]": "personal.phone",
+        "#mobilephone": "personal.phone",
+        "input[name=\"mobilephone\"]": "personal.phone",
+        "#addressstreet": "personal.address.line1",
+        "input[name=\"addressstreet\"]": "personal.address.line1",
+        "#addressstreet2": "personal.address.line2",
+        "#addresscity": "personal.address.city",
+        "input[name=\"addresscity\"]": "personal.address.city",
+        "#addressstate": "personal.address.state",
+        "select[name=\"addressstate\"]": "personal.address.state",
+        "#addresszip": "personal.address.postalCode",
+        "input[name=\"addresszip\"]": "personal.address.postalCode",
+        "#addresscountry": "personal.address.country",
+        "select[name=\"addresscountry\"]": "personal.address.country",
+        "#linkedin": "links.linkedin",
+        "input[name=\"linkedin\"]": "links.linkedin",
+        "#website": "links.portfolio",
+        "input[name=\"website\"]": "links.portfolio",
+        "#resume": "resume",
+        "input[type=\"file\"][name=\"resume\"]": "resume",
+        "#icims_upload_file": "resume",
+        "input[type=\"file\"][id*=\"resume\" i]": "resume",
+        "input[type=\"file\"][id*=\"coverletter\" i]": "coverLetter",
+        "#gender": "eeo.gender",
+        "select[name=\"gender\"]": "eeo.gender",
+        "#ethnicity": "eeo.ethnicity",
+        "select[name=\"ethnicity\"]": "eeo.ethnicity",
+        "#veteranstatus": "eeo.veteran",
+        "select[name=\"veteranstatus\"]": "eeo.veteran",
+        "#disabilitystatus": "eeo.disability",
+        "select[name=\"disabilitystatus\"]": "eeo.disability"
+      },
+      "quirks": {
+        "dateFormat": "MM/DD/YYYY",
+        "typeaheadDelayMs": 55,
+        "listboxWaitMs": 3000,
+        "stepContainerSelector": ".iCIMS_MainWrapper",
+        "dropzoneSelectors": [
+          ".iCIMS_FileUpload",
+          "#icims_uploadDropZone",
+          ".iCIMS_DragDropTarget",
+          "[class*=\"iCIMS\" i][class*=\"upload\" i]"
+        ],
+        "submitSelectors": [
+          "#quickApplyBtn",
+          ".iCIMS_Button[type=\"submit\"]",
+          "input[type=\"submit\"]",
+          "a.iCIMS_Anchor[onclick*=\"submit\" i]",
+          "a[id*=\"submit\" i]",
+          "input[value=\"Next\" i]",
+          "a[title=\"Next\" i]"
+        ]
+      },
+      "capture": {
+        "company": [
+          ".iCIMS_Logo img",
+          "#icims_logo img",
+          ".iCIMS_HeaderLogo img",
+          "meta[property=\"og:site_name\"]"
+        ],
+        "role": [
+          ".iCIMS_JobHeader h1",
+          ".iCIMS_Header h1",
+          "#icims_content h1",
+          "h1.iCIMS_Header",
+          "meta[property=\"og:title\"]"
+        ]
+      },
+      "confirmation": {
+        "urlPatterns": [
+          "/thankyou",
+          "/thank-you",
+          "applicationconfirmation",
+          "jobs/confirm",
+          "/confirm"
+        ],
+        "selectors": [
+          ".iCIMS_ThankYou",
+          "#icims_content_thankyou",
+          ".iCIMS_ConfirmationMessage",
+          ".iCIMS_InfoMsg"
+        ]
+      }
+    },
+
+    "ashby": {
+      "fieldMap": {
+        "input[name=\"_systemfield_name\"]": "personal.fullName",
+        "#_systemfield_name": "personal.fullName",
+        "input[name=\"_systemfield_email\"]": "personal.email",
+        "#_systemfield_email": "personal.email",
+        "input[name=\"_systemfield_phone\"]": "personal.phone",
+        "#_systemfield_phone": "personal.phone",
+        "input[name=\"_systemfield_location\"]": "personal.address.city",
+        "#_systemfield_location": "personal.address.city",
+        "input[name=\"_systemfield_location_city\"]": "personal.address.city",
+        "input[name=\"_systemfield_location_country\"]": "personal.address.country",
+        "input[name=\"_systemfield_linkedin\"]": "links.linkedin",
+        "input[name=\"_systemfield_github\"]": "links.github",
+        "input[name=\"_systemfield_website\"]": "links.portfolio",
+        "input[name=\"_systemfield_resume\"]": "resume",
+        "#_systemfield_resume": "resume",
+        "input[type=\"file\"][name=\"_systemfield_resume\"]": "resume",
+        "input[name=\"_systemfield_coverLetter\"]": "coverLetter",
+        "input[type=\"file\"][name=\"_systemfield_coverLetter\"]": "coverLetter"
+      },
+      "quirks": {
+        "dateFormat": "MM/DD/YYYY",
+        "typeaheadDelayMs": 45,
+        "listboxWaitMs": 2500,
+        "stepContainerSelector": ".ashby-application-form-container",
+        "dropzoneSelectors": [
+          ".ashby-application-form-file-upload",
+          "[data-testid=\"file-upload-dropzone\"]",
+          "[class*=\"_dropzone\" i]",
+          "[class*=\"_fileUpload\" i]"
+        ],
+        "submitSelectors": [
+          ".ashby-application-form-submit-button",
+          "[data-testid=\"submit-application\"]",
+          ".ashby-application-form-container button[type=\"submit\"]",
+          "button[type=\"submit\"]"
+        ]
+      },
+      "capture": {
+        "company": [
+          ".ashby-job-posting-organization-name",
+          ".ashby-header-logo img",
+          "[class*=\"_organizationName\" i]",
+          "meta[property=\"og:site_name\"]"
+        ],
+        "role": [
+          ".ashby-job-posting-heading",
+          "[data-testid=\"job-posting-title\"]",
+          ".ashby-job-posting-brief h1",
+          "meta[property=\"og:title\"]"
+        ]
+      },
+      "confirmation": {
+        "urlPatterns": ["/application/confirmation", "/confirmation", "thank", "submitted"],
+        "selectors": [
+          "[data-testid=\"application-submitted\"]",
+          ".ashby-application-form-success",
+          ".ashby-application-confirmation",
+          "[class*=\"_successMessage\" i]"
+        ]
+      }
+    },
+
+    "smartrecruiters": {
+      "fieldMap": {
+        "#firstName": "personal.firstName",
+        "input[name=\"firstName\"]": "personal.firstName",
+        "[data-test=\"first-name-input\"]": "personal.firstName",
+        "#lastName": "personal.lastName",
+        "input[name=\"lastName\"]": "personal.lastName",
+        "[data-test=\"last-name-input\"]": "personal.lastName",
+        "#email": "personal.email",
+        "input[name=\"email\"]": "personal.email",
+        "[data-test=\"email-input\"]": "personal.email",
+        "#phoneNumber": "personal.phone",
+        "input[name=\"phoneNumber\"]": "personal.phone",
+        "[data-test=\"phone-input\"]": "personal.phone",
+        "#location-input": "personal.address.city",
+        "#candidate-location": "personal.address.city",
+        "input[name=\"location\"]": "personal.address.city",
+        "[data-test=\"location-input\"]": "personal.address.city",
+        "input[name=\"city\"]": "personal.address.city",
+        "input[name=\"postalCode\"]": "personal.address.postalCode",
+        "select[name=\"country\"]": "personal.address.country",
+        "#linkedinProfileUrl": "links.linkedin",
+        "input[name=\"linkedinProfileUrl\"]": "links.linkedin",
+        "#web-profile-linkedin": "links.linkedin",
+        "#personalWebsiteUrl": "links.portfolio",
+        "input[name=\"personalWebsiteUrl\"]": "links.portfolio",
+        "input[type=\"file\"][name=\"resume\"]": "resume",
+        "#resume-upload input[type=\"file\"]": "resume",
+        "[data-test=\"resume-upload-input\"]": "resume",
+        "input[type=\"file\"][name=\"coverLetter\"]": "coverLetter",
+        "[data-test=\"cover-letter-upload-input\"]": "coverLetter"
+      },
+      "quirks": {
+        "dateFormat": "DD/MM/YYYY",
+        "typeaheadDelayMs": 45,
+        "listboxWaitMs": 2500,
+        "stepContainerSelector": "#application-form",
+        "dropzoneSelectors": [
+          "[data-test=\"resume-dropzone\"]",
+          "#resume-dropzone",
+          ".file-upload-dropzone",
+          ".js-file-upload"
+        ],
+        "submitSelectors": [
+          "[data-test=\"submit-application\"]",
+          "#submit-application",
+          ".js-submit-application",
+          "button[type=\"submit\"]"
+        ]
+      },
+      "capture": {
+        "company": [
+          "[data-test=\"company-name\"]",
+          ".company-name",
+          ".js-company-name",
+          "meta[property=\"og:site_name\"]",
+          ".header-logo img"
+        ],
+        "role": [
+          "[data-test=\"job-title\"]",
+          "h1.job-title",
+          ".job-title",
+          "meta[property=\"og:title\"]"
+        ]
+      },
+      "confirmation": {
+        "urlPatterns": ["/thank-you", "/confirmation", "application-submitted", "/applied"],
+        "selectors": [
+          "[data-test=\"application-submitted\"]",
+          ".application-confirmation",
+          ".thank-you",
+          ".js-application-success"
+        ]
+      }
+    },
+
+    "taleo": {
+      "fieldMap": {
+        "input[id$=\".firstName\"]": "personal.firstName",
+        "input[id$=\":firstName\"]": "personal.firstName",
+        "input[name$=\"firstName\"]": "personal.firstName",
+        "#firstName": "personal.firstName",
+        "input[id$=\".lastName\"]": "personal.lastName",
+        "input[id$=\":lastName\"]": "personal.lastName",
+        "input[name$=\"lastName\"]": "personal.lastName",
+        "#lastName": "personal.lastName",
+        "input[id$=\".email\"]": "personal.email",
+        "input[id$=\":email\"]": "personal.email",
+        "input[name$=\"email\"]": "personal.email",
+        "#email": "personal.email",
+        "input[id$=\".homePhone\"]": "personal.phone",
+        "input[id$=\".cellPhone\"]": "personal.phone",
+        "input[id$=\":phoneNumber\"]": "personal.phone",
+        "input[name$=\"phoneNumber\"]": "personal.phone",
+        "#phoneNumber": "personal.phone",
+        "input[id$=\".address\"]": "personal.address.line1",
+        "input[id$=\".addressLine1\"]": "personal.address.line1",
+        "input[id$=\".addressLine2\"]": "personal.address.line2",
+        "input[id$=\".city\"]": "personal.address.city",
+        "input[id$=\".zipCode\"]": "personal.address.postalCode",
+        "input[id$=\".postalCode\"]": "personal.address.postalCode",
+        "select[id$=\".state\"]": "personal.address.state",
+        "select[id$=\".country\"]": "personal.address.country",
+        "input[type=\"file\"][id$=\"fileUpload\"]": "resume",
+        "input[type=\"file\"][id$=\"fileUploadfileInput\"]": "resume",
+        "#fileUploadfileInput": "resume",
+        "input[type=\"file\"][name*=\"resume\" i]": "resume",
+        "input[type=\"file\"][id*=\"coverLetter\" i]": "coverLetter",
+        "input[id$=\".employer\"]": "work[0].company",
+        "input[id$=\".jobTitle\"]": "work[0].title",
+        "input[id$=\".institution\"]": "education[0].school",
+        "input[id$=\".programme\"]": "education[0].field",
+        "select[id$=\".educationLevel\"]": "education[0].degree",
+        "select[id$=\".gender\"]": "eeo.gender",
+        "select[id$=\".ethnicity\"]": "eeo.ethnicity",
+        "select[id$=\".veteranStatus\"]": "eeo.veteran",
+        "select[id$=\".disabilityStatus\"]": "eeo.disability"
+      },
+      "quirks": {
+        "dateFormat": "MM/DD/YYYY",
+        "typeaheadDelayMs": 55,
+        "listboxWaitMs": 3000,
+        "stepContainerSelector": "#dynamicForm",
+        "dropzoneSelectors": [
+          "#fileUploadDropZone",
+          ".fileUploadDropArea",
+          "[class*=\"dropArea\" i]"
+        ],
+        "submitSelectors": [
+          "#submitButton",
+          "a[id$=\"submitButton\"]",
+          "input[value=\"Submit\" i]",
+          "input[value=\"Next\" i]",
+          "a[id$=\"next\"]",
+          "#next",
+          "#saveAndContinue"
+        ]
+      },
+      "capture": {
+        "company": [
+          "#companyLogo img",
+          ".headerLogo img",
+          ".careersection-header img",
+          "meta[property=\"og:site_name\"]"
+        ],
+        "role": [
+          "#requisitionDescriptionInterface\\.reqTitleLinkAction\\.row1",
+          "[id$=\"reqTitleLinkAction.row1\"]",
+          ".requisitionDescriptionInterface h1",
+          "#job-title",
+          "meta[property=\"og:title\"]"
+        ]
+      },
+      "confirmation": {
+        "urlPatterns": [
+          "applyconfirm",
+          "thankyou",
+          "thank-you",
+          "confirmation",
+          "jobapplyconfirm"
+        ],
+        "selectors": [
+          "#confirmationMessage",
+          ".confirmationMessage",
+          "#applicationConfirmation",
+          "[id$=\"applyConfirmation\"]"
+        ]
+      }
+    }
+  }
+}

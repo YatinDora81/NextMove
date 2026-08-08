@@ -1,0 +1,88 @@
+<!doctype html>
+<!--
+  JF-001 Rev 3.0 SEC 11 — e2e-only fixture (NOT part of the `fixtures/` corpus).
+
+  WHY THIS FILE EXISTS
+  F-17 / SEC 5.7 claims that answering a screening question once means never paying for it again:
+  "Screening questions repeat brutally across applications … a hit at ≥ SAME_Q reuses the banked
+  answer outright. Zero API spend." Proving that needs TWO applications at TWO employers asking the
+  SAME question, which the corpus does not contain.
+
+  This is the second application. It is a different company (Halcyon Metrics, invented) with a
+  different form shell, and it asks the identical screening question. `answers/normalize.ts`
+  replaces the employer name with the literal `{company}` token before matching, so
+
+      "Why do you want to work at Northwind Labs?"   (fixtures/greenhouse/standard.html)
+      "Why do you want to work at Halcyon Metrics?"  (this file)
+
+  both reduce to `why do you want to work at {company}` — a ≥ SAME_Q hit. `ai-answer.spec.ts`
+  asserts the bank serves it with the Gemini call counter frozen.
+
+  Invented employer, no real personal data, `action="#"`.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Backend Engineer — Halcyon Metrics Careers</title>
+    <meta property="og:site_name" content="Halcyon Metrics" />
+    <meta property="og:title" content="Backend Engineer" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="brand">Halcyon Metrics</div>
+      <h1 class="posting-title">Backend Engineer</h1>
+      <div class="posting-location">Remote (EU)</div>
+    </header>
+
+    <main>
+      <section class="posting-body">
+        <p>
+          Halcyon Metrics is a company invented for this fixture. This posting exists so that the
+          Answer Bank has a second, genuinely different application to be tested against: a
+          different employer, a different form shell, and one screening question that — once the
+          employer name is tokenised — is the same question the candidate has already answered.
+        </p>
+      </section>
+
+      <form id="careers-application" action="#" method="post" novalidate>
+        <h2>Apply for this role</h2>
+
+        <div class="form-row">
+          <label for="applicant-first">First name</label>
+          <input type="text" id="applicant-first" name="applicant_first" autocomplete="given-name" required />
+        </div>
+
+        <div class="form-row">
+          <label for="applicant-last">Last name</label>
+          <input type="text" id="applicant-last" name="applicant_last" autocomplete="family-name" required />
+        </div>
+
+        <div class="form-row">
+          <label for="applicant-email">Email address</label>
+          <input type="email" id="applicant-email" name="applicant_email" autocomplete="email" required />
+        </div>
+
+        <div class="form-row">
+          <label for="applicant-phone">Phone number</label>
+          <input type="tel" id="applicant-phone" name="applicant_phone" autocomplete="tel" />
+        </div>
+
+        <div class="form-row">
+          <label for="applicant-linkedin">LinkedIn profile</label>
+          <input type="url" id="applicant-linkedin" name="applicant_linkedin" />
+        </div>
+
+        <!-- The repeat question. Same wording, different employer. -->
+        <div class="form-row">
+          <label for="screening-motivation">Why do you want to work at Halcyon Metrics?</label>
+          <textarea id="screening-motivation" name="screening_motivation" rows="6"></textarea>
+        </div>
+
+        <!-- INV-1: located and highlighted, never clicked. -->
+        <div class="form-actions">
+          <button type="submit" id="send-application">Send application</button>
+        </div>
+      </form>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,231 @@
+<!doctype html>
+<!--
+  JF-001 Rev 3.0 SEC 11 — ATS fixture corpus. "The ground truth."
+
+  Greenhouse, classic board generation (`boards.greenhouse.io/<company>/jobs/<id>`).
+  HAND-AUTHORED AND SANITIZED: the attribute patterns (#first_name, #last_name, #email, #phone,
+  #job_application_location, #resume_fieldset, #job_application_gender …) are reproduced faithfully
+  because they are what `core/adapters/greenhouse.ts` keys on, but every value is invented.
+
+  Nothing here is real: no real employer, no real posting id, no real personal data, no reachable
+  posting URL. `action="#"` so a stray submit in a browser-based debugging session can never post.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Software Engineer, Platform - Northwind Labs</title>
+    <meta property="og:site_name" content="Northwind Labs" />
+    <meta property="og:title" content="Software Engineer, Platform" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "JobPosting",
+        "title": "Software Engineer, Platform",
+        "hiringOrganization": { "@type": "Organization", "name": "Northwind Labs" },
+        "employmentType": "FULL_TIME"
+      }
+    </script>
+  </head>
+  <body class="jobs">
+    <div id="header">
+      <div class="company-name">Northwind Labs</div>
+      <h1 class="app-title">Software Engineer, Platform</h1>
+      <div class="location">Remote — Worldwide</div>
+    </div>
+
+    <div id="content">
+      <div class="job">
+        <p>
+          Northwind Labs is a fictional company invented for this fixture. We build imaginary
+          distributed systems and we are hiring an imaginary platform engineer. You will own service
+          reliability, developer tooling and the deployment pipeline, and you will work with a small
+          team that cares a great deal about correctness. Experience with TypeScript, Postgres and
+          container orchestration is useful but not required; curiosity is. This paragraph exists so
+          that job-description extraction has something realistic to chew on.
+        </p>
+      </div>
+
+      <form id="application_form" action="#" method="post" enctype="multipart/form-data" novalidate>
+        <h3>Personal Information</h3>
+
+        <div class="field">
+          <label for="first_name">First Name <span class="asterisk">*</span></label>
+          <input type="text" id="first_name" name="job_application[first_name]" required />
+        </div>
+
+        <div class="field">
+          <label for="last_name">Last Name <span class="asterisk">*</span></label>
+          <input type="text" id="last_name" name="job_application[last_name]" required />
+        </div>
+
+        <div class="field">
+          <label for="email">Email <span class="asterisk">*</span></label>
+          <input type="email" id="email" name="job_application[email]" required />
+        </div>
+
+        <div class="field">
+          <label for="phone">Phone</label>
+          <input type="tel" id="phone" name="job_application[phone]" />
+        </div>
+
+        <div class="field">
+          <label for="job_application_location">Location (City)</label>
+          <input
+            type="text"
+            id="job_application_location"
+            name="job_application[location]"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="false"
+            aria-controls="location_listbox"
+            autocomplete="off"
+          />
+          <ul id="location_listbox" role="listbox" style="display: none"></ul>
+        </div>
+
+        <h3>Attachments</h3>
+
+        <fieldset id="resume_fieldset">
+          <label for="resume">Resume/CV <span class="asterisk">*</span></label>
+          <div class="dropzone" data-testid="resume-drop-zone">
+            <span>Attach, Dropbox, Google Drive or enter manually</span>
+            <input type="file" id="resume" name="job_application[resume]" accept=".pdf,.doc,.docx" />
+          </div>
+        </fieldset>
+
+        <fieldset id="cover_letter_fieldset">
+          <label for="cover_letter">Cover Letter</label>
+          <div class="dropzone">
+            <input
+              type="file"
+              id="cover_letter"
+              name="job_application[cover_letter]"
+              accept=".pdf,.doc,.docx"
+            />
+          </div>
+        </fieldset>
+
+        <h3>Additional Information</h3>
+
+        <div class="field">
+          <label for="job_application_answers_attributes_0_text_value">
+            Why do you want to work at Northwind Labs?
+          </label>
+          <textarea
+            id="job_application_answers_attributes_0_text_value"
+            name="job_application[answers_attributes][0][text_value]"
+            rows="6"
+          ></textarea>
+        </div>
+
+        <div class="field">
+          <label for="job_application_answers_attributes_1_text_value">
+            LinkedIn Profile
+          </label>
+          <input
+            type="url"
+            id="job_application_answers_attributes_1_text_value"
+            name="job_application[answers_attributes][1][text_value]"
+          />
+        </div>
+
+        <div class="field">
+          <label for="job_application_answers_attributes_2_text_value">
+            How did you hear about this position?
+          </label>
+          <input
+            type="text"
+            id="job_application_answers_attributes_2_text_value"
+            name="job_application[answers_attributes][2][text_value]"
+          />
+        </div>
+
+        <h3>References</h3>
+        <p class="description">
+          Please provide one professional reference. We will not contact them without asking you
+          first.
+        </p>
+
+        <div class="field">
+          <label for="job_application_answers_attributes_3_text_value">Name</label>
+          <input
+            type="text"
+            id="job_application_answers_attributes_3_text_value"
+            name="job_application[answers_attributes][3][text_value]"
+          />
+        </div>
+
+        <div class="field">
+          <label for="job_application_answers_attributes_4_text_value">Email</label>
+          <input
+            type="email"
+            id="job_application_answers_attributes_4_text_value"
+            name="job_application[answers_attributes][4][text_value]"
+          />
+        </div>
+
+        <h3>U.S. Equal Employment Opportunity information (Completion is voluntary)</h3>
+
+        <div id="eeoc_form" class="field">
+          <div class="field">
+            <label for="job_application_gender">Gender</label>
+            <select id="job_application_gender" name="job_application[gender]">
+              <option value="">Please select</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Decline To Self Identify">Decline To Self Identify</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="job_application_race">Race</label>
+            <select id="job_application_race" name="job_application[race]">
+              <option value="">Please select</option>
+              <option value="Asian">Asian (Not Hispanic or Latino)</option>
+              <option value="Black or African American">Black or African American</option>
+              <option value="White">White (Not Hispanic or Latino)</option>
+              <option value="Two or More Races">Two or More Races</option>
+              <option value="Decline To Self Identify">Decline To Self Identify</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="job_application_veteran_status">Veteran Status</label>
+            <select id="job_application_veteran_status" name="job_application[veteran_status]">
+              <option value="">Please select</option>
+              <option value="I am not a protected veteran">I am not a protected veteran</option>
+              <option value="I identify as one or more of the classifications of a protected veteran">
+                I identify as one or more of the classifications of a protected veteran
+              </option>
+              <option value="I don't wish to answer">I don't wish to answer</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="job_application_disability_status">Disability Status</label>
+            <select id="job_application_disability_status" name="job_application[disability_status]">
+              <option value="">Please select</option>
+              <option value="Yes">Yes, I have a disability, or have had one in the past</option>
+              <option value="No">No, I do not have a disability</option>
+              <option value="I don't wish to answer">I do not want to answer</option>
+            </select>
+          </div>
+        </div>
+
+        <!--
+          Greenhouse plants a spam trap on some boards. `core/scanner.ts::isHoneypot` must drop it:
+          filling it silently discards the application.
+        -->
+        <input type="text" name="leave_this_blank" id="leave_this_blank" tabindex="-1" autocomplete="off" />
+
+        <!--
+          INV-1: JobFill locates and highlights this control. NOTHING in this codebase may click it.
+          `tests/unit/inv1.test.ts` spies on HTMLElement.prototype.click and asserts it stays cold.
+        -->
+        <div class="actions">
+          <input type="submit" id="submit_app" name="commit" value="Submit Application" />
+        </div>
+      </form>
+    </div>
+  </body>
+</html>

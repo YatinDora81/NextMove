@@ -1,0 +1,181 @@
+<!doctype html>
+<!--
+  JF-001 Rev 3.0 SEC 11 — ATS fixture corpus.
+
+  A plain, hand-rolled careers page — no ATS, no adapter, no vendor markup. This is the long tail
+  the generic engine has to survive, and it is the fixture that exercises the SEC 6.3 tiers the
+  vendor fixtures skip past:
+
+    · `autocomplete` attributes (tier 3, score 95) — a semantic form tells us what its fields mean;
+    · the −30 duplicate-path modifier ("Confirm email address" after "Email address");
+    · the −20 conflicting-section modifier (a "Name" and an "Email" under a References legend);
+    · a honeypot the scanner must drop before the matcher ever sees it.
+
+  Invented employer, no real personal data, `action="#"`.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Apply: Technical Writer — Ravensmoor Instruments</title>
+    <meta property="og:site_name" content="Ravensmoor Instruments" />
+  </head>
+  <body>
+    <header>
+      <a href="#" class="brand">Ravensmoor Instruments</a>
+    </header>
+
+    <main>
+      <article class="job-description">
+        <h1>Technical Writer</h1>
+        <p>
+          Ravensmoor Instruments is an invented company that exists only in this fixture. We are
+          hiring a technical writer to own our documentation: reference material, tutorials, release
+          notes and the occasional deeply unglamorous migration guide. You will work with engineers
+          who like writing and with engineers who do not, and you will be the reason our users can
+          tell the difference between the two. This paragraph exists so that description extraction
+          has enough prose to behave the way it would on a real posting.
+        </p>
+      </article>
+
+      <form id="careers-application" action="#" method="post" enctype="multipart/form-data" novalidate>
+        <fieldset>
+          <legend>Your details</legend>
+
+          <p>
+            <label for="applicant-first">First name</label>
+            <input
+              type="text"
+              id="applicant-first"
+              name="applicant_first"
+              autocomplete="given-name"
+              required
+            />
+          </p>
+
+          <p>
+            <label for="applicant-last">Last name</label>
+            <input
+              type="text"
+              id="applicant-last"
+              name="applicant_last"
+              autocomplete="family-name"
+              required
+            />
+          </p>
+
+          <p>
+            <label for="applicant-email">Email address</label>
+            <input
+              type="email"
+              id="applicant-email"
+              name="applicant_email"
+              autocomplete="email"
+              required
+            />
+          </p>
+
+          <p>
+            <label for="applicant-email-confirm">Confirm email address</label>
+            <input
+              type="email"
+              id="applicant-email-confirm"
+              name="applicant_email_confirm"
+              autocomplete="email"
+              required
+            />
+          </p>
+
+          <p>
+            <label for="applicant-phone">Phone number</label>
+            <input type="tel" id="applicant-phone" name="applicant_phone" autocomplete="tel" />
+          </p>
+
+          <p>
+            <label for="applicant-city">Town or city</label>
+            <input
+              type="text"
+              id="applicant-city"
+              name="applicant_city"
+              autocomplete="address-level2"
+            />
+          </p>
+
+          <p>
+            <label for="applicant-country">Country</label>
+            <select id="applicant-country" name="applicant_country" autocomplete="country-name">
+              <option value="">Choose a country</option>
+              <option value="IN">India</option>
+              <option value="GB">United Kingdom</option>
+              <option value="US">United States</option>
+              <option value="DE">Germany</option>
+            </select>
+          </p>
+        </fieldset>
+
+        <fieldset>
+          <legend>Links</legend>
+
+          <p>
+            <label for="applicant-linkedin">LinkedIn profile</label>
+            <input type="url" id="applicant-linkedin" name="applicant_linkedin" />
+          </p>
+
+          <p>
+            <label for="applicant-github">GitHub profile</label>
+            <input type="url" id="applicant-github" name="applicant_github" />
+          </p>
+        </fieldset>
+
+        <fieldset>
+          <legend>Your application</legend>
+
+          <p>
+            <label for="applicant-cv">Upload your CV</label>
+            <input type="file" id="applicant-cv" name="applicant_cv" accept=".pdf,.doc,.docx" />
+          </p>
+
+          <p>
+            <label for="applicant-cover-letter">Cover letter</label>
+            <textarea id="applicant-cover-letter" name="applicant_cover_letter" rows="8"></textarea>
+          </p>
+
+          <p>
+            <label for="applicant-notice">Notice period (days)</label>
+            <input type="text" id="applicant-notice" name="applicant_notice" />
+          </p>
+        </fieldset>
+
+        <fieldset>
+          <legend>References</legend>
+          <p class="hint">Please give one professional reference. We will ask before contacting them.</p>
+
+          <p>
+            <label for="reference-name">Name</label>
+            <input type="text" id="reference-name" name="reference_name" />
+          </p>
+
+          <p>
+            <label for="reference-email">Email</label>
+            <input type="email" id="reference-email" name="reference_email" />
+          </p>
+
+          <p>
+            <label for="reference-relationship">Relationship</label>
+            <input type="text" id="reference-relationship" name="reference_relationship" />
+          </p>
+        </fieldset>
+
+        <!-- Spam trap. `core/scanner.ts::isHoneypot` must drop this before matching. -->
+        <p style="display: none">
+          <label for="url_trap">Leave this field empty</label>
+          <input type="text" id="url_trap" name="url_trap" autocomplete="off" tabindex="-1" />
+        </p>
+
+        <!-- INV-1: located and highlighted, never clicked. -->
+        <p class="actions">
+          <button type="submit" id="send-application">Send application</button>
+        </p>
+      </form>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,201 @@
+<!doctype html>
+<!--
+  JF-001 Rev 3.0 SEC 11 — e2e-only fixture (NOT part of the `fixtures/` corpus).
+
+  WHY THIS FILE EXISTS
+  The corpus under `apps/extension/fixtures/` is hand-authored STATIC html with no <script> tag at
+  all, which is the right shape for the happy-dom unit layer. But it means the location listbox in
+  `fixtures/ashby/standard.html` is markup that never opens: nothing listens for `input`, nothing
+  ever sets `display: block`. `core/fill/strategies/combobox.ts` therefore waits the SEC 6.4 3s cap,
+  finds no popup and — correctly, per INV-4 — downgrades the field to `suggest`. That downgrade is
+  the ONLY thing the unit layer can observe.
+
+  This page is the same Ashby combobox with the ~40 lines of behaviour a real react-select-style
+  widget has: it filters as you type, renders `role="option"` rows, and commits the selection on
+  click. It is the fixture that lets `typeahead.spec.ts` assert what SEC 6.4 actually promises —
+  "click best option (exact > startsWith > fuzzy) -> verify committed value" — end to end in a
+  real browser.
+
+  Everything Ashby-shaped (`#ashby-application-form-container`, `_systemfield_*`) is reproduced so
+  `core/adapters/ashby.ts` detects it exactly as it detects the corpus page. Invented employer,
+  invented posting, no real personal data, `action="#"`.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Staff Platform Engineer @ Halcyon Metrics</title>
+    <meta property="og:site_name" content="Halcyon Metrics" />
+    <meta property="og:title" content="Staff Platform Engineer" />
+  </head>
+  <body>
+    <div id="ashby-embed">
+      <div class="ashby-job-posting-brief">
+        <h1 class="ashby-job-posting-brief-title">Staff Platform Engineer</h1>
+        <div class="ashby-job-posting-brief-details">Halcyon Metrics · Remote (EU)</div>
+      </div>
+
+      <div class="ashby-job-posting-content">
+        <p>
+          Halcyon Metrics is a company invented for this fixture. We are hiring a platform engineer
+          to own the deployment pipeline and the service catalogue for an analytics product that
+          does not exist. You would work with a small team that reviews each other's designs, keeps
+          the on-call rotation humane, and treats reliability as a product feature. This paragraph
+          exists so job-description capture has realistic prose to work with.
+        </p>
+      </div>
+
+      <div id="ashby-application-form-container" class="ashby-application-form-container">
+        <h2 class="ashby-application-form-header">Application</h2>
+
+        <form action="#" method="post" enctype="multipart/form-data" novalidate>
+          <div class="ashby-application-form-field-entry">
+            <label for="_systemfield_name">Name<span aria-hidden="true">*</span></label>
+            <input type="text" id="_systemfield_name" name="_systemfield_name" autocomplete="name" required />
+          </div>
+
+          <div class="ashby-application-form-field-entry">
+            <label for="_systemfield_email">Email<span aria-hidden="true">*</span></label>
+            <input type="email" id="_systemfield_email" name="_systemfield_email" autocomplete="email" required />
+          </div>
+
+          <div class="ashby-application-form-field-entry">
+            <label for="_systemfield_phone">Phone</label>
+            <input type="tel" id="_systemfield_phone" name="_systemfield_phone" autocomplete="tel" />
+          </div>
+
+          <!--
+            The live combobox. Identical markup to the corpus fixture; the difference is the script
+            at the bottom of this file, which makes the listbox real.
+          -->
+          <div class="ashby-application-form-field-entry">
+            <label id="location-label">Location</label>
+            <div role="combobox" aria-expanded="false" aria-haspopup="listbox" class="ashby-combobox">
+              <input
+                type="text"
+                id="_systemfield_location"
+                name="_systemfield_location"
+                aria-labelledby="location-label"
+                aria-autocomplete="list"
+                aria-controls="location-options"
+                autocomplete="off"
+              />
+              <ul id="location-options" role="listbox" style="display: none"></ul>
+            </div>
+            <!--
+              The committed selection id. A typeahead that merely leaves text in the box has NOT
+              committed anything; a real one records the chosen record. `typeahead.spec.ts` asserts
+              on this, which is a stronger claim than "the input reads Berlin, Germany".
+            -->
+            <input type="hidden" id="_systemfield_location_id" name="_systemfield_location_id" />
+            <span id="location-status" role="status"></span>
+          </div>
+
+          <div class="ashby-application-form-field-entry">
+            <label for="_systemfield_linkedin">LinkedIn Profile</label>
+            <input type="url" id="_systemfield_linkedin" name="_systemfield_linkedin" />
+          </div>
+
+          <fieldset class="ashby-application-form-field-entry">
+            <legend>Are you legally authorized to work in the European Union?</legend>
+            <label for="auth-yes">Yes</label>
+            <input type="radio" id="auth-yes" name="a1c93e00" value="Yes" />
+            <label for="auth-no">No</label>
+            <input type="radio" id="auth-no" name="a1c93e00" value="No" />
+          </fieldset>
+
+          <!-- INV-1: located and highlighted, never clicked. -->
+          <button type="submit" class="ashby-application-form-submit-button">Submit Application</button>
+        </form>
+      </div>
+    </div>
+
+    <script>
+      // A minimal but faithful typeahead. It reacts to `input` events (which is what the SEC 6.4
+      // per-character keystroke stream produces), renders options asynchronously over two frames
+      // the way a network-backed widget does, and commits on `click` — never on Enter, because a
+      // real one does not need Enter and JobFill deliberately never sends it (INV-1).
+      (function () {
+        var CITIES = [
+          { id: 'loc_ber', label: 'Berlin, Germany' },
+          { id: 'loc_bex', label: 'Bexley, United Kingdom' },
+          { id: 'loc_bcn', label: 'Barcelona, Spain' },
+          { id: 'loc_lis', label: 'Lisbon, Portugal' },
+          { id: 'loc_ams', label: 'Amsterdam, Netherlands' },
+        ];
+
+        var input = document.getElementById('_systemfield_location');
+        var listbox = document.getElementById('location-options');
+        var wrapper = input.closest('[role="combobox"]');
+        var hidden = document.getElementById('_systemfield_location_id');
+        var status = document.getElementById('location-status');
+        var pending = null;
+
+        function close() {
+          listbox.style.display = 'none';
+          listbox.replaceChildren();
+          wrapper.setAttribute('aria-expanded', 'false');
+        }
+
+        function commit(city) {
+          input.value = city.label;
+          hidden.value = city.id;
+          status.textContent = 'Selected ' + city.label;
+          close();
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        function render(matches) {
+          listbox.replaceChildren();
+          matches.forEach(function (city) {
+            var li = document.createElement('li');
+            li.setAttribute('role', 'option');
+            li.setAttribute('data-value', city.id);
+            li.textContent = city.label;
+            li.addEventListener('click', function () {
+              commit(city);
+            });
+            listbox.appendChild(li);
+          });
+          listbox.style.display = matches.length > 0 ? 'block' : 'none';
+          wrapper.setAttribute('aria-expanded', matches.length > 0 ? 'true' : 'false');
+        }
+
+        input.addEventListener('input', function () {
+          var query = input.value.trim().toLowerCase();
+          if (pending !== null) clearTimeout(pending);
+          if (query.length === 0) {
+            close();
+            return;
+          }
+          // Two-stage render: a "Searching…" frame, then the results — the shape that makes
+          // `awaitListbox`'s settle window earn its keep.
+          listbox.replaceChildren();
+          var loading = document.createElement('li');
+          loading.setAttribute('role', 'option');
+          loading.setAttribute('aria-disabled', 'true');
+          loading.textContent = 'Searching…';
+          listbox.appendChild(loading);
+          listbox.style.display = 'block';
+          wrapper.setAttribute('aria-expanded', 'true');
+
+          pending = setTimeout(function () {
+            pending = null;
+            render(
+              CITIES.filter(function (city) {
+                return city.label.toLowerCase().indexOf(query) === 0;
+              }),
+            );
+          }, 60);
+        });
+
+        // Typing anything by hand invalidates a previous commit, like every real widget.
+        input.addEventListener('input', function () {
+          if (hidden.value !== '' && input.value !== status.textContent.replace('Selected ', '')) {
+            hidden.value = '';
+            status.textContent = '';
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>

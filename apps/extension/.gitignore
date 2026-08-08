@@ -1,0 +1,7 @@
+build
+.output
+.wxt
+node_modules
+stats.html
+playwright-report
+test-results

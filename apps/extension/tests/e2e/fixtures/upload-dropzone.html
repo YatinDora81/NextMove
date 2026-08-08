@@ -1,0 +1,123 @@
+<!doctype html>
+<!--
+  JF-001 Rev 3.0 SEC 11 — e2e-only fixture (NOT part of the `fixtures/` corpus).
+
+  WHY THIS FILE EXISTS
+  SEC 6.4's file strategy has two halves: "DataTransfer injection. If the ATS hides the input
+  behind a dropzone, dispatch `drop` with the same DataTransfer on the zone. Verify via
+  `input.files.length` or filename chip in DOM." The corpus fixtures give the first half a plain
+  `<input type=file>` but nothing in them can ever render a filename chip, because they carry no
+  script — so the "or filename chip" branch has no fixture anywhere in the repo.
+
+  This page supplies both shapes on one form:
+
+    #resume-plain   an ordinary, visible file input. `input.files.length` is the proof.
+    #resume-hidden  a `display: none` input behind a real dropzone that listens for `drop`,
+                    reads `event.dataTransfer.files`, and renders `#resume-chip` with the file
+                    name — an async uploader that never populates `input.files`, which is the
+                    case `awaitFilenameChip()` exists for.
+
+  See `file-attach.spec.ts` for what this fixture currently proves and what it cannot: the
+  content-script orchestrator never hands the FillEngine a resume, so `fillFile` is reached with
+  `attachment === null` on every real page.
+
+  Invented employer, no real personal data, `action="#"`.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Apply — Reliability Engineer at Marlowe Freight</title>
+    <meta property="og:site_name" content="Marlowe Freight" />
+    <meta property="og:title" content="Reliability Engineer" />
+    <style>
+      .visually-hidden-input {
+        display: none;
+      }
+      .dropzone {
+        border: 1px dashed #888;
+        padding: 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="company-name">Marlowe Freight</div>
+      <h1>Reliability Engineer</h1>
+    </header>
+
+    <p>
+      Marlowe Freight is an invented company. This posting exists to exercise the two attachment
+      shapes SEC 6.4 describes, and nothing else. The prose here gives job-description capture
+      something to read.
+    </p>
+
+    <form id="application-form" action="#" method="post" enctype="multipart/form-data" novalidate>
+      <div class="field">
+        <label for="applicant-first">First name</label>
+        <input type="text" id="applicant-first" name="applicant_first" autocomplete="given-name" required />
+      </div>
+
+      <div class="field">
+        <label for="applicant-last">Last name</label>
+        <input type="text" id="applicant-last" name="applicant_last" autocomplete="family-name" required />
+      </div>
+
+      <div class="field">
+        <label for="applicant-email">Email address</label>
+        <input type="email" id="applicant-email" name="applicant_email" autocomplete="email" required />
+      </div>
+
+      <!-- Shape 1: the input itself is the target. -->
+      <fieldset id="resume-plain-fieldset">
+        <legend>Resume / CV</legend>
+        <label for="resume-plain">Attach your resume</label>
+        <input type="file" id="resume-plain" name="resume_plain" accept=".pdf,.doc,.docx,.txt" />
+      </fieldset>
+
+      <!-- Shape 2: the input is decorative; the zone around it is what listens. -->
+      <fieldset id="resume-drop-fieldset">
+        <legend>Cover letter</legend>
+        <label for="resume-hidden">Attach your cover letter</label>
+        <div class="dropzone" id="cover-dropzone" data-testid="cover-drop-zone">
+          <span>Drop a file here, or click to browse</span>
+          <input
+            type="file"
+            id="resume-hidden"
+            name="cover_letter"
+            class="visually-hidden-input"
+            accept=".pdf,.doc,.docx,.txt"
+          />
+        </div>
+        <div id="resume-chip" data-attached="0"></div>
+      </fieldset>
+
+      <!-- INV-1: located and highlighted, never clicked. -->
+      <div class="actions">
+        <button type="submit" id="send-application">Send application</button>
+      </div>
+    </form>
+
+    <script>
+      (function () {
+        var zone = document.getElementById('cover-dropzone');
+        var chip = document.getElementById('resume-chip');
+
+        function accept(event) {
+          event.preventDefault();
+          var transfer = event.dataTransfer;
+          if (!transfer || !transfer.files || transfer.files.length === 0) return;
+          var file = transfer.files[0];
+          // Deliberately does NOT assign to input.files: this is the async-uploader shape, where
+          // the only evidence a file landed is the chip the widget renders.
+          chip.textContent = file.name;
+          chip.setAttribute('data-attached', '1');
+        }
+
+        zone.addEventListener('dragover', function (event) {
+          event.preventDefault();
+        });
+        zone.addEventListener('drop', accept);
+      })();
+    </script>
+  </body>
+</html>

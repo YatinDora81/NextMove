@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./.wxt/tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "jsx": "react-jsx"
+  },
+  "include": [
+    "./.wxt/types/**/*",
+    "./src/**/*",
+    "./tests/**/*",
+    "./wxt.config.ts",
+    "./vitest.config.ts"
+  ],
+  "exclude": ["./.output", "./node_modules"]
+}

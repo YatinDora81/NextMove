@@ -1,0 +1,211 @@
+<!doctype html>
+<!--
+  JF-001 Rev 3.0 SEC 11 — ATS fixture corpus.
+
+  Lever hosted posting (`jobs.lever.co/<company>/<uuid>`).
+  HAND-AUTHORED AND SANITIZED. Lever is NAME-ATTRIBUTE driven — `name="name"`, `name="org"`,
+  `name="urls[LinkedIn]"` — and wraps every control in a `<label class="application-label">`, so
+  this fixture is also the corpus's coverage of the "wrapping label" resolution strategy
+  (SEC 6.2 strategy 2) and of the styled dropzone in front of a real `<input type="file">`.
+
+  Invented employer, invented posting id, no real personal data, `action="#"`.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Senior Backend Engineer - Fablewright</title>
+    <meta property="og:site_name" content="Fablewright" />
+  </head>
+  <body>
+    <div class="content-wrapper" data-qa="posting">
+      <div class="posting-header">
+        <div class="main-header-content">
+          <a class="main-header-logo" href="#">Fablewright</a>
+        </div>
+        <h2 data-qa="posting-name">Senior Backend Engineer</h2>
+        <div class="posting-categories">
+          <span class="location">Bengaluru, India</span>
+          <span class="department">Engineering</span>
+        </div>
+      </div>
+
+      <div class="section page-centered posting-description">
+        <p>
+          Fablewright is an invented company that exists only inside this test fixture. The role is
+          equally invented. You would design and operate the services behind our imaginary product,
+          own their data model, and mentor other engineers. We care about clear writing, small
+          reversible changes, and taking on-call seriously. This paragraph gives the job-description
+          extractor enough prose to behave like it would on a real posting.
+        </p>
+      </div>
+
+      <div class="section page-centered application-form-wrapper">
+        <form class="application-form" action="#" method="POST" enctype="multipart/form-data" novalidate>
+          <div class="application-question-header">Submit your application</div>
+
+          <ul class="application-fields">
+            <li class="application-question required">
+              <label class="application-label">
+                <div class="application-label-inner">Full name<span class="required">✱</span></div>
+                <input type="text" name="name" required class="application-form-input" />
+              </label>
+            </li>
+
+            <li class="application-question required">
+              <label class="application-label">
+                <div class="application-label-inner">Email<span class="required">✱</span></div>
+                <input type="email" name="email" required class="application-form-input" />
+              </label>
+            </li>
+
+            <li class="application-question">
+              <label class="application-label">
+                <div class="application-label-inner">Phone</div>
+                <input type="tel" name="phone" class="application-form-input" />
+              </label>
+            </li>
+
+            <li class="application-question">
+              <label class="application-label">
+                <div class="application-label-inner">Current company</div>
+                <input type="text" name="org" class="application-form-input" />
+              </label>
+            </li>
+
+            <li class="application-question">
+              <label class="application-label">
+                <div class="application-label-inner">Location</div>
+                <input
+                  type="text"
+                  name="location"
+                  id="location-input"
+                  class="application-form-input"
+                  aria-autocomplete="list"
+                  aria-controls="location-suggestions"
+                />
+                <ul id="location-suggestions" role="listbox" style="display: none"></ul>
+              </label>
+            </li>
+
+            <li class="application-question">
+              <label class="application-label">
+                <div class="application-label-inner">LinkedIn URL</div>
+                <input type="url" name="urls[LinkedIn]" class="application-form-input" />
+              </label>
+            </li>
+
+            <li class="application-question">
+              <label class="application-label">
+                <div class="application-label-inner">GitHub URL</div>
+                <input type="url" name="urls[GitHub]" class="application-form-input" />
+              </label>
+            </li>
+
+            <li class="application-question">
+              <label class="application-label">
+                <div class="application-label-inner">Portfolio URL</div>
+                <input type="url" name="urls[Portfolio]" class="application-form-input" />
+              </label>
+            </li>
+          </ul>
+
+          <div class="application-question application-file-input">
+            <label class="application-label" for="resume-upload-input">
+              <div class="application-label-inner">Resume/CV<span class="required">✱</span></div>
+            </label>
+            <div class="filename-container" data-qa="resume-dropzone">
+              <span class="dropzone-hint">Attach or drop your resume here</span>
+              <input
+                type="file"
+                name="resume"
+                id="resume-upload-input"
+                accept=".pdf,.doc,.docx,.txt"
+                required
+              />
+            </div>
+          </div>
+
+          <ul class="application-additional">
+            <li class="application-question">
+              <label class="application-label">
+                <div class="application-label-inner">
+                  What interests you about this position?
+                </div>
+                <textarea name="cards[b7c1][field0]" rows="5" class="application-form-input"></textarea>
+              </label>
+            </li>
+
+            <li class="application-question">
+              <label class="application-label">
+                <div class="application-label-inner">Additional information</div>
+                <textarea name="comments" rows="4" class="application-form-input"></textarea>
+              </label>
+            </li>
+          </ul>
+
+          <div class="application-eeo">
+            <h4>Voluntary Self-Identification</h4>
+
+            <div class="application-question">
+              <label class="application-label" for="eeo-gender">
+                <div class="application-label-inner">Gender</div>
+              </label>
+              <select name="eeo[gender]" id="eeo-gender">
+                <option value="">Select…</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="decline">I don't wish to answer</option>
+              </select>
+            </div>
+
+            <div class="application-question">
+              <label class="application-label" for="eeo-race">
+                <div class="application-label-inner">Race / Ethnicity</div>
+              </label>
+              <select name="eeo[race]" id="eeo-race">
+                <option value="">Select…</option>
+                <option value="asian">Asian</option>
+                <option value="black">Black or African American</option>
+                <option value="white">White</option>
+                <option value="decline">I don't wish to answer</option>
+              </select>
+            </div>
+
+            <div class="application-question">
+              <label class="application-label" for="eeo-veteran">
+                <div class="application-label-inner">Veteran status</div>
+              </label>
+              <select name="eeo[veteran]" id="eeo-veteran">
+                <option value="">Select…</option>
+                <option value="not-veteran">I am not a protected veteran</option>
+                <option value="veteran">I identify as a protected veteran</option>
+                <option value="decline">I don't wish to answer</option>
+              </select>
+            </div>
+
+            <div class="application-question">
+              <label class="application-label" for="eeo-disability">
+                <div class="application-label-inner">Disability status</div>
+              </label>
+              <select name="eeo[disability]" id="eeo-disability">
+                <option value="">Select…</option>
+                <option value="yes">Yes, I have a disability</option>
+                <option value="no">No, I do not have a disability</option>
+                <option value="decline">I do not want to answer</option>
+              </select>
+            </div>
+          </div>
+
+          <!--
+            INV-1: located and highlighted, never clicked.
+          -->
+          <div class="application-actions">
+            <button type="submit" class="template-btn-submit" data-qa="btn-submit">
+              Submit application
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,211 @@
+<!doctype html>
+<!--
+  JF-001 Rev 3.0 SEC 11 — ATS fixture corpus.
+
+  Workday, step 1 of the apply flow ("My Information") on a tenant at
+  `<tenant>.wd5.myworkdayjobs.com/en-US/<site>/job/<slug>/apply`.
+
+  HAND-AUTHORED AND SANITIZED. Everything Workday-shaped is keyed on `data-automation-id`, which is
+  exactly what `core/adapters/workday.ts` maps, and the page carries the real structural furniture:
+
+    · the multi-step shell — `[data-automation-id="applyFlowPage"]` + `[data-automation-id="progressBar"]`
+      with the active step marked `aria-current="step"`, so `workdayAdapter.steps.currentStep()`
+      has something honest to read;
+    · a button-driven "select" (`countryDropdown`) — no native <select> anywhere in Workday;
+    · a real TYPEAHEAD (`aria-autocomplete="list"` + `aria-controls` → `role="listbox"`), which the
+      signature builder must classify as `combobox`, not `text`;
+    · a "Next" control that INV-1 forbids anyone from clicking.
+
+  Invented tenant, invented employer, no real personal data, `action="#"`.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Apply - Data Engineer II - Grimsby Aerospace</title>
+    <meta property="og:site_name" content="Grimsby Aerospace" />
+    <meta property="og:title" content="Data Engineer II" />
+  </head>
+  <body>
+    <div data-automation-id="brandingHeader">
+      <span data-automation-id="companyName">Grimsby Aerospace</span>
+    </div>
+
+    <div data-automation-id="jobApplicationPage">
+      <h2 data-automation-id="jobPostingHeader">Data Engineer II</h2>
+
+      <div data-automation-id="applyFlowPage">
+        <ol data-automation-id="progressBar">
+          <li data-automation-id="progressBarActiveStep" aria-current="step">My Information</li>
+          <li>My Experience</li>
+          <li>Application Questions</li>
+          <li>Voluntary Disclosures</li>
+          <li>Self Identify</li>
+          <li>Review</li>
+        </ol>
+
+        <h2 data-automation-id="pageHeader">My Information</h2>
+
+        <form action="#" method="post" novalidate>
+          <div data-automation-id="formField-source">
+            <label for="input-1">How Did You Hear About Us?</label>
+            <div data-automation-id="multiSelectContainer">
+              <input
+                type="text"
+                id="input-1"
+                data-automation-id="searchBox"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded="false"
+                aria-controls="source-listbox"
+                aria-haspopup="listbox"
+              />
+              <ul id="source-listbox" role="listbox" style="display: none">
+                <li role="option" data-automation-id="promptOption">Job Board</li>
+                <li role="option" data-automation-id="promptOption">Referral</li>
+                <li role="option" data-automation-id="promptOption">University Career Fair</li>
+              </ul>
+            </div>
+          </div>
+
+          <fieldset data-automation-id="legalNameSection">
+            <legend>Legal Name</legend>
+
+            <div data-automation-id="formField-legalNameSection_firstName">
+              <label for="input-2">First Name</label>
+              <input
+                type="text"
+                id="input-2"
+                data-automation-id="legalNameSection_firstName"
+                aria-required="true"
+              />
+            </div>
+
+            <div data-automation-id="formField-legalNameSection_lastName">
+              <label for="input-3">Last Name</label>
+              <input
+                type="text"
+                id="input-3"
+                data-automation-id="legalNameSection_lastName"
+                aria-required="true"
+              />
+            </div>
+          </fieldset>
+
+          <fieldset data-automation-id="addressSection">
+            <legend>Address</legend>
+
+            <div data-automation-id="formField-country">
+              <label id="country-label">Country</label>
+              <button
+                type="button"
+                data-automation-id="countryDropdown"
+                role="combobox"
+                aria-haspopup="listbox"
+                aria-labelledby="country-label"
+                aria-expanded="false"
+              >
+                Select One
+              </button>
+            </div>
+
+            <div data-automation-id="formField-addressSection_addressLine1">
+              <label for="input-4">Address Line 1</label>
+              <input type="text" id="input-4" data-automation-id="addressSection_addressLine1" />
+            </div>
+
+            <div data-automation-id="formField-addressSection_addressLine2">
+              <label for="input-5">Address Line 2</label>
+              <input type="text" id="input-5" data-automation-id="addressSection_addressLine2" />
+            </div>
+
+            <div data-automation-id="formField-addressSection_city">
+              <label for="input-6">City</label>
+              <input type="text" id="input-6" data-automation-id="addressSection_city" />
+            </div>
+
+            <div data-automation-id="formField-addressSection_countryRegion">
+              <label id="region-label">State</label>
+              <button
+                type="button"
+                data-automation-id="addressSection_countryRegion"
+                role="combobox"
+                aria-haspopup="listbox"
+                aria-labelledby="region-label"
+                aria-expanded="false"
+              >
+                Select One
+              </button>
+            </div>
+
+            <div data-automation-id="formField-addressSection_postalCode">
+              <label for="input-7">Postal Code</label>
+              <input type="text" id="input-7" data-automation-id="addressSection_postalCode" />
+            </div>
+          </fieldset>
+
+          <fieldset data-automation-id="contactInformationSection">
+            <legend>Contact Information</legend>
+
+            <div data-automation-id="formField-email">
+              <label for="input-8">Email Address</label>
+              <input type="text" id="input-8" data-automation-id="email" aria-required="true" />
+            </div>
+
+            <div data-automation-id="formField-phone-number">
+              <label for="input-9">Phone Number</label>
+              <input type="text" id="input-9" data-automation-id="phone-number" />
+            </div>
+          </fieldset>
+
+          <fieldset data-automation-id="previousWorkerSection" role="radiogroup" aria-labelledby="pw-label">
+            <legend id="pw-label">Have you previously worked for Grimsby Aerospace?</legend>
+            <label for="pw-yes">Yes</label>
+            <input type="radio" id="pw-yes" name="previousWorker" value="yes" />
+            <label for="pw-no">No</label>
+            <input type="radio" id="pw-no" name="previousWorker" value="no" />
+          </fieldset>
+
+          <div data-automation-id="resumeUpload">
+            <label for="input-10">Resume/CV</label>
+            <div data-automation-id="fileUploadDropZone">
+              <span>Drop files here or</span>
+              <input
+                type="file"
+                id="input-10"
+                data-automation-id="file-upload-input-ref"
+                accept=".pdf,.doc,.docx"
+              />
+            </div>
+          </div>
+
+          <!--
+            The next step of the wizard, pre-rendered but hidden. INV-1 aside, the scanner must not
+            offer to fill a step the human has not reached — `core/observer.ts` re-scans on step
+            change instead.
+          -->
+          <fieldset data-automation-id="workExperienceSection" style="display: none">
+            <legend>Work Experience</legend>
+            <div data-automation-id="formField-jobTitle">
+              <label for="input-11">Job Title</label>
+              <input type="text" id="input-11" data-automation-id="jobTitle" />
+            </div>
+            <div data-automation-id="formField-company">
+              <label for="input-12">Company</label>
+              <input type="text" id="input-12" data-automation-id="company" />
+            </div>
+          </fieldset>
+
+          <!--
+            INV-1: "Next" advances the wizard and commits this page's answers, so it is as
+            untouchable as a Submit button. Located and highlighted, never clicked.
+          -->
+          <div data-automation-id="bottom-navigation">
+            <button type="button" data-automation-id="bottom-navigation-next-button">
+              Save and Continue
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </body>
+</html>
