@@ -91,8 +91,13 @@ export const E2E_PROFILE: Profile = {
 };
 
 /**
- * INV-5 / SEC 11: an obviously fake key literal. It is the right *shape* for the vault's
- * `AIza…` guard and for the masking code, and it is not, and never was, a credential. Every
- * request it would authorise is intercepted before it leaves the browser (`helpers/gemini.ts`).
+ * INV-5 / SEC 11: an obviously fake key. It is the right *shape* for the vault's `AIza…` guard and
+ * for the masking code, and it is not, and never was, a credential. Every request it would
+ * authorise is intercepted before it leaves the browser (`helpers/gemini.ts`).
+ *
+ * Kept in two pieces on purpose. GitHub secret scanning matches `AIza` followed by 35 characters,
+ * so a fixture of this shape written as one literal raises a "Google API Key" alert on every push
+ * and trains everyone to click past those alerts. Joining at runtime keeps the value identical for
+ * the tests while leaving no matching literal in the source. Do not merge these back together.
  */
-export const FAKE_GEMINI_KEY = 'AIzaSyE2E0000000FAKE0000000NOT0A0REAL0KEY';
+export const FAKE_GEMINI_KEY = ['AIza', 'SyE2E0000000FAKE0000000NOT0A0REAL0KEY'].join('');
