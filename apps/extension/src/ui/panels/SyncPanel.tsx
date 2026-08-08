@@ -104,9 +104,14 @@ export function SyncPanel(): ReactElement {
     if (ok) {
       setCode('');
       toast.ok('This device is connected to your NextMove account.');
-    } else {
-      toast.error('That code did not work. Codes expire after five minutes and are single-use.');
+      return;
     }
+    const reason = useSyncStore.getState().error;
+    toast.error(
+      reason === null || reason.trim() === ''
+        ? 'That code did not work. Codes expire after five minutes and are single-use.'
+        : reason,
+    );
   };
 
   const onPush = async (): Promise<void> => {

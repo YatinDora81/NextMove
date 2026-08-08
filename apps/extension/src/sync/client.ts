@@ -397,11 +397,17 @@ async function send(spec: RequestSpec): Promise<Attempt> {
     await markUnpaired('Your NextMove session for this device ended. Pair again to resume sync.');
   }
 
+  const unreachable =
+    code === 'not-found' && (spec.path === SYNC_ROUTES.pair || spec.path === SYNC_ROUTES.devices);
+
   const error: SyncError = {
     code,
     status: res.status,
-    message:
-      res.message.length > 0
+    message: unreachable
+      ? `The NextMove sync service did not recognise ${spec.method} ${spec.path}. The server is ` +
+        'reachable but does not have this endpoint, so it is likely out of date or the extension ' +
+        'is pointed at the wrong host. This is not a problem with your pairing code.'
+      : res.message.length > 0
         ? res.message
         : `Sync request failed (HTTP ${res.status}) on ${spec.method} ${spec.path}.`,
   };

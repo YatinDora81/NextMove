@@ -123,7 +123,7 @@ export const ANSWER_MAX_WORDS = 120;
 
 export const CONFIG_URL = 'https://nextmove-yatin.vercel.app/extension/adapters.json';
 
-export const API_BASE_URL = 'https://nextmove-yatin.vercel.app';
+export const API_BASE_URL = 'https://nextmove-7squ.onrender.com';
 
 export const CONFIG_FETCH_TIMEOUT_MS = 10_000;
 export const CONFIG_MIN_POLL_INTERVAL_MS = 6 * 60 * 60 * 1_000;

@@ -55,6 +55,7 @@ export default defineConfig({
     host_permissions: [
       'https://generativelanguage.googleapis.com/*',
       'https://nextmove-yatin.vercel.app/*',
+      'https://nextmove-7squ.onrender.com/*',
     ],
     action: {
       default_popup: 'popup.html',
