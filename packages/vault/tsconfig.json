@@ -1,0 +1,24 @@
+{
+  "//": "moduleResolution is Bundler, not the base's nodenext. This package is only ever consumed by a bundler — webpack via apps/web, rolldown via apps/extension — and nodenext would force `.js` specifiers on relative imports that webpack cannot resolve, giving a green `check-types` and a red `next build`.",
+  "extends": "@repo/typescript-config/base.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true,
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "types": [],
+    "module": "ESNext",
+    "moduleResolution": "Bundler"
+  },
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}
