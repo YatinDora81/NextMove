@@ -101,6 +101,11 @@ export interface BrowserMock {
       removeListener(fn: (...args: unknown[]) => unknown): void;
       hasListener(fn: (...args: unknown[]) => unknown): boolean;
     };
+    onMessageExternal: {
+      addListener(fn: (...args: unknown[]) => unknown): void;
+      removeListener(fn: (...args: unknown[]) => unknown): void;
+      hasListener(fn: (...args: unknown[]) => unknown): boolean;
+    };
   };
   alarms: {
     create(name: string, info: Omit<MockAlarm, 'name'>): void;
@@ -118,6 +123,7 @@ export interface BrowserMock {
   __sent: unknown[];
   __reset(): void;
   __emitMessage(message: unknown, sender?: MockRuntimeMessage['sender']): unknown[];
+  __emitExternalMessage(message: unknown, sender: Record<string, unknown>): Promise<unknown>;
   __fireAlarm(name: string): void;
 }
 
@@ -146,6 +152,7 @@ function createBrowserMock(): BrowserMock {
 
   const storageChanged = listenerSet<(changes: Record<string, unknown>, area: string) => void>();
   const onMessage = listenerSet<(...args: unknown[]) => unknown>();
+  const onMessageExternal = listenerSet<(...args: unknown[]) => unknown>();
   const onAlarm = listenerSet<(alarm: MockAlarm) => void>();
 
   const notify = (changes: Record<string, unknown>): void => {
@@ -232,6 +239,11 @@ function createBrowserMock(): BrowserMock {
         removeListener: onMessage.removeListener,
         hasListener: onMessage.hasListener,
       },
+      onMessageExternal: {
+        addListener: onMessageExternal.addListener,
+        removeListener: onMessageExternal.removeListener,
+        hasListener: onMessageExternal.hasListener,
+      },
     },
 
     alarms: {
@@ -263,12 +275,36 @@ function createBrowserMock(): BrowserMock {
     __reset(): void {
       for (const key of Object.keys(store)) delete store[key];
       for (const key of Object.keys(sessionStore)) delete sessionStore[key];
+      // Listeners are per-worker state and must not survive a reset: a listener left registered by
+      // an earlier test changes how the next one dispatches, which is the same class of bug as the
+      // duplicate external listener this file's sibling test exists to catch.
+      onMessage.clear();
+      onMessageExternal.clear();
+      onAlarm.clear();
+      storageChanged.clear();
       alarms.clear();
       sent.length = 0;
       storageChanged.clear();
       onMessage.clear();
       onAlarm.clear();
       mock.runtime.lastError = undefined;
+    },
+
+    async __emitExternalMessage(message: unknown, sender: Record<string, unknown>): Promise<unknown> {
+      // Chrome hands the message to every registered listener in registration order and delivers
+      // the FIRST sendResponse it receives. Modelling that ordering is the whole point: a listener
+      // registered earlier can silently swallow a later one's reply, which is exactly how the
+      // connect handshake shipped broken.
+      return new Promise((resolve) => {
+        let settled = false;
+        const respond = (reply: unknown): void => {
+          if (settled) return;
+          settled = true;
+          resolve(reply);
+        };
+        for (const fn of onMessageExternal.all()) fn(message, sender, respond);
+        if (!settled) queueMicrotask(() => setTimeout(() => respond(undefined), 0));
+      });
     },
 
     __emitMessage(message: unknown, sender = { id: 'jobfill-test' }): unknown[] {
