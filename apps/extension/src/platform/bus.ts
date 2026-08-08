@@ -347,7 +347,6 @@ type RuntimeListener = (
 ) => boolean | void;
 
 let messageListener: RuntimeListener | null = null;
-let externalListener: RuntimeListener | null = null;
 
 /**
  * Install the router. Called once from the service worker after its handlers are registered.
@@ -387,21 +386,19 @@ export function startRouter(): void {
     typeof api.runtime.onMessage.addListener
   >[0]);
 
-  // SEC 6.6 — external messages are refused entirely. `externally_connectable` is absent from the
-  // manifest, so this should never fire; it is registered anyway so the refusal is explicit and
-  // auditable rather than implicit in a missing manifest key.
-  const external = api.runtime.onMessageExternal;
-  if (external && typeof external.addListener === 'function') {
-    externalListener = (_message, sender, sendResponse) => {
-      log.warn('refused an external message', { senderId: sender.id ?? null, url: sender.url ?? null });
-      sendResponse(errReply('BAD_REQUEST', 'This extension does not accept external messages.'));
-      return false;
-    };
-    external.addListener(
-      externalListener as unknown as Parameters<typeof external.addListener>[0],
-    );
-  }
-
+  // SEC 6.6 used to refuse every external message here, on the stated grounds that
+  // `externally_connectable` was absent from the manifest so the listener could never fire. That
+  // grounds no longer holds: the manifest now lists the NextMove origins so the web app can hand
+  // this extension a pairing code and an E2E vault key. Registering a blanket refusal here is
+  // therefore not a harmless belt-and-braces — it is a live bug. Chrome runs external listeners in
+  // registration order and delivers the FIRST synchronous `sendResponse`, and the router installs
+  // before the handoff does, so the refusal won every race and the handshake could never complete.
+  //
+  // External messages are now owned exclusively by `background/handoff.ts`, which is the layer that
+  // can actually authorise one: it checks `sender.origin` against an exact allowlist, requires the
+  // top frame of a real tab, and burns a single-use nonce. An unknown message type there returns
+  // `false` without responding, which is the correct refusal — Chrome closes the channel and the
+  // caller sees no reply.
   log.info('message router started');
 }
 
@@ -413,13 +410,6 @@ export function stopRouter(): void {
       messageListener as unknown as Parameters<typeof api.runtime.onMessage.removeListener>[0],
     );
     messageListener = null;
-  }
-  const external = api.runtime.onMessageExternal;
-  if (externalListener !== null && external && typeof external.removeListener === 'function') {
-    external.removeListener(
-      externalListener as unknown as Parameters<typeof external.removeListener>[0],
-    );
-    externalListener = null;
   }
 }
 
