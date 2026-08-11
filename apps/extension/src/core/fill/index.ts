@@ -17,6 +17,15 @@
  *          write that cannot be *verified* is downgraded from `filled` to `suggested` — the report
  *          only ever claims what we can prove.
  *
+ * And one policy that is not an invariant but is felt just as hard when it is missing:
+ *
+ *   Never overwrite an answer. `isAlreadyAnswered` is the single definition of "this control is
+ *   already answered" — non-blank text/textarea, a typeahead holding a selection, a dropdown whose
+ *   selection is not a placeholder — and no bulk or chained run writes over one. `overwrite` is the
+ *   only way past it, it defaults to off, and only an explicit single-field gesture sets it. Before
+ *   this existed, ⚡ Fill all destroyed a sentence the user had typed while carefully preserving the
+ *   dropdown next to it.
+ *
  * The engine is deliberately dependency-light: it takes a `Profile` and `MatchResult[]` and returns
  * a `FillReport`. Tracking (`FILL_REPORT`), overlay rendering and the resume blob read all live
  * with their owners; this file just drives the DOM and counts honestly.
@@ -42,6 +51,7 @@ import {
   assertNotSubmitControl,
   isAborted,
   isCheckable,
+  isFileInput,
   jitter,
   looksLikeCombobox,
   sleep,
@@ -55,6 +65,7 @@ import {
   isSkipReason,
   readQuirks,
   type FillQuirks,
+  type FillRequest,
   type FillValue,
   type ResumeAttachment,
   type StrategyContext,
@@ -62,11 +73,11 @@ import {
 } from './types';
 
 import { fillChoice, previewChoice } from './strategies/choice';
-import { fillCombobox } from './strategies/combobox';
+import { comboboxHasRealValue, fillCombobox } from './strategies/combobox';
 import { fillDate } from './strategies/date';
 import { fillFile } from './strategies/file';
-import { fillSelect } from './strategies/select';
-import { fillText } from './strategies/text';
+import { fillSelect, selectHasRealValue } from './strategies/select';
+import { fillText, textHasRealValue } from './strategies/text';
 
 export * from './types';
 export {
@@ -85,11 +96,11 @@ export { isSubmitControl,
   isForbiddenClickTarget,
   assertClickable, assertNotSubmitControl, SubmitControlError } from './dom';
 export { setNativeValue } from './strategies/text';
-export { fillText } from './strategies/text';
-export { fillSelect, normalizeCountry, normalizeRegion } from './strategies/select';
+export { fillText, textHasRealValue } from './strategies/text';
+export { fillSelect, normalizeCountry, normalizeRegion, selectHasRealValue } from './strategies/select';
 export { fillChoice, fillRadio, fillCheckbox } from './strategies/choice';
 export { fillDate, formatDate, parseDateValue } from './strategies/date';
-export { fillCombobox } from './strategies/combobox';
+export { fillCombobox, comboboxHasRealValue } from './strategies/combobox';
 export { fillFile, fileFromResume, findDropzone } from './strategies/file';
 
 /* ------------------------------------------------------------------------------------------------
@@ -164,6 +175,42 @@ export function resolveValue(profile: Profile, path: ProfilePath | null): FillVa
 }
 
 /* ------------------------------------------------------------------------------------------------
+ * "This control is already answered" — one policy, one definition
+ * ---------------------------------------------------------------------------------------------- */
+
+/**
+ * Would a human say this control already has an answer?
+ *
+ * The engine's single definition, composed from the clause each strategy owns and enforces:
+ * `selectHasRealValue` for a `<select>`, `comboboxHasRealValue` for a typeahead, `textHasRealValue`
+ * for everything else that holds typed text (which includes `date`, `number` and contenteditable —
+ * a date the user typed is an answer like any other). It is deliberately blind to WHERE the answer
+ * came from: the page's own default, a restored draft and a sentence the user typed are
+ * indistinguishable from here, and all three are answers a bulk fill has no business replacing.
+ *
+ * Two shapes are excluded, and both are exclusions rather than oversights:
+ *
+ *   - radios and checkboxes, because `input.value` is the option's own label and reads non-blank
+ *     whether or not the box is ticked. "Answered" for a choice group means which MEMBER is
+ *     checked, a question only `fillChoice` can answer — it already returns `filled` for a target
+ *     that is checked, though a group whose user-checked member is a different one is still
+ *     rewritten. Closing that belongs with the choice strategy, not with a value check here;
+ *   - file inputs, because "already attached" is `input.files`, not a value, and the resume
+ *     strategy verifies its own write. A pre-populated token in `value` must not be read as an
+ *     attachment the user chose.
+ */
+export function isAlreadyAnswered(el: Element, sig?: FieldSignature): boolean {
+  if (el instanceof HTMLSelectElement) return selectHasRealValue(el);
+  if (isCheckable(el) || isFileInput(el)) return false;
+
+  const declared = sig?.inputType;
+  if (declared === 'combobox' || declared === 'select' || looksLikeCombobox(el)) {
+    return comboboxHasRealValue(el);
+  }
+  return textHasRealValue(el);
+}
+
+/* ------------------------------------------------------------------------------------------------
  * Engine options and events
  * ---------------------------------------------------------------------------------------------- */
 
@@ -196,6 +243,13 @@ export interface FillEngineOptions {
   resolveResume?: (path: ProfilePath | null) => Promise<ResumeAttachment | null>;
   /** SEC 6.4 / SEC 13 — jittered inter-field delays. Defaults to on. */
   humanPacing?: boolean;
+  /**
+   * Write over answers the controls already carry. Defaults to OFF, and every bulk entry point
+   * (⚡ Fill all, Alt+J, the chained auto-fill on each wizard step) leaves it off: a run that can
+   * destroy what the user typed is not a fill, it is data loss. The single-field re-fill gesture is
+   * the only caller that may set it, because the user is looking at that control when they ask.
+   */
+  overwrite?: boolean;
   /** Whole-run ceiling; remaining fields are reported as skipped. */
   timeoutMs?: number;
   signal?: AbortSignal;
@@ -260,6 +314,10 @@ export class FillEngine {
     const written = new Set<Element>();
     let wroteAnything = false;
 
+    // The engine's one concession to "re-fill this field": off unless the caller asked, and carried
+    // to every strategy that can write over an answer, so the whole run has a single policy.
+    const request: FillRequest = { overwrite: this.options.overwrite === true };
+
     for (const match of matches) {
       const sig = match.node.sig;
       const el = asElement(match.node.el);
@@ -311,7 +369,7 @@ export class FillEngine {
       const ctx = this.contextFor(sig);
       let result: StrategyResult;
       try {
-        result = await this.dispatch(el, sig, value, match.path, ctx);
+        result = await this.dispatch(el, sig, value, match.path, ctx, request);
       } catch (error) {
         result = failed(error instanceof Error ? error.message : REASON.exception);
       }
@@ -339,33 +397,45 @@ export class FillEngine {
     return report;
   }
 
-  /** Which strategy owns this field (SEC 6.4). */
+  /**
+   * Which strategy owns this field (SEC 6.4).
+   *
+   * The three strategies that can compare a standing answer with the one we would have written take
+   * `request` and enforce the overwrite policy themselves — that way a field which already reads
+   * exactly what we were going to type is still reported as `filled`, instead of being turned into
+   * a gap the user has to go and check. `fillDate` cannot make that comparison (its target may be a
+   * widget, not an input), so the policy is applied for it here, before it can write.
+   */
   private async dispatch(
     el: HTMLElement,
     sig: FieldSignature,
     value: FillValue,
     path: ProfilePath | null,
     ctx: StrategyContext,
+    request: FillRequest,
   ): Promise<StrategyResult> {
     switch (sig.inputType) {
       case 'select':
         // A scanner-declared `select` that is not a real <select> is an ARIA combobox.
         return el instanceof HTMLSelectElement
-          ? fillSelect(el, value, ctx)
-          : fillCombobox(el, value, ctx);
+          ? fillSelect(el, value, ctx, request)
+          : fillCombobox(el, value, ctx, request);
 
       case 'radio':
       case 'checkbox':
         return fillChoice(el, value, ctx);
 
       case 'date':
+        if (request.overwrite !== true && isAlreadyAnswered(el, sig)) {
+          return failed(REASON.alreadyAnswered);
+        }
         return fillDate(el, value, ctx);
 
       case 'file':
         return fillFile(el, await this.resume(path), ctx);
 
       case 'combobox':
-        return fillCombobox(el, value, ctx);
+        return fillCombobox(el, value, ctx, request);
 
       case 'text':
       case 'email':
@@ -373,9 +443,9 @@ export class FillEngine {
       case 'url':
       case 'textarea': {
         // Some ATS render a typeahead in a plain text input; honour what the element declares.
-        if (looksLikeCombobox(el)) return fillCombobox(el, value, ctx);
+        if (looksLikeCombobox(el)) return fillCombobox(el, value, ctx, request);
         if (isCheckable(el)) return fillChoice(el, value, ctx);
-        return fillText(el, toDisplayString(value), ctx);
+        return fillText(el, toDisplayString(value), ctx, request);
       }
 
       default:

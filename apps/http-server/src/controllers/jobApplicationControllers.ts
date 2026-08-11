@@ -3,6 +3,7 @@ import logger from "@/config/logger.js"
 import { touchPairedDevice } from "@/controllers/deviceControllers.js"
 import jobApplicationRepo, {
     DEFAULT_PAGE_SIZE,
+    JobApplicationDuplicateUrlError,
     JobApplicationOwnershipError,
     MAX_PAGE_SIZE,
     countPatchFields,
@@ -109,6 +110,10 @@ class JobApplicationControllers {
      * Idempotent by design: the extension retries pushes whenever it comes back online, and a retry
      * must land on the same row (201 the first time, 200 thereafter). A `clientId` that already
      * belongs to another account is a 409, never a silent overwrite.
+     *
+     * A push whose `clientId` is unknown but whose url matches one of the caller's existing rows -
+     * what a reinstall or a second local profile produces - lands on that row and returns 200 with
+     * its *original* `clientId`, so the client can adopt the id the server already knows.
      */
     async create(req: Request, res: Response) {
         try {
@@ -160,6 +165,15 @@ class JobApplicationControllers {
                     success: false,
                     data: { code: error.code },
                     message: "That application id is already in use. Generate a new one on the device."
+                })
+                return
+            }
+
+            if (error instanceof JobApplicationDuplicateUrlError) {
+                res.status(409).json({
+                    success: false,
+                    data: { code: error.code },
+                    message: "You are already tracking an application for that job posting."
                 })
                 return
             }
@@ -247,6 +261,15 @@ class JobApplicationControllers {
                 message: "Job application updated successfully"
             })
         } catch (error) {
+            if (error instanceof JobApplicationDuplicateUrlError) {
+                res.status(409).json({
+                    success: false,
+                    data: { code: error.code },
+                    message: "You are already tracking an application for that job posting."
+                })
+                return
+            }
+
             logger.error(`[CONTROLLER: patch] Error patching job application for user: ${req.user?.user_id}`, error)
             res.status(500).json({
                 success: false,

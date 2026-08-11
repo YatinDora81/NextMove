@@ -1,8 +1,8 @@
 /**
  * JF-001 · the migration chain, actually executed.
  *
- * There is no Postgres server in this repo's dev/CI environment, so for a long time the two
- * JF-001 migrations were only ever *read*. This suite runs them for real: @electric-sql/pglite is
+ * There is no Postgres server in this repo's dev/CI environment, so for a long time the JF-001
+ * migrations were only ever *read*. This suite runs them for real: @electric-sql/pglite is
  * PostgreSQL 18 compiled to WASM, so `migration.sql` is executed by the same parser, planner and
  * catalogue code that Neon would use in production.
  *
@@ -10,9 +10,11 @@
  *   1. the whole chain applies, in Prisma's lexical order, from an empty database;
  *   2. the five new tables exist with the exact columns / keys / indexes / enums SEC 7.4 specifies;
  *   3. every new foreign key is `ON DELETE CASCADE` — asserted in the catalogue *and* behaviourally;
- *   4. the two JF-001 migrations are additive-only (SEC 7.5: "Existing models are never edited by
+ *   4. the JF-001 migrations are additive-only (SEC 7.5: "Existing models are never edited by
  *      these migrations — additions only"), enforced by diffing information_schema before/after;
- *   5. the column defaults and uniqueness constraints behave the way the server code assumes.
+ *   5. the column defaults and uniqueness constraints behave the way the server code assumes;
+ *   6. the `urlKey` backfill reduces a url to the same key `normalizeUrlKey` computes in the
+ *      server, which is the identity the Applied page's deduplication is built on.
  *
  * Nothing here writes to a real database and nothing reads DATABASE_URL.
  */
@@ -34,9 +36,12 @@ const MIGRATIONS_DIR = path.resolve(
   'migrations',
 );
 
-/** The two migrations JF-001 adds. Everything sorting before them is the pre-existing chain. */
+/** The migrations JF-001 adds, in order. Everything sorting before them is the pre-existing chain. */
 const JOBFILL_MIGRATION = '20260807000001_jobfill_sync_models';
 const BYOK_MIGRATION = '20260807000002_web_byok_vault';
+/** Adds `JobApplication.urlKey` + its partial unique index, and backfills the existing rows. */
+const URL_DEDUPE_MIGRATION = '20260811000001_job_application_url_dedupe';
+const JF001_MIGRATIONS = [JOBFILL_MIGRATION, BYOK_MIGRATION, URL_DEDUPE_MIGRATION] as const;
 
 /** The chain that shipped before JF-001 (SEC 7.5 calls it "13 shipped"). */
 const PRE_EXISTING_MIGRATION_COUNT = 13;
@@ -213,6 +218,7 @@ interface IndexRow {
   index_name: string;
   is_unique: boolean;
   is_primary: boolean;
+  is_partial: boolean;
   columns: string[] | null;
 }
 
@@ -220,6 +226,11 @@ interface IndexRow {
  * Physical indexes, with their key columns *in order*. Prisma emits `@@unique`/`@unique` as bare
  * `CREATE UNIQUE INDEX` (not `ADD CONSTRAINT ... UNIQUE`), so uniqueness has to be read off
  * pg_index rather than pg_constraint — a contype='u' check would find nothing and pass vacuously.
+ *
+ * `is_partial` is read as "has a predicate at all" rather than as the predicate's text: the text is
+ * whatever `pg_get_expr` chooses to print in a given PostgreSQL release, while the presence of a
+ * predicate is the thing the schema depends on (see JobApplication_userId_urlKey_key, which
+ * schema.prisma cannot declare as partial).
  */
 async function readIndexes(db: PGlite, tables: readonly string[]): Promise<IndexRow[]> {
   const result = await db.query<IndexRow>(
@@ -227,6 +238,7 @@ async function readIndexes(db: PGlite, tables: readonly string[]): Promise<Index
             cls.relname   AS index_name,
             idx.indisunique  AS is_unique,
             idx.indisprimary AS is_primary,
+            (idx.indpred IS NOT NULL) AS is_partial,
             (SELECT array_agg(att.attname ORDER BY k.ord)
                FROM unnest(idx.indkey) WITH ORDINALITY AS k(attnum, ord)
                JOIN pg_attribute att
@@ -375,6 +387,9 @@ const EXPECTED_COLUMNS: Record<NewTable, Record<string, ColumnShape>> = {
     company: notNull('text'),
     role: notNull('text'),
     url: nullable('text'),
+    // `url` reduced to the server's "same posting, same user" key — nullable, because a url the
+    // tracker could not reduce means no identity rather than a shared empty one.
+    urlKey: nullable('text'),
     ats: nullable('text'),
     status: enumColumn('JobAppStatus'),
     appliedAt: nullable(TIMESTAMP, 'timestamp'),
@@ -428,22 +443,45 @@ const EXPECTED_PRIMARY_KEYS: Record<NewTable, readonly string[]> = {
 interface IndexShape {
   readonly table: NewTable;
   readonly unique: boolean;
+  /** True when the index carries a `WHERE` predicate — see JobApplication_userId_urlKey_key. */
+  readonly partial: boolean;
   readonly columns: readonly string[];
 }
 
-/** Every non-primary-key index the two migrations create, keyed by index name. */
+/** Every non-primary-key index the JF-001 migrations create, keyed by index name. */
 const EXPECTED_SECONDARY_INDEXES: Record<string, IndexShape> = {
-  ProfileBlob_userId_key: { table: 'ProfileBlob', unique: true, columns: ['userId'] },
-  JobApplication_clientId_key: { table: 'JobApplication', unique: true, columns: ['clientId'] },
+  ProfileBlob_userId_key: {
+    table: 'ProfileBlob',
+    unique: true,
+    partial: false,
+    columns: ['userId'],
+  },
+  JobApplication_clientId_key: {
+    table: 'JobApplication',
+    unique: true,
+    partial: false,
+    columns: ['clientId'],
+  },
+  // The server's "one row per posting per user" rule. `partial: true` is load-bearing: schema.prisma
+  // can only declare a *total* `@@unique([userId, urlKey])`, so this expectation is what stops the
+  // next `prisma migrate dev` drift-fix from quietly indexing every url-less row.
+  JobApplication_userId_urlKey_key: {
+    table: 'JobApplication',
+    unique: true,
+    partial: true,
+    columns: ['userId', 'urlKey'],
+  },
   JobApplication_userId_status_appliedAt_idx: {
     table: 'JobApplication',
     unique: false,
+    partial: false,
     columns: ['userId', 'status', 'appliedAt'],
   },
-  Device_userId_idx: { table: 'Device', unique: false, columns: ['userId'] },
+  Device_userId_idx: { table: 'Device', unique: false, partial: false, columns: ['userId'] },
   UserGeminiKey_userId_status_idx: {
     table: 'UserGeminiKey',
     unique: false,
+    partial: false,
     columns: ['userId', 'status'],
   },
 };
@@ -460,15 +498,16 @@ const EXPECTED_ENUMS: Record<string, readonly string[]> = {
 describe('migration chain', () => {
   const migrations = listMigrations();
 
-  it('is ordered with the two JF-001 migrations appended to the 13 shipped ones', () => {
+  it('is ordered with the JF-001 migrations appended to the 13 shipped ones', () => {
     expect(migrations).toEqual([...migrations].sort());
 
     const jobfillIndex = migrations.indexOf(JOBFILL_MIGRATION);
-    const byokIndex = migrations.indexOf(BYOK_MIGRATION);
     expect(jobfillIndex, `${JOBFILL_MIGRATION} is missing from ${MIGRATIONS_DIR}`).toBeGreaterThan(-1);
-    expect(byokIndex, `${BYOK_MIGRATION} must sort immediately after ${JOBFILL_MIGRATION}`).toBe(
-      jobfillIndex + 1,
-    );
+    // The JF-001 migrations are consecutive and in this order — urlKey's backfill reads rows the
+    // first of them creates, so it cannot sort before it.
+    expect(migrations.slice(jobfillIndex, jobfillIndex + JF001_MIGRATIONS.length)).toEqual([
+      ...JF001_MIGRATIONS,
+    ]);
     expect(migrations.slice(0, jobfillIndex)).toHaveLength(PRE_EXISTING_MIGRATION_COUNT);
 
     for (const name of migrations) {
@@ -547,6 +586,7 @@ describe('schema produced by the JF-001 migrations', () => {
       secondary[index.index_name] = {
         table: table as NewTable,
         unique: index.is_unique,
+        partial: index.is_partial,
         columns: index.columns ?? [],
       };
     }
@@ -649,7 +689,7 @@ describe('the JF-001 migrations are additive-only (SEC 7.5)', () => {
     const preExisting = migrations.slice(0, jobfillIndex);
     const jf001 = migrations.slice(jobfillIndex);
     expect(preExisting).toHaveLength(PRE_EXISTING_MIGRATION_COUNT);
-    expect(jf001).toEqual([JOBFILL_MIGRATION, BYOK_MIGRATION]);
+    expect(jf001).toEqual([...JF001_MIGRATIONS]);
 
     const db = await migratedDatabase(preExisting);
     try {
@@ -791,6 +831,64 @@ describe('defaults and constraints behave as the server code assumes', () => {
     expect(rejection.message).toContain('JobApplication_clientId_key');
   });
 
+  it('rejects a second row on the same (userId, urlKey) — one Applied card per posting', async () => {
+    await db.query(
+      `INSERT INTO "public"."JobApplication"
+         ("id", "userId", "clientId", "company", "role", "url", "urlKey", "updatedAt")
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+      [
+        'app-url-a',
+        'user-defaults-1',
+        'client-url-a',
+        'Acme',
+        'SRE',
+        'https://www.indeed.com/viewjob?jk=111',
+        'indeed.com/viewjob?jk=111',
+      ],
+    );
+    const rejection = await expectRejection(
+      () =>
+        db.query(
+          `INSERT INTO "public"."JobApplication"
+             ("id", "userId", "clientId", "company", "role", "url", "urlKey", "updatedAt")
+           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+          [
+            'app-url-b',
+            'user-defaults-1',
+            'client-url-b',
+            'Acme',
+            'SRE',
+            'https://www.indeed.com/viewjob?jk=111&utm_source=email',
+            'indeed.com/viewjob?jk=111',
+          ],
+        ),
+      'a second JobApplication row on a urlKey the user already tracks',
+    );
+    expect(rejection.code).toBe('23505');
+    expect(rejection.message).toContain('JobApplication_userId_urlKey_key');
+  });
+
+  it('lets one user keep many rows with no urlKey (the index is partial)', async () => {
+    // Manually added applications and ATSs the tracker could not read a permalink from all land
+    // here. They have no identity, so they must not be forced into sharing one.
+    for (const suffix of ['a', 'b', 'c']) {
+      await db.query(
+        `INSERT INTO "public"."JobApplication" ("id", "userId", "clientId", "company", "role", "updatedAt")
+         VALUES ($1, $2, $3, $4, $5, NOW())`,
+        [`app-nokey-${suffix}`, 'user-defaults-1', `client-nokey-${suffix}`, 'Globex', 'Data Eng'],
+      );
+    }
+    const count = firstRow(
+      await db.query<{ n: number }>(
+        `SELECT COUNT(*)::int AS n FROM "public"."JobApplication"
+         WHERE "userId" = $1 AND "urlKey" IS NULL`,
+        ['user-defaults-1'],
+      ),
+      'url-less JobApplication rows',
+    );
+    expect(count.n).toBeGreaterThanOrEqual(3);
+  });
+
   it('rejects a value that is not a JobAppStatus member', async () => {
     const rejection = await expectRejection(
       () =>
@@ -855,5 +953,257 @@ describe('defaults and constraints behave as the server code assumes', () => {
     );
     expect(rejection.code).toBe('23503'); // foreign_key_violation
     expect(rejection.message).toContain('Device_userId_fkey');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 6 · the urlKey backfill agrees with the server's normalizeUrlKey
+// ---------------------------------------------------------------------------
+
+interface BackfillCase {
+  readonly id: string;
+  readonly url: string | null;
+  readonly urlKey: string | null;
+  readonly why: string;
+}
+
+/**
+ * Transcribed from `normalizeUrlKey` in apps/http-server/src/repository/jobApplicationRepo.ts,
+ * which is itself a mirror of `normalizeApplicationUrl` in apps/extension/src/tracker/service.ts.
+ *
+ * The three implementations are one identity written three times, and this table is where a drift
+ * between them shows up: a backfilled key that does not match what the server computes on the next
+ * push means the push misses the row it belongs to (a duplicate Applied card), while a key that is
+ * *coarser* than the server's means the push matches a row that tracks a different posting and
+ * overwrites it.
+ */
+const BACKFILL_CASES: readonly BackfillCase[] = [
+  {
+    id: 'bf-indeed-111',
+    url: 'https://www.indeed.com/viewjob?jk=111',
+    urlKey: 'indeed.com/viewjob?jk=111',
+    why: 'Indeed carries the job id in ?jk=, so the query string is the posting',
+  },
+  {
+    id: 'bf-indeed-222',
+    url: 'https://www.indeed.com/viewjob?jk=222',
+    urlKey: 'indeed.com/viewjob?jk=222',
+    why: 'a second Indeed posting on the same path must not share the first one key',
+  },
+  {
+    id: 'bf-taleo',
+    url: 'https://acme.taleo.net/careersection/jobdetail.ftl?job=42&src=linkedin',
+    urlKey: 'acme.taleo.net/careersection/jobdetail.ftl?job=42',
+    why: 'Taleo ?job= survives, the ?src= referral tag does not',
+  },
+  {
+    id: 'bf-successfactors',
+    url: 'https://career5.successfactors.eu/careers?career_job_req_id=987&utm_source=x',
+    urlKey: 'career5.successfactors.eu/careers?career_job_req_id=987',
+    why: 'SuccessFactors ?career_job_req_id= survives, utm_* does not',
+  },
+  {
+    id: 'bf-linkedin',
+    url: 'https://www.linkedin.com/jobs/view?currentJobId=555&trk=guest_homepage',
+    urlKey: 'linkedin.com/jobs/view?currentJobId=555',
+    why: 'LinkedIn ?currentJobId= survives, ?trk= does not',
+  },
+  {
+    id: 'bf-greenhouse',
+    url: 'https://boards.greenhouse.io/acme/jobs/12?gh_src=abc&utm_campaign=x&ref=y',
+    urlKey: 'boards.greenhouse.io/acme/jobs/12',
+    why: 'a query made only of tracking params leaves no query at all',
+  },
+  {
+    id: 'bf-sorted',
+    url: 'https://Careers.example.com/apply?b=2&a=1#/step2',
+    urlKey: 'careers.example.com/apply?a=1&b=2',
+    why: 'params are sorted, the fragment is dropped and only the host is lowercased',
+  },
+  {
+    id: 'bf-case-path',
+    url: 'https://www.Example.com/Jobs/AbC/',
+    urlKey: 'example.com/Jobs/AbC',
+    why: 'www., scheme and trailing slash go; the case-sensitive path token stays',
+  },
+  {
+    id: 'bf-empty-query',
+    url: 'https://example.com/jobs?',
+    urlKey: 'example.com/jobs',
+    why: 'a bare ? is not a query',
+  },
+  {
+    id: 'bf-unreducible',
+    url: 'https://',
+    urlKey: null,
+    why: 'a url that reduces to nothing is no identity — it must stay NULL, not become an empty key',
+  },
+  {
+    id: 'bf-whitespace-only',
+    url: ' \t\n',
+    urlKey: null,
+    why: 'a url that is nothing but whitespace reduces to nothing, exactly as .trim() leaves it',
+  },
+  {
+    id: 'bf-leading-tab',
+    url: '\thttps://www.indeed.com/viewjob?jk=333',
+    urlKey: 'indeed.com/viewjob?jk=333',
+    why: 'normalizeUrlKey opens with .trim(), which is all whitespace and not only ASCII spaces',
+  },
+  {
+    id: 'bf-plus-encoded-space',
+    url: 'https://example.com/jobs?q=a+b',
+    urlKey: 'example.com/jobs?q=a+b',
+    why: 'query segments keep their exact bytes — see the URLSearchParams note below',
+  },
+  {
+    id: 'bf-percent-encoded-space',
+    url: 'https://example.com/jobs?q=a%20b',
+    urlKey: 'example.com/jobs?q=a%20b',
+    why: '…so %20 is deliberately a different key from +, which under-deduplicates and never over-',
+  },
+  {
+    id: 'bf-valueless-param',
+    url: 'https://example.com/jobs?flag',
+    urlKey: 'example.com/jobs?flag',
+    why: 'a bare flag keeps its exact bytes too, where URLSearchParams would render it flag=',
+  },
+  {
+    id: 'bf-no-url',
+    url: null,
+    urlKey: null,
+    why: 'a manually added application has no url to key off',
+  },
+];
+
+/**
+ * Surrounding whitespace is not part of a posting's identity: `normalizeUrlKey` opens with
+ * `url.trim()`, so a url the tracker recorded with a stray tab or newline must key exactly as the
+ * bare url does. One case per whitespace character both JavaScript's `trim()` and PostgreSQL's
+ * `\s` recognise — a backfill that trims a narrower set writes keys the server can never emit
+ * again, and the row silently stops being the one a push matches.
+ *
+ * Each case gets its own path so a mismatch shows up as a wrong key rather than as the dedupe pass
+ * NULLing the losers of a duplicate group.
+ */
+const WHITESPACE_PADS = [' ', '\t', '\n', '\r', '\f', '\v', ' \t\n'] as const;
+
+const WHITESPACE_CASES: readonly BackfillCase[] = WHITESPACE_PADS.map((pad, index) => ({
+  id: `bf-ws-${index}`,
+  url: `${pad}https://www.example.com/ws/${index}/${pad}`,
+  urlKey: `example.com/ws/${index}`,
+  why: `padded with ${JSON.stringify(pad)}`,
+}));
+
+/** Two urls that are genuinely the same posting: the backfill must let only one keep the key. */
+const DUPLICATE_URLS: readonly { id: string; url: string }[] = [
+  { id: 'bf-dup-older', url: 'https://jobs.lever.co/acme/abc-123?lever-source=Indeed' },
+  { id: 'bf-dup-newer', url: 'https://www.jobs.lever.co/acme/abc-123/?utm_medium=email' },
+];
+
+const BACKFILL_USER = 'user-backfill-1';
+
+async function insertPreBackfillRow(
+  db: PGlite,
+  id: string,
+  url: string | null,
+  updatedAt: string,
+): Promise<void> {
+  // No "urlKey" column yet — that is the point: these rows predate the migration under test.
+  await db.query(
+    `INSERT INTO "public"."JobApplication"
+       ("id", "userId", "clientId", "company", "role", "url", "updatedAt")
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [id, BACKFILL_USER, `client-${id}`, 'Acme', 'Backend Engineer', url, updatedAt],
+  );
+}
+
+describe('the urlKey backfill computes the key the server will compute', () => {
+  let db: PGlite;
+
+  beforeAll(async () => {
+    const migrations = listMigrations();
+    const beforeBackfill = migrations.slice(0, migrations.indexOf(URL_DEDUPE_MIGRATION));
+    db = await migratedDatabase(beforeBackfill);
+    await insertUser(db, BACKFILL_USER);
+    for (const testCase of [...BACKFILL_CASES, ...WHITESPACE_CASES]) {
+      await insertPreBackfillRow(db, testCase.id, testCase.url, '2026-08-01T00:00:00Z');
+    }
+    // Deliberately staggered: the dedupe pass keeps the freshest row of a duplicate group.
+    await insertPreBackfillRow(db, 'bf-dup-older', DUPLICATE_URLS[0]?.url ?? null, '2026-08-01T00:00:00Z');
+    await insertPreBackfillRow(db, 'bf-dup-newer', DUPLICATE_URLS[1]?.url ?? null, '2026-08-02T00:00:00Z');
+    // The migration is what is under test here, so it runs *after* the rows exist.
+    await applyMigration(db, URL_DEDUPE_MIGRATION);
+  });
+
+  afterAll(async () => {
+    await db.close();
+  });
+
+  async function urlKeyOf(id: string): Promise<string | null> {
+    const row = firstRow(
+      await db.query<{ urlKey: string | null }>(
+        `SELECT "urlKey" FROM "public"."JobApplication" WHERE "id" = $1`,
+        [id],
+      ),
+      `urlKey of ${id}`,
+    );
+    return row.urlKey;
+  }
+
+  for (const testCase of BACKFILL_CASES) {
+    it(`keys ${testCase.url ?? 'a row with no url'} — ${testCase.why}`, async () => {
+      expect(await urlKeyOf(testCase.id)).toBe(testCase.urlKey);
+    });
+  }
+
+  it('trims every whitespace character JavaScript trims, not just ASCII spaces', async () => {
+    for (const testCase of WHITESPACE_CASES) {
+      expect(await urlKeyOf(testCase.id), `${testCase.id} — ${testCase.why}`).toBe(testCase.urlKey);
+    }
+  });
+
+  it('keeps two postings that differ only in the query string apart', async () => {
+    // The failure this guards is not a missed de-duplication but a destroyed row: one key for both
+    // postings lets the server's url fallback update the first application with the second one data.
+    const first = await urlKeyOf('bf-indeed-111');
+    const second = await urlKeyOf('bf-indeed-222');
+    expect(first).not.toBeNull();
+    expect(first).not.toBe(second);
+  });
+
+  it('leaves the key on only the freshest row of a duplicate group', async () => {
+    expect(await urlKeyOf('bf-dup-newer')).toBe('jobs.lever.co/acme/abc-123');
+    // The older copy stays on the Applied page, it simply stops being the row a push will match.
+    expect(await urlKeyOf('bf-dup-older')).toBeNull();
+    const kept = firstRow(
+      await db.query<{ n: number }>(
+        `SELECT COUNT(*)::int AS n FROM "public"."JobApplication" WHERE "id" IN ($1, $2)`,
+        ['bf-dup-older', 'bf-dup-newer'],
+      ),
+      'rows in the duplicate group',
+    );
+    expect(kept.n, 'the backfill must never delete a row').toBe(2);
+  });
+
+  it('writes keys that survive being reduced again (the server re-keys on every push)', async () => {
+    // A backfilled key is fed straight back into the identity on the next sync — the row's own key
+    // is compared against `normalizeUrlKey(url)`. Reducing an already-reduced key must therefore
+    // change nothing: no scheme, no "www.", no trailing slash, no fragment, params already sorted.
+    const keys = await db.query<{ urlKey: string }>(
+      `SELECT "urlKey" FROM "public"."JobApplication"
+       WHERE "userId" = $1 AND "urlKey" IS NOT NULL`,
+      [BACKFILL_USER],
+    );
+    expect(keys.rows.length).toBeGreaterThan(0);
+    for (const { urlKey } of keys.rows) {
+      expect(urlKey, `${urlKey} still carries a scheme`).not.toMatch(/^[a-z][a-z0-9+.-]*:\/\//i);
+      expect(urlKey, `${urlKey} still carries a www.`).not.toMatch(/^www\./i);
+      expect(urlKey, `${urlKey} still carries a fragment`).not.toContain('#');
+      expect(urlKey, `${urlKey} ends in a slash`).not.toMatch(/\/$/);
+      const query = urlKey.includes('?') ? urlKey.slice(urlKey.indexOf('?') + 1) : '';
+      const segments = query.length > 0 ? query.split('&') : [];
+      expect(segments, `${urlKey} has unsorted query params`).toEqual([...segments].sort());
+    }
   });
 });

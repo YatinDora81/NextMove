@@ -42,6 +42,15 @@ export const REASON = {
   noValue: 'no-value',
   noOptionMatch: 'no-option-match',
   notFillable: 'not-fillable',
+  /**
+   * The control already carries an answer, so nothing was written.
+   *
+   * Distinct from `notFillable` on purpose: "this control disappeared before it could be filled" and
+   * "you have already answered this one" are opposite states, and the overlay renders a different
+   * sentence for each. Reporting the second as the first is how a deliberate, correct refusal came
+   * to look like a malfunction.
+   */
+  alreadyAnswered: 'already-answered',
   unsupportedInput: 'unsupported-input',
   noResume: 'no-resume',
   submitControl: 'submit-control',
@@ -64,6 +73,7 @@ export const SKIP_REASONS: ReadonlySet<string> = new Set<string>([
   REASON.noValue,
   REASON.noOptionMatch,
   REASON.notFillable,
+  REASON.alreadyAnswered,
   REASON.unsupportedInput,
   REASON.noResume,
   REASON.timeout,
@@ -229,6 +239,30 @@ export function isFillQuirks(value: unknown): value is FillQuirks {
     Array.isArray(q.listboxSelectors) &&
     Array.isArray(q.optionSelectors)
   );
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Per-write request — the one escape hatch from "never overwrite an answer"
+ * ---------------------------------------------------------------------------------------------- */
+
+/**
+ * What a single write is allowed to do beyond the engine's defaults.
+ *
+ * One shape for every strategy, because the alternative is what shipped before: `fillSelect`
+ * refused to clobber a chosen dropdown while `fillText` overwrote whatever the user had typed, so
+ * the same ⚡ Fill all respected one answer and destroyed the other.
+ */
+export interface FillRequest {
+  /**
+   * Replace an answer the control already carries.
+   *
+   * A bulk or chained fill never sets this. A field that already reads "Canada", or holds a
+   * sentence the user typed, was answered by the page, by a restored draft or by the human, and
+   * overwriting it silently destroys work nobody asked us to touch. The only caller entitled to it
+   * is an explicit "write this into THIS field" gesture — the user is then looking at the control
+   * and asked for the write (the AI answer accepted from a ✨ button is exactly that).
+   */
+  overwrite?: boolean;
 }
 
 /* ------------------------------------------------------------------------------------------------

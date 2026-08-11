@@ -17,4 +17,5 @@ export * from './overlay/FieldMarkers';
 export * from './overlay/Toast';
 export * from './overlay/ReviewPanel';
 export * from './overlay/SparkleButton';
+export * from './overlay/Suggest';
 export * from './pill';

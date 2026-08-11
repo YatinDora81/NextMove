@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getOverlay } from '@/content';
 import { FormScanner, nodeElement } from '@/core';
-import type { FillEngineOptions, FillFieldEvent } from '@/core/fill';
+import { REASON, type FillEngineOptions, type FillFieldEvent } from '@/core/fill';
 import { disposePageObserver } from '@/core/observer';
 import { setSettings } from '@/platform/storage';
 import { DEFAULT_SETTINGS } from '@/shared/constants';
@@ -77,6 +77,49 @@ function fakeFillRun(
   }
 
   return Promise.resolve(report);
+}
+
+/**
+ * A run where the engine wrote nothing at all: every field the matcher recognised came back as a
+ * skip carrying `reason`. `already-answered` is the interesting one — the field was recognised and
+ * deliberately left alone — and it reports 0 filled / 0 suggested, exactly like a page where
+ * nothing matched.
+ */
+function fakeSkipAllRun(
+  reason: string,
+): (matches: readonly MatchResult[], options: FillEngineOptions) => Promise<FillReport> {
+  return (matches, options) => {
+    const report: FillReport = {
+      atsId: String(options.atsId),
+      url: options.url,
+      filled: 0,
+      suggested: 0,
+      skipped: 0,
+      errors: 0,
+      perField: [],
+    };
+
+    for (const match of matches) {
+      const el = nodeElement(match.node);
+      const event: FillFieldEvent = {
+        hash: match.node.sig.hash,
+        path: match.path,
+        score: match.score,
+        action: 'skip',
+        value: '',
+        ok: false,
+        reason,
+        el: el instanceof HTMLElement ? el : null,
+        sig: match.node.sig,
+        selector: null,
+      };
+      options.onField?.(event);
+      report.perField.push({ hash: event.hash, action: 'skip', ok: false });
+      report.skipped += 1;
+    }
+
+    return Promise.resolve(report);
+  };
 }
 
 function backgroundStub(...args: unknown[]): unknown {
@@ -506,6 +549,51 @@ describe('content script — step identity, chaining and panel state', () => {
       expect(fills()).toBe(2);
     });
 
+    it('arms the chain when step 1 was recognised and deliberately left alone', async () => {
+      // Every field on step 1 already carries the user's answer, so the run writes nothing: 0
+      // filled, 0 suggested. That is still "we recognised this page", and the later, genuinely
+      // empty steps must keep being filled for the user.
+      runFillMock.mockImplementation(fakeSkipAllRun(REASON.alreadyAnswered));
+
+      await bootContentScript(STEP1_HTML, STEP1_URL, {
+        autoFillOnLoad: false,
+        autoFillNextSteps: true,
+        humanPacing: false,
+      });
+      await waitFor(pillMounted, 'the content script to finish its first evaluate');
+
+      mock.__emitMessage(makeEnvelope('FILL_REQUEST', { profileId: null, trigger: 'popup' }));
+      await waitFor(() => fills() === 1, 'the fill the user asked for on step 1');
+      await waitFor(() => panelRowLabels().length > 0, 'step 1 rows');
+
+      runFillMock.mockImplementation(fakeFillRun);
+      swapStep(STEP2_HTML);
+      await waitFor(() => fills() === 2, 'the empty step 2 to be auto-filled');
+      expect(panelRowLabels()).toContain('Job Title');
+    });
+
+    it('does not arm the chain when nothing on step 1 was recognised', async () => {
+      // `no-value` is the other 0-filled/0-suggested shape: fields we know nothing about. Nothing
+      // was respected here, so there is no evidence the chain belongs to this wizard.
+      runFillMock.mockImplementation(fakeSkipAllRun(REASON.noValue));
+
+      await bootContentScript(STEP1_HTML, STEP1_URL, {
+        autoFillOnLoad: false,
+        autoFillNextSteps: true,
+        humanPacing: false,
+      });
+      await waitFor(pillMounted, 'the content script to finish its first evaluate');
+
+      mock.__emitMessage(makeEnvelope('FILL_REQUEST', { profileId: null, trigger: 'popup' }));
+      await waitFor(() => fills() === 1, 'the fill the user asked for on step 1');
+      await waitFor(() => panelRowLabels().length > 0, 'step 1 rows');
+
+      swapStep(STEP2_HTML);
+      await sleep(1_500);
+
+      expect(fills()).toBe(1);
+    });
+
     it('does not fill a step whose key it has already auto-filled', async () => {
       await bootContentScript(STEP1_HTML, STEP1_URL, {
         autoFillOnLoad: true,
@@ -522,6 +610,27 @@ describe('content script — step identity, chaining and panel state', () => {
       await sleep(1_500);
 
       expect(fills()).toBe(2);
+    });
+  });
+
+  describe('already-answered rows', () => {
+    it('explains the row instead of flagging it red with no reason', async () => {
+      runFillMock.mockImplementation(fakeSkipAllRun(REASON.alreadyAnswered));
+
+      await bootContentScript(STEP1_HTML, STEP1_URL, {
+        autoFillOnLoad: true,
+        autoFillNextSteps: false,
+        humanPacing: false,
+      });
+      await waitFor(() => fills() === 1, 'the first auto-fill');
+      await waitFor(() => panelRowLabels().length > 0, 'the review panel to list its rows');
+
+      // A field NextMove deliberately respected is not a field that needs the user.
+      expect(panel().querySelectorAll('.jf-row--unmatched')).toHaveLength(0);
+      expect(panel().querySelectorAll('.jf-row--answered').length).toBeGreaterThan(0);
+      expect(panel().textContent ?? '').toContain(
+        'You have already answered this — NextMove left it alone.',
+      );
     });
   });
 

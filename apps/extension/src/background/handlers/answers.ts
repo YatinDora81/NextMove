@@ -21,6 +21,12 @@
  * templates the employer name out to `{company}` before writing, so reuse can never leak the wrong
  * company into a form.
  *
+ * ── Management (SEC 5.2 Options → Answer Bank) ──────────────────────────────────────────────────
+ * `ANSWERS_LIST` / `ANSWERS_PIN` / `ANSWERS_DELETE` / `ANSWERS_CLEAR` are the manage-what-you-
+ * remember surface. They inherit the offline contract above for the same reason `ANSWERS_LOOKUP`
+ * has it — they are IndexedDB writes and nothing else, so none of them appears in
+ * `GESTURE_REQUIRED`, none leases a key, and none opens a socket.
+ *
  * SEC 7.4: the bank is local-only and is NEVER synced. `handlers/sync.ts` does not know it exists.
  */
 
@@ -34,7 +40,12 @@ const log = createLogger('bg:answers');
 
 type AnswerHandlers = Pick<
   MessageHandlers,
-  'ANSWERS_LOOKUP' | 'ANSWERS_SAVE' | 'ANSWERS_LIST' | 'ANSWERS_DELETE'
+  | 'ANSWERS_LOOKUP'
+  | 'ANSWERS_SAVE'
+  | 'ANSWERS_LIST'
+  | 'ANSWERS_DELETE'
+  | 'ANSWERS_PIN'
+  | 'ANSWERS_CLEAR'
 >;
 
 /**
@@ -110,9 +121,35 @@ const answersDelete: AnswerHandlers['ANSWERS_DELETE'] = async (payload) => {
   return okReply({ deleted: true as const });
 };
 
+/**
+ * Pin / unpin. The flag belongs on the row rather than in the Options page's own storage: `list()`
+ * sorts pinned rows first, so a pin that lived only in the UI would change nothing about which
+ * answers the user actually sees first, and would be lost the moment they open the popup instead.
+ */
+const answersPin: AnswerHandlers['ANSWERS_PIN'] = async (payload) => {
+  const record = await answerBank.pin(payload.id, payload.pinned);
+  if (record === null) {
+    return errReply('NOT_FOUND', 'That answer is no longer in the bank.');
+  }
+  return okReply({ record });
+};
+
+/**
+ * "Forget every answer" (SEC 5.2). Irreversible and unconfirmed at this layer — the confirmation
+ * belongs to the surface that can show the user what they are about to lose. The row count comes
+ * back so that surface can report what actually went, rather than guessing from a stale list.
+ */
+const answersClear: AnswerHandlers['ANSWERS_CLEAR'] = async () => {
+  const cleared = await answerBank.clear();
+  log.info(`the answer bank was cleared (${String(cleared)} rows)`);
+  return okReply({ cleared });
+};
+
 export const answerHandlers: AnswerHandlers = {
   ANSWERS_LOOKUP: answersLookup,
   ANSWERS_SAVE: answersSave,
   ANSWERS_LIST: answersList,
   ANSWERS_DELETE: answersDelete,
+  ANSWERS_PIN: answersPin,
+  ANSWERS_CLEAR: answersClear,
 };

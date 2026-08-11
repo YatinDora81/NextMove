@@ -129,7 +129,10 @@ const score = z.number().int().min(0).max(100);
 export const settingsSchema = z.object({
   activeProfileId: z.string().nullable().default(DEFAULT_SETTINGS.activeProfileId),
 
+  enabled: z.boolean().default(DEFAULT_SETTINGS.enabled),
+
   fillThreshold: score.default(DEFAULT_SETTINGS.fillThreshold),
+
   suggestThreshold: score.default(DEFAULT_SETTINGS.suggestThreshold),
 
   autoFillOnLoad: z.boolean().default(DEFAULT_SETTINGS.autoFillOnLoad),

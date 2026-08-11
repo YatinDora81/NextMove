@@ -208,6 +208,15 @@ export const Clock = icon(
 
 export const Zap = icon('Zap', <path d="M14 2 4 13h7l-1 9 10-11h-7Z" />);
 
+export const Power = icon(
+  'Power',
+  <>
+    <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
+    <path d="M12 2v10" />
+  </>,
+);
+
+
 export const Sparkles = icon(
   'Sparkles',
   <>

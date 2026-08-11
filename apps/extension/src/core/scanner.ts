@@ -24,10 +24,13 @@ import {
   buildFieldSignature,
   describeElement,
   elementOf,
+  elementText,
   matches,
+  resolveLabel,
   searchRootOf,
   tagOf,
 } from './signature';
+import { normalizeText } from './similarity';
 
 /* ------------------------------------------------------------------------------------------------
  * Public shapes
@@ -313,6 +316,49 @@ function isFileInputBehindVisibleZone(el: Element): boolean {
   return false;
 }
 
+/**
+ * The `<label>` the browser itself associates with a control: `labels[0]` when the DOM exposes it,
+ * else a wrapping `<label>`. Shared by the visibility exemption below and by the radio-group
+ * question derivation, which both need "the visible half of this control".
+ */
+function associatedLabel(el: Element): Element | null {
+  const labels = (el as Partial<HTMLInputElement>).labels;
+  const first = labels?.[0];
+  if (first !== null && first !== undefined) return first;
+
+  if (typeof el.closest !== 'function') return null;
+  try {
+    return el.closest('label');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Is `el` a radio/checkbox whose visible half is its `<label>`?
+ *
+ * The single most common way an ATS styles a choice control: the real `<input>` is `opacity:0`,
+ * `visibility:hidden` or clipped to nothing, and the `<label>` next to it carries the box, the tick
+ * and the caption the user actually sees and clicks. Judging the input by its own rendering drops
+ * the entire question — every Yes/No, every EEO group, every consent tick — before the engine ever
+ * sees it, on exactly the forms that style their controls at all.
+ *
+ * As narrow as the file-input exemption above and for the same reason: only radio and checkbox
+ * inputs, and only when a VISIBLE label proves a human can reach the control. A styled-away input
+ * with a styled-away label stays hidden, so collapsed wizard steps are unaffected.
+ *
+ * Cannot recurse: a `<label>` is not a checkable input, so the `isVisible` call below re-enters
+ * this function only to be turned away by the tag test.
+ */
+function isCheckableBehindVisibleLabel(el: Element): boolean {
+  if (tagOf(el) !== 'input') return false;
+  const type = attrOf(el, 'type').toLowerCase();
+  if (type !== 'radio' && type !== 'checkbox') return false;
+
+  const label = associatedLabel(el);
+  return label !== null && isVisible(label);
+}
+
 /** `CSS.escape` with the same conservative fallback `signature.ts` uses. */
 function cssEscapeForScan(value: string): string {
   const globalCss = (globalThis as { CSS?: { escape?: (input: string) => string } }).CSS;
@@ -368,7 +414,10 @@ export function isVisible(el: Element): boolean {
     // control is reachable by a human. A file input hidden with nothing visible attached to it
     // stays hidden, and no other input type is affected — so pre-rendered wizard steps, collapsed
     // sections and honeypots are all untouched.
-    if (styleHides) return isFileInputBehindVisibleZone(el);
+    //
+    // A radio/checkbox styled away behind its own `<label>` is the same story told about a
+    // different control type — see `isCheckableBehindVisibleLabel`.
+    if (styleHides) return isFileInputBehindVisibleZone(el) || isCheckableBehindVisibleLabel(el);
   }
 
   if (ancestorAriaHidden(el)) return false;
@@ -405,7 +454,9 @@ export function isVisible(el: Element): boolean {
     }
   }
 
-  return false;
+  // Last word for a choice control: it may be clipped out of the layout entirely while the label
+  // that drives it is on screen.
+  return isCheckableBehindVisibleLabel(el);
 }
 
 function ancestorAriaHidden(el: Element): boolean {
@@ -585,6 +636,111 @@ function radioScopeOf(el: Element): ParentNode | null {
 }
 
 /* ------------------------------------------------------------------------------------------------
+ * The question a radio group asks
+ * ---------------------------------------------------------------------------------------------- */
+
+/** Elements a question is written in when the page uses no `<fieldset>` and no ARIA at all. */
+const GROUP_QUESTION_SELECTOR = 'legend,label,p,span,div,h1,h2,h3,h4';
+
+/** How far up we walk looking for the smallest ancestor that holds the whole group. */
+const GROUP_QUESTION_MAX_HOPS = 6;
+
+/** Under this a candidate is a fragment ("Yes"); over it, a paragraph of policy, not a question. */
+const GROUP_QUESTION_MIN_LENGTH = 6;
+const GROUP_QUESTION_MAX_LENGTH = 180;
+
+/**
+ * The question a radio group answers, read out of unstructured markup ("div soup").
+ *
+ * `signature.resolveGroupLabel` handles the well-formed cases — `<fieldset><legend>`, an ARIA
+ * `radiogroup` name, a nearby heading — and falls back to the option's own caption when none of
+ * them exist. That fallback signs every group on the page as "Yes", which matches nothing and makes
+ * two different questions collide on one signature hash. This is the tier below the heading: find
+ * the smallest ancestor that contains the whole group, then take the first descendant that reads
+ * like a prompt rather than like one of the options.
+ *
+ * "Reads like a prompt" is three cheap, independent tests, all of which must hold:
+ *   - it contains no control of its own, so it is text and not a wrapper around the group;
+ *   - its text is 6–180 characters, long enough to be a sentence and short enough to be a question;
+ *   - it is not one of the option captions, which is what excludes "Yes" / "No" / "Prefer not to
+ *     say" from being mistaken for the thing being asked.
+ *
+ * Returns `''` rather than guessing: an unlabelled group must score low and be flagged (INV-4).
+ */
+export function deriveGroupQuestion(el: Element): string {
+  const members = radioGroupMembers(el);
+  // A lone radio has no group whose container could carry a shared question.
+  if (members.length < 2) return '';
+
+  const first = members[0];
+  const last = members[members.length - 1];
+  if (first === undefined || last === undefined) return '';
+
+  const container = smallestAncestorContaining(el, first, last);
+  if (container === null) return '';
+
+  const optionCaptions = new Set<string>();
+  for (const member of members) {
+    const caption = normalizeText(optionCaption(member));
+    if (caption.length > 0) optionCaptions.add(caption);
+  }
+
+  let candidates: NodeListOf<Element>;
+  try {
+    candidates = container.querySelectorAll(GROUP_QUESTION_SELECTOR);
+  } catch {
+    return '';
+  }
+
+  for (let i = 0; i < candidates.length; i++) {
+    const candidate = candidates[i];
+    if (candidate === undefined) continue;
+    if (containsNativeControl(candidate)) continue;
+
+    const text = elementText(candidate);
+    if (text.length < GROUP_QUESTION_MIN_LENGTH || text.length > GROUP_QUESTION_MAX_LENGTH) continue;
+    if (optionCaptions.has(normalizeText(text))) continue;
+
+    return text;
+  }
+
+  return '';
+}
+
+/** Nearest ancestor of `el` that holds every member of the group, within `GROUP_QUESTION_MAX_HOPS`. */
+function smallestAncestorContaining(el: Element, first: Element, last: Element): Element | null {
+  let ancestor = el.parentElement;
+  for (let hops = 0; ancestor !== null && hops < GROUP_QUESTION_MAX_HOPS; hops++) {
+    if (containsElement(ancestor, first) && containsElement(ancestor, last)) {
+      // `<body>` contains everything, so it says nothing about this group in particular — and its
+      // text is the whole page.
+      const tag = tagOf(ancestor);
+      return tag === 'body' || tag === 'html' ? null : ancestor;
+    }
+    ancestor = ancestor.parentElement;
+  }
+  return null;
+}
+
+function containsElement(ancestor: Element, node: Element): boolean {
+  if (typeof ancestor.contains !== 'function') return false;
+  try {
+    return ancestor.contains(node);
+  } catch {
+    return false;
+  }
+}
+
+/** How one option of the group reads — the text a question candidate must NOT be. */
+function optionCaption(el: Element): string {
+  const label = elementText(associatedLabel(el));
+  if (label.length > 0) return label;
+  const aria = attrOf(el, 'aria-label');
+  if (aria.length > 0) return aria;
+  return attrOf(el, 'value');
+}
+
+/* ------------------------------------------------------------------------------------------------
  * FormScanner
  * ---------------------------------------------------------------------------------------------- */
 
@@ -744,10 +900,25 @@ export class FormScanner {
       return;
     }
 
-    const sig = buildFieldSignature(el, {
+    let sig = buildFieldSignature(el, {
       frameId: this.options.frameId,
       groupLabel: isRadio,
     });
+
+    // `resolveGroupLabel` ends at the option's own caption when the page carries no legend, no ARIA
+    // group and no heading — i.e. when the group label EQUALS what the element would be labelled
+    // with on its own. That is the case `deriveGroupQuestion` exists for, and the only case it is
+    // allowed to speak in: a legend or a heading is an authored answer and outranks any derivation.
+    if (isRadio && sig.label === resolveLabel(el).text) {
+      const question = deriveGroupQuestion(el);
+      if (question.length > 0) {
+        sig = buildFieldSignature(el, {
+          frameId: this.options.frameId,
+          groupLabel: true,
+          labelOverride: question,
+        });
+      }
+    }
 
     state.fields.push({
       el,

@@ -7,13 +7,20 @@ import { errReply, okReply } from '@/shared/messages';
 import type { MessageHandlers } from '@/shared/messages';
 import type { ApplicationRow, AppStatus, SyncScope, SyncState } from '@/shared/types';
 import {
+  isApplicationPushBlocked,
   isPaired,
+  noteApplicationPushed,
+  noteApplicationRefused,
   pushApplications,
   pushMappings,
+  readApplicationSyncMap,
+  wireClientIdFor,
+
   requestPairing,
   status,
   toBusError,
   unpair,
+
 } from '@/sync';
 import { pullProfile, pushProfile, reconcileAfterPairing } from '@/sync/profile';
 import { armSyncAlarm } from '@/background/sync-scheduler';
@@ -42,15 +49,27 @@ const CLOUD_STATUS: Readonly<Record<AppStatus, jobApplicationRowSchemaType['stat
   ghosted: 'GHOSTED',
 };
 
-function toWireRow(row: ApplicationRow): jobApplicationRowSchemaType | null {
+/**
+ * `jobApplicationRowSchema` (packages/Types) requires a non-empty `role`, but plenty of postings
+ * hide the title behind a lazily rendered header that auto-capture never sees. Dropping those rows
+ * meant a tracked application was silently never synced and never reached the web Applied page —
+ * data loss the user has no way to notice. A placeholder they can edit is strictly better.
+ */
+const UNKNOWN_ROLE = 'Unknown role';
+
+/**
+ * `clientId` is passed in rather than read off the row: it is the identity the SERVER holds for
+ * this application, which is only the local id until the two diverge (see `readApplicationSyncMap`).
+ */
+function toWireRow(row: ApplicationRow, clientId: string): jobApplicationRowSchemaType | null {
   const company = row.company.trim();
   const role = row.role.trim();
-  if (company.length === 0 || role.length === 0) return null;
+  if (company.length === 0) return null;
 
   return {
-    clientId: row.id,
+    clientId,
     company,
-    role,
+    role: role.length > 0 ? role : UNKNOWN_ROLE,
     url: row.url.length > 0 ? row.url : null,
     ats: row.ats,
     status: CLOUD_STATUS[row.status],
@@ -122,16 +141,42 @@ const syncPush: SyncHandlers['SYNC_PUSH'] = async (payload) => {
     pushed.mappings = result.data.pushed;
   }
 
+  let applicationsError: string | null = null;
   if (scopes.has('applications')) {
+    const identities = await readApplicationSyncMap();
     const rows = await listUnsyncedApplications();
     const wire: jobApplicationRowSchemaType[] = [];
-    const byClientId = new Map<string, ApplicationRow>();
+    // One clientId can name SEVERAL local rows — the same posting under two profiles, or a
+    // `www.`/`https` pair the server's url reduction collapses — because both adopt the id the
+    // server answered with. A plain `Map<string, ApplicationRow>` loses all but the last of them,
+    // and the loser is never stamped, so the alarm re-pushes it on every tick forever.
+    const byWireClientId = new Map<string, ApplicationRow[]>();
+    let blocked = 0;
+
     for (const row of rows) {
-      const converted = toWireRow(row);
+      // A parked row is one the server has refused to the ceiling. It stays unsynced — it is not
+      // lost — but it stops spending a write per tick on a verdict that cannot change by itself.
+      if (isApplicationPushBlocked(identities[row.id], row.updatedAt ?? 0)) {
+        blocked += 1;
+        continue;
+      }
+      // Address the server by the id IT holds for this row. Sending the local id instead is what
+      // makes an edited url miss both server lookups and mint a duplicate application.
+      const converted = toWireRow(row, wireClientIdFor(identities, row.id));
       if (converted === null) continue;
-      wire.push(converted);
-      byClientId.set(converted.clientId, row);
+
+      const sharing = byWireClientId.get(converted.clientId);
+      if (sharing === undefined) {
+        // Only the first of a colliding set goes on the wire. Sending the same clientId twice in
+        // one batch is two upserts of one server row where the second silently wins, which is a
+        // write and a race for no gain — the server holds one row for the posting either way.
+        byWireClientId.set(converted.clientId, [row]);
+        wire.push(converted);
+      } else {
+        sharing.push(row);
+      }
     }
+
 
     if (wire.length > 0) {
       const result = await pushApplications(wire);
@@ -139,13 +184,61 @@ const syncPush: SyncHandlers['SYNC_PUSH'] = async (payload) => {
         const busError = toBusError(result.error);
         return errReply(busError.code, busError.message, busError.retryAt);
       }
+      // Resolve every acknowledgement by the clientId we PUSHED, never by the one that came back.
+      //
+      // The server's upsert falls back to the posting's url when the clientId lookup misses, and
+      // that branch keeps the matched row's original clientId (it is the id other installs address
+      // the application by). After a reinstall every row takes that branch, so keying this lookup
+      // on the returned id misses every time, `syncedAt` is never written, and the alarm re-pushes
+      // the whole table on every tick, forever.
+      //
+      // The returned id is not discarded either: `noteApplicationPushed` adopts it as this row's
+      // wire identity, so from here on both sides name the same application. The Dexie primary key
+      // is deliberately left alone — see the note above `readApplicationSyncMap`.
       const at = Date.now();
-      for (const saved of result.data.rows) {
-        const local = byClientId.get(saved.clientId);
-        if (local === undefined) continue;
-        await putApplication({ ...local, syncedAt: at });
+      let diverged = 0;
+      for (const saved of result.data.saved) {
+        const locals = byWireClientId.get(saved.requestedClientId);
+        if (locals === undefined) continue;
+        if (saved.row.clientId !== saved.requestedClientId) diverged += 1;
+        // Every local row sharing this identity settles on the one acknowledgement — a row that
+        // never went on the wire is represented by the one that did, not left behind unsynced.
+        for (const local of locals) {
+          await putApplication({ ...local, syncedAt: at });
+          await noteApplicationPushed(local.id, saved.row.clientId);
+        }
       }
+
+      if (diverged > 0) {
+        log.debug(`${diverged} row(s) resolved to an application the account already tracked`);
+      }
+      if (result.data.duplicateUrls.length > 0) {
+        log.debug(
+          `${String(result.data.duplicateUrls.length)} row(s) refused: another application ` +
+            'already tracks that posting',
+        );
+      }
+      for (const refused of result.data.duplicateUrls) {
+        const locals = byWireClientId.get(refused);
+        if (locals === undefined) continue;
+        // The refusal is about the posting, so it lands on every local row that named it — leaving
+        // the ones that shared the wire slot unmarked would retry them forever with no ceiling.
+        for (const local of locals) {
+          if (await noteApplicationRefused(local.id, local.updatedAt ?? 0)) blocked += 1;
+        }
+      }
+
       pushed.applications = result.data.pushed;
+    }
+
+    if (blocked > 0) {
+      // The alarm path throws this reply away (`drainSync` only logs it), so the durable signal is
+      // `listBlockedApplications()` — this sentence is for whoever asked for the push.
+      applicationsError =
+        `${String(blocked)} application${blocked === 1 ? '' : 's'} could not be synced: another ` +
+        'application already tracks that job posting. Merge or delete the duplicate in NextMove ' +
+        'on the web, then edit the row here to try again.';
+      log.warn(`${String(blocked)} application row(s) parked after repeated DUPLICATE_URL refusals`);
     }
   }
 
@@ -163,8 +256,11 @@ const syncPush: SyncHandlers['SYNC_PUSH'] = async (payload) => {
     }
   }
 
+  // A missing vault key blocks the whole profile, so it outranks a single stuck application row.
+  const reportedError = profileError ?? applicationsError;
   const state: SyncState = await status();
-  const finalState: SyncState = profileError === null ? state : { ...state, lastError: profileError };
+  const finalState: SyncState =
+    reportedError === null ? state : { ...state, lastError: reportedError };
 
   return okReply({ state: finalState, pushed });
 };

@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import {
   jobApplicationPatchSchema,
   jobApplicationRowSchema,
@@ -32,6 +34,13 @@ export type SyncErrorCode =
   | 'unauthorized'
   | 'invalid-code'
   | 'version-conflict'
+  /**
+   * The server refused ONE row because another of this account's rows already tracks that posting
+   * (`@@unique([userId, urlKey])`). Kept separate from `version-conflict` because the two need
+   * opposite handling: a profile version conflict has to stop the caller and be merged, while this
+   * one is a permanent verdict on a single row that the rest of a batch must survive.
+   */
+  | 'duplicate-url'
   | 'rate-limited'
   | 'bad-request'
   | 'not-found'
@@ -84,6 +93,7 @@ export function toBusError(error: SyncError): BusError {
     unauthorized: 'NOT_PAIRED',
     'invalid-code': 'BAD_REQUEST',
     'version-conflict': 'SYNC_CONFLICT',
+    'duplicate-url': 'SYNC_CONFLICT',
     'rate-limited': 'NETWORK',
     'bad-request': 'BAD_REQUEST',
     'not-found': 'NOT_FOUND',
@@ -298,7 +308,10 @@ function codeForStatus(status: number, serverCode: string | null, authed: boolea
     if (!authed) return 'invalid-code';
     return 'unauthorized';
   }
-  if (status === 409) return 'version-conflict';
+  // Both of the API's 409s carry a `data.code`, and they are not interchangeable: DUPLICATE_URL is
+  // about one job-application row, everything else (a profile VERSION_CONFLICT, CLIENT_ID_TAKEN)
+  // is a conflict the caller has to stop and resolve.
+  if (status === 409) return serverCode === 'DUPLICATE_URL' ? 'duplicate-url' : 'version-conflict';
   if (status === 429) return 'rate-limited';
   if (status === 404) return 'not-found';
   if (status === 400 || status === 422) return 'bad-request';
@@ -500,8 +513,13 @@ export async function unpair(): Promise<SyncState> {
     await send({ method: 'DELETE', path: SYNC_ROUTES.device(current.deviceId), auth: true });
   }
   tokenCache = null;
+  // Every record in this map describes one account's server rows — the ids it holds them under and
+  // which of them it refuses. Carrying that into a re-pair with a DIFFERENT account addresses one
+  // user's applications with another user's identities, which the server rejects outright.
+  await browser.storage.local.remove(STORAGE_KEY_APPLICATION_SYNC);
   return mutateSyncState(() => ({ ...DEFAULT_SYNC_STATE, deviceName: current.deviceName }));
 }
+
 
 function coerceEnvelope(data: unknown): profileBlobEnvelopeSchemaType | null {
   const candidates: unknown[] = [data];
@@ -750,25 +768,261 @@ export async function pushApplication(
   return ok(saved);
 }
 
+/**
+ * One row's round trip, with BOTH identities kept apart on purpose.
+ *
+ * The server resolves an upsert by `clientId` first and by the posting's url second, and the url
+ * branch answers with the matched row's *original* `clientId` — the id every other install of this
+ * account already addresses that application by. So after a reinstall (fresh local ids, postings
+ * the account already tracks) `row.clientId` is routinely NOT the id we sent.
+ *
+ * `requestedClientId` is therefore the only key a caller may use to find the local row this
+ * acknowledgement belongs to. Matching on `row.clientId` drops the acknowledgement on the floor,
+ * which is what makes an unsynced row unsyncable forever.
+ */
+export interface PushedApplication {
+  /** The clientId this device sent. Still the primary key of the local row. */
+  requestedClientId: string;
+  /** The row as the server stored it. `row.clientId` may be the server's own id, not ours. */
+  row: jobApplicationRowSchemaType;
+}
+
+export interface PushApplicationsResult {
+  /** How many rows the server accepted — i.e. `saved.length`. */
+  pushed: number;
+  saved: PushedApplication[];
+  /**
+   * clientIds the server refused with DUPLICATE_URL. Deliberately not counted as pushed and
+   * deliberately not treated as a batch failure: see `pushApplications`.
+   */
+  duplicateUrls: string[];
+}
+
 export async function pushApplications(
   rows: readonly jobApplicationRowSchemaType[],
-): Promise<SyncResult<{ pushed: number; rows: jobApplicationRowSchemaType[] }>> {
+): Promise<SyncResult<PushApplicationsResult>> {
   if (!(await isPaired())) return notPaired();
 
-  const saved: jobApplicationRowSchemaType[] = [];
+  const saved: PushedApplication[] = [];
+  const duplicateUrls: string[] = [];
   for (const row of rows) {
     const result = await pushApplication(row);
     if (!result.ok) {
       if (result.error.code === 'bad-request' || result.error.code === 'guard') continue;
+      // A duplicate-url refusal is a verdict on this row alone — the account already tracks that
+      // posting under another row. Failing the batch on it would park every row queued behind it,
+      // for good, on a request that cannot start succeeding on its own. Skip it and keep going;
+      // it stays unsynced, so it lands by itself once the user resolves the duplicate on the web.
+      if (result.error.code === 'duplicate-url') {
+        duplicateUrls.push(row.clientId);
+        continue;
+      }
       return fail(result.error);
     }
-    saved.push(result.data);
+    saved.push({ requestedClientId: row.clientId, row: result.data });
   }
-  return ok({ pushed: saved.length, rows: saved });
+  return ok({ pushed: saved.length, saved, duplicateUrls });
 }
 
+/* ------------------------------------------------------------------------------------------------
+ * Applications · where the local row and the server row agree on one identity
+ *
+ * `ApplicationRow.id` is the Dexie primary key AND a live handle: the content script keeps the id
+ * `TRACKER_LOG_FILL` gave it for the rest of the page's life and later posts `TRACKER_MARK_APPLIED`
+ * with it, and the dashboard addresses rows by it. Re-keying a row in place to the clientId the
+ * server answered with would strand those handles — `markApplied()` resolves by id and returns null
+ * for a row that moved — and so silently drop an OBSERVED status flip (INV-1). Adoption therefore
+ * happens BESIDE the row, in this map: the row keeps its local id forever and the map decides which
+ * clientId goes ON THE WIRE for it, which is the only identity the server ever sees.
+ *
+ * Without it, a row the server matched by url (it answers with its own original clientId) misses
+ * BOTH server lookups the next time its url changes locally — the clientId is unknown there and the
+ * new urlKey matches nothing — and the server creates a SECOND row, orphaning the first on the
+ * Applied page. That is the duplicate `@@unique([userId, urlKey])` exists to prevent.
+ * ---------------------------------------------------------------------------------------------- */
+
+const STORAGE_KEY_APPLICATION_SYNC = 'jf.sync.applications';
+
+/**
+ * Consecutive DUPLICATE_URL refusals a row gets before it is parked instead of retried.
+ *
+ * The server's verdict is permanent until a human changes something, so an unbounded retry is a
+ * write per row per alarm tick, forever, for an outcome that cannot improve on its own.
+ */
+export const APPLICATION_PUSH_MAX_ATTEMPTS = 3;
+
+const applicationSyncRecordSchema = z.object({
+  /** The clientId the SERVER holds this row under. Equal to the local id until the two diverge. */
+  remoteClientId: z.string().min(1),
+  /** Length of the current DUPLICATE_URL refusal streak. Reset by any successful push. */
+  refusals: z.number().int().nonnegative(),
+  /** When the streak hit the ceiling and the row was parked; null while it is still being tried. */
+  blockedAt: z.number().int().nonnegative().nullable(),
+});
+
+const applicationSyncMapSchema = z.record(z.string(), applicationSyncRecordSchema);
+
+export type ApplicationSyncRecord = z.infer<typeof applicationSyncRecordSchema>;
+export type ApplicationSyncMap = z.infer<typeof applicationSyncMapSchema>;
+
+/** A row the server refuses to accept, and which is no longer being retried. */
+export interface BlockedApplication {
+  /** `ApplicationRow.id` — what the tracker UI addresses the row by. */
+  localId: string;
+  remoteClientId: string;
+  refusals: number;
+  blockedAt: number;
+}
+
+let applicationChain: Promise<unknown> = Promise.resolve();
+
+export async function readApplicationSyncMap(): Promise<ApplicationSyncMap> {
+  const stored = await browser.storage.local.get(STORAGE_KEY_APPLICATION_SYNC);
+  const parsed = applicationSyncMapSchema.safeParse(stored[STORAGE_KEY_APPLICATION_SYNC] ?? {});
+  return parsed.success ? parsed.data : {};
+}
+
+async function mutateApplicationSyncMap(
+  update: (current: ApplicationSyncMap) => ApplicationSyncMap,
+): Promise<ApplicationSyncMap> {
+  const run = applicationChain.then(async () => {
+    const next = applicationSyncMapSchema.parse(update(await readApplicationSyncMap()));
+    await browser.storage.local.set({ [STORAGE_KEY_APPLICATION_SYNC]: next });
+    return next;
+  });
+  applicationChain = run.catch(() => undefined);
+  return run;
+}
+
+/**
+ * The clientId to address the server with for a local row — its adopted identity, else its own id.
+ *
+ * Every request that names one row (`POST` upsert, `PATCH`, `DELETE`) has to go through this, or it
+ * addresses an id the server has never heard of.
+ *
+ * This mapping is many-to-one, and callers must treat it that way. The server's upsert falls back
+ * to matching on the posting's url when a clientId is unknown to it, so two local rows for one
+ * posting — the same job under two profiles, since `findExisting` is profile-scoped, or a
+ * `www.`/`https` pair the server's url reduction collapses and ours does not — both adopt the same
+ * remote id. Anything that indexes local rows BY this value has to hold a list, or one row is
+ * silently dropped and never stamped as synced.
+ */
+export function wireClientIdFor(map: ApplicationSyncMap, localId: string): string {
+  return map[localId]?.remoteClientId ?? localId;
+}
+
+
+
+export async function remoteClientIdFor(localId: string): Promise<string> {
+  return wireClientIdFor(await readApplicationSyncMap(), localId);
+}
+
+/** True while the row is parked: refused to the ceiling and untouched since. */
+export function isApplicationPushBlocked(
+  record: ApplicationSyncRecord | undefined,
+  updatedAt: number,
+): boolean {
+  if (record === undefined || record.blockedAt === null) return false;
+  // A local edit is the only signal we get that the user has acted on the duplicate, so it is what
+  // lets a parked row leave the terminal state — there is no "retry everything" button to press.
+  return updatedAt <= record.blockedAt;
+}
+
+/** The server accepted the row: remember the identity it answered with and end any refusal streak. */
+export async function noteApplicationPushed(
+  localId: string,
+  remoteClientId: string,
+): Promise<void> {
+  const current = await readApplicationSyncMap();
+  const existing = current[localId];
+  // A row whose id the server kept needs no entry at all — most rows, most of the time.
+  if (existing === undefined && remoteClientId === localId) return;
+  if (
+    existing !== undefined &&
+    existing.remoteClientId === remoteClientId &&
+    existing.refusals === 0 &&
+    existing.blockedAt === null
+  ) {
+    return;
+  }
+  await mutateApplicationSyncMap((map) => ({
+    ...map,
+    [localId]: { remoteClientId, refusals: 0, blockedAt: null },
+  }));
+}
+
+/**
+ * Count one DUPLICATE_URL refusal against a row, parking it once the streak reaches the ceiling.
+ * Returns whether the row is parked as of this refusal.
+ *
+ * `updatedAt` restarts the streak rather than resuming it when the row was edited after it was
+ * parked: an edited row has earned a fresh run of attempts, not the one attempt a resumed streak
+ * would give it.
+ */
+export async function noteApplicationRefused(
+  localId: string,
+  updatedAt: number,
+): Promise<boolean> {
+  const at = Date.now();
+  const next = await mutateApplicationSyncMap((current) => {
+    const existing = current[localId];
+    const rearmed =
+      existing !== undefined &&
+      existing.blockedAt !== null &&
+      !isApplicationPushBlocked(existing, updatedAt);
+    const refusals = (rearmed ? 0 : (existing?.refusals ?? 0)) + 1;
+    return {
+      ...current,
+      [localId]: {
+        remoteClientId: existing?.remoteClientId ?? localId,
+        refusals,
+        blockedAt: refusals >= APPLICATION_PUSH_MAX_ATTEMPTS ? at : null,
+      },
+    };
+  });
+  const record = next[localId];
+  return record !== undefined && record.blockedAt !== null;
+}
+
+/** Every row the server has permanently refused. This is the state a UI should surface. */
+export async function listBlockedApplications(): Promise<BlockedApplication[]> {
+  const map = await readApplicationSyncMap();
+  const blocked: BlockedApplication[] = [];
+  for (const [localId, record] of Object.entries(map)) {
+    if (record.blockedAt === null) continue;
+    blocked.push({
+      localId,
+      remoteClientId: record.remoteClientId,
+      refusals: record.refusals,
+      blockedAt: record.blockedAt,
+    });
+  }
+  return blocked.sort((a, b) => b.blockedAt - a.blockedAt);
+}
+
+/** Drop the sync identity of rows that no longer exist locally, so the map cannot grow forever. */
+export async function forgetApplicationSyncRecords(localIds: readonly string[]): Promise<void> {
+  if (localIds.length === 0) return;
+  const current = await readApplicationSyncMap();
+  if (!localIds.some((id) => current[id] !== undefined)) return;
+  await mutateApplicationSyncMap((map) => {
+    const next: ApplicationSyncMap = { ...map };
+    for (const id of localIds) delete next[id];
+    return next;
+  });
+}
+
+export async function forgetAllApplicationSyncRecords(): Promise<void> {
+  await mutateApplicationSyncMap(() => ({}));
+}
+
+/**
+ * `id` is the tracker row's LOCAL id; it is resolved to the identity the server holds for that row.
+ * Resolution is idempotent — an id that is not a local key (an id the server itself handed us) is
+ * passed through — so neither kind of caller can address a row the server has never heard of.
+ */
 export async function patchApplication(
-  clientId: string,
+  id: string,
   patch: jobApplicationPatchSchemaType,
 ): Promise<SyncResult<jobApplicationRowSchemaType>> {
   if (!(await isPaired())) return notPaired();
@@ -783,7 +1037,7 @@ export async function patchApplication(
 
   const attempt = await send({
     method: 'PATCH',
-    path: SYNC_ROUTES.jobApplication(clientId),
+    path: SYNC_ROUTES.jobApplication(await remoteClientIdFor(id)),
     auth: true,
     body: body.data,
   });
@@ -800,12 +1054,13 @@ export async function patchApplication(
   return ok(saved);
 }
 
-export async function deleteApplication(clientId: string): Promise<SyncResult<{ deleted: true }>> {
+/** `id` is resolved the same way `patchApplication` resolves it. */
+export async function deleteApplication(id: string): Promise<SyncResult<{ deleted: true }>> {
   if (!(await isPaired())) return notPaired();
 
   const attempt = await send({
     method: 'DELETE',
-    path: SYNC_ROUTES.jobApplication(clientId),
+    path: SYNC_ROUTES.jobApplication(await remoteClientIdFor(id)),
     auth: true,
   });
   if (!attempt.ok) {

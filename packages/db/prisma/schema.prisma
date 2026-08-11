@@ -211,6 +211,9 @@ model JobApplication {
   company   String
   role      String
   url       String?
+  urlKey    String? // `url` reduced to a stable key — see normalizeUrlKey in jobApplicationRepo
+  //          (fragment + tracking params dropped, the remaining params kept and sorted, so an
+  //          Indeed `?jk=` or Taleo `?job=` id still separates two postings on one host)
   ats       String?
   status    JobAppStatus @default(APPLIED)
   appliedAt DateTime?
@@ -221,6 +224,20 @@ model JobApplication {
 
   user Users @relation("User_JobApplication", fields: [userId], references: [id], onDelete: Cascade)
 
+  // `clientId` is a *local* extension row id, so a reinstall or a second local profile mints a new
+  // one for a posting already synced and the Applied page grows a second card. This is the server's
+  // own "same posting, same user" identity.
+  //
+  // ⚠ KNOWN DIVERGENCE from the database. The migration
+  // (20260811000001_job_application_url_dedupe) creates this index as a PARTIAL one,
+  // `WHERE "urlKey" IS NOT NULL`, so rows the extension could not attribute to a url stay out of
+  // the index entirely. Prisma's schema language cannot express a predicate, so this line — a
+  // total unique index — is the closest it can declare, and `prisma migrate dev` / `migrate diff`
+  // will therefore report drift and offer to recreate the index without the predicate. Do not
+  // accept that offer: read the ⚠ block at the bottom of that migration.sql first. Production and
+  // CI run `prisma migrate deploy`, which applies migration files and never diffs, so the
+  // deployed index is the partial one regardless of what this line says.
+  @@unique([userId, urlKey])
   @@index([userId, status, appliedAt])
 }
 

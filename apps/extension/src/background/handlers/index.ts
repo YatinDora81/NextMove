@@ -17,6 +17,8 @@
 import { mintGesture } from '@/platform/gesture';
 import { createLogger } from '@/platform/logger';
 import { sendToTab } from '@/platform/bus';
+import { getSlot } from '@/platform/storage';
+
 import { errReply, okReply } from '@/shared/messages';
 import type { MessageHandlers } from '@/shared/messages';
 
@@ -64,10 +66,17 @@ async function resolveTargetTab(preferred: number | null): Promise<number | null
  * the fill engine on the other side is the thing that refuses to touch submit controls.
  */
 const fillRequest: MessageHandlers['FILL_REQUEST'] = async (payload, ctx) => {
+  // The single choke point for every fill entry path — popup button, Alt+J and the context menu
+  // all arrive here, so the power switch is honoured once rather than in three places.
+  if (!(await getSlot('settings')).enabled) {
+    return errReply('BAD_REQUEST', 'NextMove is off. Turn it back on with Alt+Shift+N or from the popup.');
+  }
+
   const tabId = await resolveTargetTab(ctx.tabId);
   if (tabId === null) {
     return errReply('NOT_FOUND', 'There is no active tab to fill.');
   }
+
 
   const reply = await sendToTab(tabId, 'FILL_REQUEST', payload, { frameId: TOP_FRAME_ID });
   if (!reply.ok) {

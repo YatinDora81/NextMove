@@ -118,6 +118,9 @@ const PAYLOAD_SCHEMAS: { readonly [T in MessageType]: z.ZodType } = {
     offset: z.number().optional(),
   }),
   ANSWERS_DELETE: z.object({ id: z.string().min(1) }),
+  ANSWERS_PIN: z.object({ id: z.string().min(1), pinned: z.boolean() }),
+  ANSWERS_CLEAR: emptyPayload,
+
 
   CONFIG_GET: z.object({ atsId: atsIdSchema }),
   CONFIG_REFRESH: z.object({ force: z.boolean() }),

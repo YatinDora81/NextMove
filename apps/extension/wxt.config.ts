@@ -67,7 +67,14 @@ export default defineConfig({
         suggested_key: { default: 'Alt+J' },
         description: 'Fill this application',
       },
+      // The global power switch, reachable without opening the popup. Chrome maps Alt to Option
+      // on macOS, so this is ⌥⇧N there. Remap at chrome://extensions/shortcuts on a conflict.
+      'toggle-enabled': {
+        suggested_key: { default: 'Alt+Shift+N' },
+        description: 'Turn NextMove on / off',
+      },
     },
+
     content_security_policy: {
       extension_pages: "script-src 'self'; object-src 'self'",
     },

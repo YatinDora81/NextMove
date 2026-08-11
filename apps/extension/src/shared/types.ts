@@ -328,7 +328,15 @@ export interface JobContext {
 export interface Settings {
   activeProfileId: string | null;
 
+  /**
+   * The global power switch. When false the in-page layer draws nothing, suggests nothing and
+   * fills nothing — the toolbar button, Alt+J and the context menu all refuse too. Everything
+   * already stored stays stored; this is "stop touching pages", not "forget me".
+   */
+  enabled: boolean;
+
   fillThreshold: number;
+
   suggestThreshold: number;
 
   autoFillOnLoad: boolean;

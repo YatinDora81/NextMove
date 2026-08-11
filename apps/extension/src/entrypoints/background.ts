@@ -1,6 +1,7 @@
 import { createLogger } from '@/platform/logger';
-import { runMigrations } from '@/platform/storage';
-import { COMMAND_FILL_PAGE, MENU_FILL_PAGE } from '@/shared/constants';
+import { runMigrations, updateSlot } from '@/platform/storage';
+import { COMMAND_FILL_PAGE, COMMAND_TOGGLE_ENABLED, MENU_FILL_PAGE } from '@/shared/constants';
+
 
 import { installAlarmListener, registerAlarms } from '@/background/alarms';
 import { refreshKeyBadge } from '@/background/badge';
@@ -9,6 +10,8 @@ import { handleExternalMessage } from '@/background/handoff';
 import { dispatchLocal, installRouter } from '@/background/router';
 import { getSlot } from '@/platform/storage';
 import { ONBOARDED_KEY, ONBOARDING_PAGE, WEB_UNINSTALL_URL } from '@/shared/constants';
+import type { Settings } from '@/shared/types';
+
 
 const log = createLogger('bg');
 
@@ -67,12 +70,31 @@ async function maybeOpenOnboarding(reason: string): Promise<void> {
   }
 }
 
+/**
+ * Flip the global power switch and repaint the badge.
+ *
+ * Nothing else has to be told: the in-page layer, the popup and the options page all watch the
+ * settings slot through `storage.onChanged`, so one write reaches every surface in every tab.
+ */
+async function toggleEnabled(): Promise<boolean> {
+  const next = await updateSlot('settings', (current: Settings) => ({
+    ...current,
+    enabled: !current.enabled,
+    updatedAt: Date.now(),
+  }));
+  await refreshKeyBadge();
+  log.info(`power switch → ${next.enabled ? 'on' : 'off'}`);
+  return next.enabled;
+}
+
 async function triggerFill(
   trigger: 'shortcut' | 'context-menu',
   tabId: number | null,
   url: string | null,
 ): Promise<void> {
   const reply = await dispatchLocal(
+
+
     'FILL_REQUEST',
     { profileId: null, trigger },
     { tabId, url },
@@ -93,9 +115,14 @@ export default defineBackground(() => {
   installAlarmListener();
 
   browser.commands.onCommand.addListener((command, tab) => {
+    if (command === COMMAND_TOGGLE_ENABLED) {
+      void toggleEnabled();
+      return;
+    }
     if (command !== COMMAND_FILL_PAGE) return;
     void triggerFill('shortcut', tab?.id ?? null, tab?.url ?? null);
   });
+
 
   browser.contextMenus.onClicked.addListener((info, tab) => {
     if (info.menuItemId !== MENU_FILL_PAGE) return;

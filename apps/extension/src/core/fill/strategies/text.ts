@@ -14,6 +14,7 @@ import {
   assertNotSubmitControl,
   isAborted,
   isTextLike,
+  readLocalValue,
   sleep,
 } from '../dom';
 import { normalize } from '../matching';
@@ -22,6 +23,7 @@ import {
   failed,
   filled,
   unverified,
+  type FillRequest,
   type StrategyContext,
   type StrategyResult,
 } from '../types';
@@ -69,6 +71,48 @@ function committed(actual: string | null, expected: string): boolean {
 }
 
 /**
+ * Is the text standing in the field the text we were about to write?
+ *
+ * Deliberately stricter than `committed`. That judges a value the page has just taken FROM us and is
+ * generous about reformatting — it accepts a prefix within two characters, so a widget that trimmed
+ * or truncated our write still counts as a commit. Asking the opposite question, "did the human
+ * already answer this with our value", cannot afford that generosity: "Ash" is a different answer
+ * from "Asha", and treating it as a match would report a nickname the user chose as a value we
+ * never wrote — the exact silent-overwrite failure this guard exists to prevent, minus the write.
+ */
+function alreadySays(actual: string | null, expected: string): boolean {
+  if (actual === null) return false;
+  if (actual === expected) return true;
+  if (normalize(actual) === normalize(expected)) return true;
+  // An input mask ("(415) 555-0134" for "4155550134") is the same answer, differently punctuated.
+  const digitsA = actual.replace(/\D+/g, '');
+  const digitsB = expected.replace(/\D+/g, '');
+  return digitsB.length >= 6 && digitsA === digitsB;
+}
+
+/**
+ * Does this control already hold something a human would call an answer?
+ *
+ * The text half of the engine's one "already answered" policy (`isAlreadyAnswered`). Whitespace is
+ * not an answer; anything else is, because from here a value the page defaulted, a value restored
+ * from a draft and a sentence the user typed are indistinguishable — and all three are answers
+ * JobFill has no business replacing.
+ *
+ * Deliberately shape-based rather than `isTextLike`: a `date`/`number`/`month` input holds a typed
+ * answer exactly the same way, and the engine asks this question before it knows which strategy
+ * will run. Radios and checkboxes must never be asked — their `value` is the option's own label,
+ * which reads non-blank whether or not the box is ticked (see `isAlreadyAnswered`).
+ */
+export function textHasRealValue(el: Element): boolean {
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+    return el.value.trim().length > 0;
+  }
+  const html = el as HTMLElement;
+  if (html.isContentEditable) return (html.textContent ?? '').trim().length > 0;
+  return false;
+}
+
+/**
  * Write a plain text value and prove it stuck.
  *
  * Escalation ladder: bridge SET_VALUE → (unverified) a real keystroke stream → (still unverified)
@@ -78,6 +122,7 @@ export async function fillText(
   el: Element,
   value: string,
   ctx: StrategyContext,
+  request: FillRequest = {},
 ): Promise<StrategyResult> {
   try {
     // INV-1: never auto-submit. A text write can never target a submit control.
@@ -97,6 +142,16 @@ export async function fillText(
   }
 
   const expected = expectedValue(el, value);
+
+  // An already-answered field is left exactly as it is (see `textHasRealValue`). When the standing
+  // text is the text we would have written, that is a `filled` — the field is correct and the report
+  // should say so instead of opening a gap for the user to go and check, the same way `fillSelect`
+  // treats a dropdown that already reads the right thing. Otherwise nothing is written and the field
+  // is reported as skipped, not as an error: declining to clobber an answer is the strategy working.
+  if (request.overwrite !== true && textHasRealValue(el)) {
+    return alreadySays(readLocalValue(el), expected) ? filled() : failed(REASON.alreadyAnswered);
+  }
+
   const callOptions = ctx.preferLocal === true ? { preferLocal: true } : undefined;
 
   if (ctx.quirks.typeTextFields && isTextLike(el)) {
@@ -139,6 +194,7 @@ export async function fillTextValue(
   el: Element,
   value: string | number,
   ctx: StrategyContext,
+  request: FillRequest = {},
 ): Promise<StrategyResult> {
-  return fillText(el, typeof value === 'number' ? String(value) : value, ctx);
+  return fillText(el, typeof value === 'number' ? String(value) : value, ctx, request);
 }

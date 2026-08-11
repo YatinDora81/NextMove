@@ -150,6 +150,33 @@ function toOption(el: HTMLElement): ChoiceOption {
 }
 
 /**
+ * Can a human reach this option at all?
+ *
+ * The control itself is routinely styled away — `opacity:0` under a decorated `<span>` — while its
+ * `<label>` carries the whole widget, so "is the input visible" is the wrong question and its
+ * `<label>` is the right one. `core/scanner.ts` applies the same rule when it decides whether a
+ * choice control is on screen.
+ */
+function choiceVisible(el: HTMLElement): boolean {
+  if (isVisible(el)) return true;
+  const label = labelElementFor(el);
+  return label !== null && isVisible(label);
+}
+
+/**
+ * Drop the members of a group no human could pick — a wizard step that is rendered but hidden, or
+ * an option the page has styled out of existence — while keeping the ones behind a visible label.
+ *
+ * Never returns an empty group: if the whole group is off screen the caller still gets the real
+ * membership, so `isChecked` can report what the group already answers rather than pretending the
+ * question does not exist.
+ */
+function reachableMembers<T extends HTMLElement>(found: readonly T[]): T[] {
+  const reachable = found.filter(choiceVisible);
+  return reachable.length > 0 ? reachable : [...found];
+}
+
+/**
  * All members of the group `el` belongs to. Native radios group by `name` inside their form;
  * ARIA widgets group by the enclosing `role="radiogroup"` / fieldset.
  */
@@ -161,7 +188,7 @@ export function resolveGroup(el: HTMLElement): ChoiceOption[] {
       const found = Array.from(
         scope.querySelectorAll<HTMLInputElement>(`input[type="radio"][name="${cssEscape(name)}"]`),
       );
-      if (found.length > 0) return found.map(toOption);
+      if (found.length > 0) return reachableMembers(found).map(toOption);
     }
   }
 
@@ -170,7 +197,7 @@ export function resolveGroup(el: HTMLElement): ChoiceOption[] {
     const group = el.closest('[role="radiogroup"]') ?? el.parentElement;
     if (group) {
       const found = Array.from(group.querySelectorAll<HTMLElement>('[role="radio"]'));
-      if (found.length > 0) return found.map(toOption);
+      if (found.length > 0) return reachableMembers(found).map(toOption);
     }
   }
 
@@ -179,7 +206,7 @@ export function resolveGroup(el: HTMLElement): ChoiceOption[] {
     const found = Array.from(
       fieldset.querySelectorAll<HTMLElement>('input[type="radio"], [role="radio"]'),
     );
-    if (found.length > 1) return found.map(toOption);
+    if (found.length > 1) return reachableMembers(found).map(toOption);
   }
 
   return [toOption(el)];

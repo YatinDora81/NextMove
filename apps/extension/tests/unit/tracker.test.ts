@@ -13,11 +13,15 @@
  *   infer that it did. `markApplied(id, signal)` refuses a signal that did not confirm, and a
  *   finished fill run on its own leaves the row in `draft`.
  *
+ * The v2.2 submit-time signal is tested with the same suspicion: `installSubmitWatch()` reports the
+ * user's own press and nothing else, and `looksLikeJobPage()` is the gate that stops a generic
+ * "thank you" anywhere on the web from minting an application that never happened.
+ *
  * Dexie cannot run under happy-dom (no IndexedDB), so `@/platform/db` is replaced with the
  * in-memory stand-in from `tests/setup.ts`.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/platform/db', async () => ({ db: (await import('../setup')).memoryDb }));
 
@@ -34,7 +38,14 @@ import {
   CONFIRMATION_MIN_CONFIDENCE,
   NO_CONFIRMATION,
   detectConfirmation,
+  looksLikeJobPage,
+  matchesConfirmationUrl,
 } from '@/tracker/detectors';
+import {
+  installSubmitWatch,
+  type SubmitSignal,
+  type SubmitWatchHandle,
+} from '@/tracker/submit-watch';
 import {
   computeStats,
   get,
@@ -240,6 +251,389 @@ describe('detectConfirmation — observation only (INV-1)', () => {
 });
 
 /* ------------------------------------------------------------------------------------------------
+ * v2.2 Phase 3 — the job-page gate
+ * ---------------------------------------------------------------------------------------------- */
+
+describe('looksLikeJobPage — the gate in front of every auto-log', () => {
+  it('recognises the ATS hosts', () => {
+    for (const url of [
+      FIXTURE_URLS.greenhouse,
+      FIXTURE_URLS.lever,
+      FIXTURE_URLS.workday,
+      FIXTURE_URLS.ashby,
+      'https://www.naukri.com/job-listings-platform-engineer-northwind-123456',
+      'https://jobs.smartrecruiters.com/Northwind/743999',
+      'https://northwind.icims.com/jobs/4321/platform-engineer/job',
+      'https://northwind.taleo.net/careersection/ex/jobapply.ftl',
+    ]) {
+      expect(looksLikeJobPage(url), url).toBe(true);
+    }
+  });
+
+  it('recognises a company careers site by its subdomain or by its path', () => {
+    expect(looksLikeJobPage(FIXTURE_URLS.generic)).toBe(true); // careers.ravensmoor.example
+    expect(looksLikeJobPage('https://jobs.ravensmoor.example/technical-writer')).toBe(true);
+    expect(looksLikeJobPage('https://ravensmoor.example/careers/technical-writer')).toBe(true);
+    expect(looksLikeJobPage('https://ravensmoor.example/jobs/42/apply')).toBe(true);
+  });
+
+  it('REFUSES a confirmation-shaped page that has nothing to do with a job', () => {
+    // The reason this predicate exists. The URL below matches the confirmation vocabulary outright,
+    // so without the gate a checkout receipt would mint an `applied` row for a job that was never
+    // applied to — and a tracker the user cannot trust is worse than no tracker.
+    const url = 'https://shop.example.com/checkout/thank-you';
+    expect(matchesConfirmationUrl(url).matched).toBe(true);
+    expect(looksLikeJobPage(url)).toBe(false);
+  });
+
+  it('a matched ATS adapter answers on its own, whatever the host looks like', () => {
+    const intranet = 'https://intranet.example.com/hiring/tool';
+    expect(looksLikeJobPage(intranet, 'greenhouse')).toBe(true);
+    expect(looksLikeJobPage(intranet, 'generic')).toBe(false);
+    expect(looksLikeJobPage(intranet, null)).toBe(false);
+  });
+
+  it('is not fooled by a string that is not a URL at all', () => {
+    expect(looksLikeJobPage('not a url')).toBe(false);
+    expect(looksLikeJobPage('')).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * v2.2 Phase 3 — the submit-time signal
+ * ---------------------------------------------------------------------------------------------- */
+
+describe('installSubmitWatch — it watches the user press submit, it never presses (INV-1)', () => {
+  /**
+   * A form shaped the way a real application is — the questions plus the résumé. The form path
+   * demands that shape on top of the submit vocabulary, because a bare "Submit" caption sits on
+   * search boxes and newsletter signups too.
+   */
+  const FORM = `
+    <form id="app">
+      <input type="text" name="full_name" />
+      <input type="email" name="email" />
+      <input type="tel" name="phone" />
+      <input type="file" name="resume" />
+      <button type="button" id="save">Save draft</button>
+      <div role="button" id="easy">Easy apply</div>
+      <button type="submit" id="send">Submit application</button>
+    </form>`;
+
+
+  const watchers: SubmitWatchHandle[] = [];
+
+  afterEach(() => {
+    while (watchers.length > 0) watchers.pop()?.destroy();
+  });
+
+  function watch(seen: SubmitSignal[], debounceMs?: number): SubmitWatchHandle {
+    const handle = installSubmitWatch(
+      debounceMs === undefined
+        ? { doc: document, onSubmit: (signal) => seen.push(signal) }
+        : { doc: document, debounceMs, onSubmit: (signal) => seen.push(signal) },
+    );
+    watchers.push(handle);
+    return handle;
+  }
+
+  function el(doc: Document, id: string): Element {
+    const found = doc.getElementById(id);
+    if (found === null) throw new Error(`#${id} is missing from the test page`);
+    return found;
+  }
+
+  /**
+   * happy-dom does not implement `isTrusted`, and the production guard reads it — so a "real" press
+   * has to say so explicitly here. Its absence is exactly what the page-script case asserts on.
+   */
+  function trustedClick(target: Element): void {
+    const event = new MouseEvent('click', { bubbles: true, composed: true });
+    Object.defineProperty(event, 'isTrusted', { value: true, configurable: true });
+    target.dispatchEvent(event);
+  }
+
+  it('a real form submit reports one signal', () => {
+    const doc = page(FORM);
+    const seen: SubmitSignal[] = [];
+    watch(seen);
+
+    el(doc, 'app').dispatchEvent(new Event('submit', { bubbles: true }));
+
+    expect(seen).toEqual([{ reason: 'form', label: '' }]);
+  });
+
+  it('the submitter names the signal when the engine supplies one', () => {
+    const doc = page(FORM);
+    const seen: SubmitSignal[] = [];
+    watch(seen);
+
+    const event = new Event('submit', { bubbles: true });
+    Object.defineProperty(event, 'submitter', { value: el(doc, 'send'), configurable: true });
+    el(doc, 'app').dispatchEvent(event);
+
+    expect(seen).toEqual([{ reason: 'form', label: 'Submit application' }]);
+  });
+
+  it('a trusted press on an apply-shaped control reports even without a <form> submit', () => {
+    const doc = page(FORM);
+    const seen: SubmitSignal[] = [];
+    watch(seen);
+
+    trustedClick(el(doc, 'easy'));
+
+    expect(seen).toEqual([{ reason: 'button', label: 'Easy apply' }]);
+  });
+
+  it('a SYNTHETIC click is ignored — a page script must not be able to log an application', () => {
+    const doc = page(FORM);
+    const seen: SubmitSignal[] = [];
+    watch(seen);
+
+    el(doc, 'easy').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(seen).toEqual([]);
+  });
+
+  it('a press on an unrelated button is ignored', () => {
+    const doc = page(FORM);
+    const seen: SubmitSignal[] = [];
+    watch(seen);
+
+    trustedClick(el(doc, 'save'));
+
+    expect(seen).toEqual([]);
+  });
+
+  it('one press that produces both a click and a submit reports ONCE', () => {
+    const doc = page(FORM);
+    const seen: SubmitSignal[] = [];
+    watch(seen);
+
+    trustedClick(el(doc, 'send'));
+    el(doc, 'app').dispatchEvent(new Event('submit', { bubbles: true }));
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.reason).toBe('button');
+  });
+
+  it('the collapse is time-bounded, not once per page — a second application still reports', () => {
+    const doc = page(FORM);
+    const seen: SubmitSignal[] = [];
+    watch(seen, 0);
+
+    el(doc, 'app').dispatchEvent(new Event('submit', { bubbles: true }));
+    el(doc, 'app').dispatchEvent(new Event('submit', { bubbles: true }));
+
+    expect(seen).toHaveLength(2);
+  });
+
+  /* ----------------------------------------------------------------------------------------------
+   * The FORM path needs POSITIVE evidence that what was submitted is an APPLICATION.
+   *
+   * A `submit` event reaching the document says only that *some* form on the page was sent. The
+   * caller's other gate (`looksLikeJobPage()`) is true for the whole careers host, so on
+   * `careers.acme.example/jobs` an unfiltered form path mints an `applied` row for a job nobody
+   * applied to the moment the user presses Enter in the site's search box.
+   * -------------------------------------------------------------------------------------------- */
+
+  it('Enter in the site’s job-SEARCH box does NOT report — one text input and a Search button', () => {
+    const doc = page(`
+      <form id="search" role="search">
+        <input type="search" name="q" placeholder="Search jobs" />
+        <button type="submit">Search</button>
+      </form>`);
+    const seen: SubmitSignal[] = [];
+    watch(seen);
+
+    // Enter inside a text field submits the form with NO submitter — the exact shape of the bug.
+    el(doc, 'search').dispatchEvent(new Event('submit', { bubbles: true }));
+
+    expect(seen).toEqual([]);
+  });
+
+  it('a LOGIN form does NOT report — an email field and a password is not an application', () => {
+    const doc = page(`
+      <form id="login">
+        <input type="email" name="email" />
+        <input type="password" name="password" />
+        <button type="submit">Sign in</button>
+      </form>`);
+    const seen: SubmitSignal[] = [];
+    watch(seen);
+
+    el(doc, 'login').dispatchEvent(new Event('submit', { bubbles: true }));
+
+    expect(seen).toEqual([]);
+  });
+
+  it('a NEWSLETTER box does NOT report — one email field and a Subscribe button', () => {
+    const doc = page(`
+      <form id="news">
+        <input type="email" name="email" placeholder="Your email" />
+        <button type="submit">Subscribe</button>
+      </form>`);
+    const seen: SubmitSignal[] = [];
+    watch(seen);
+
+    el(doc, 'news').dispatchEvent(new Event('submit', { bubbles: true }));
+
+    expect(seen).toEqual([]);
+  });
+
+  it('a REAL application form reports, even when the engine names no submitter', () => {
+    const doc = page(`
+      <form id="apply">
+        <input type="text" name="first_name" />
+        <input type="text" name="last_name" />
+        <input type="email" name="email" />
+        <input type="tel" name="phone" />
+        <input type="file" name="resume" />
+        <textarea name="cover_letter"></textarea>
+        <button type="submit">Submit application</button>
+      </form>`);
+    const seen: SubmitSignal[] = [];
+    watch(seen);
+
+    el(doc, 'apply').dispatchEvent(new Event('submit', { bubbles: true }));
+
+    expect(seen).toEqual([{ reason: 'form', label: '' }]);
+  });
+
+  it('the application-shaped FIELDS carry the form on their own, with no submit vocabulary anywhere', () => {
+    // Taleo/iCIMS ship a plain-HTML step whose control is `<input type="submit" value="Continue">`.
+    // The label proves nothing here; the résumé upload sitting next to name/email/phone does.
+    const doc = page(`
+      <form id="ats">
+        <input type="text" name="candidate_full_name" />
+        <input type="email" name="candidate_email" />
+        <input type="tel" name="candidate_phone" />
+        <input type="file" name="resume_upload" />
+        <input type="submit" value="Continue" />
+      </form>`);
+    const seen: SubmitSignal[] = [];
+    watch(seen);
+
+    el(doc, 'ats').dispatchEvent(new Event('submit', { bubbles: true }));
+
+    expect(seen).toEqual([{ reason: 'form', label: '' }]);
+  });
+
+  it('the SUBMITTER’s label alone does NOT carry a form the fields do not vouch for', () => {
+    // One field named `q` is a search box whatever the button calls itself. A genuine press on a
+    // control this specific is still reported — by the CLICK path, which needs no form at all.
+    const doc = page(`
+      <form id="short">
+        <input type="text" name="q" />
+        <button type="submit" id="go">Submit application</button>
+      </form>`);
+    const seen: SubmitSignal[] = [];
+    watch(seen);
+
+    const event = new Event('submit', { bubbles: true });
+    Object.defineProperty(event, 'submitter', { value: el(doc, 'go'), configurable: true });
+    el(doc, 'short').dispatchEvent(event);
+
+    expect(seen).toEqual([]);
+  });
+
+  it('a job-SEARCH box whose button happens to say “Submit” does NOT report', () => {
+    const doc = page(`
+      <form id="search">
+        <input type="text" name="q" />
+        <button type="submit" id="go">Submit</button>
+      </form>`);
+    const seen: SubmitSignal[] = [];
+    watch(seen);
+
+    const event = new Event('submit', { bubbles: true });
+    Object.defineProperty(event, 'submitter', { value: el(doc, 'go'), configurable: true });
+    el(doc, 'search').dispatchEvent(event);
+
+    expect(seen).toEqual([]);
+  });
+
+  it('a FEEDBACK box whose button says “Submit” does NOT report', () => {
+    const doc = page(`
+      <form id="feedback">
+        <textarea name="comments"></textarea>
+        <button type="submit" id="go">Submit</button>
+      </form>`);
+    const seen: SubmitSignal[] = [];
+    watch(seen);
+
+    const event = new Event('submit', { bubbles: true });
+    Object.defineProperty(event, 'submitter', { value: el(doc, 'go'), configurable: true });
+    el(doc, 'feedback').dispatchEvent(event);
+
+    expect(seen).toEqual([]);
+  });
+
+  it('a search form WRAPPING the results list does not borrow an “Apply now” card link', () => {
+    // The ordinary job-board layout: one big <form> around the search box AND the results. Evidence
+    // must come from the submitted form's own fields, never from a control nobody pressed.
+    const doc = page(`
+      <form id="jobsearch">
+        <input type="text" name="q" />
+        <button type="submit">Search</button>
+        <ul>
+          <li><a class="btn" href="/jobs/1">Apply now</a></li>
+          <li><a class="btn" href="/jobs/2">Apply now</a></li>
+        </ul>
+      </form>`);
+    const seen: SubmitSignal[] = [];
+    watch(seen);
+
+    el(doc, 'jobsearch').dispatchEvent(new Event('submit', { bubbles: true }));
+
+    expect(seen).toEqual([]);
+  });
+
+
+  it('a submit that belongs to no form at all is refused rather than guessed at', () => {
+    const doc = page(`${FORM}<div id="loose">not a form</div>`);
+    const seen: SubmitSignal[] = [];
+    watch(seen);
+
+    // Nothing to inspect ⇒ no evidence ⇒ fail closed, rather than crediting the page's other form.
+    el(doc, 'loose').dispatchEvent(new Event('submit', { bubbles: true }));
+
+    expect(seen).toEqual([]);
+  });
+
+  it('destroy() detaches, and is safe to call twice', () => {
+    const doc = page(FORM);
+    const seen: SubmitSignal[] = [];
+    const handle = watch(seen);
+
+    handle.destroy();
+    handle.destroy();
+    el(doc, 'app').dispatchEvent(new Event('submit', { bubbles: true }));
+    trustedClick(el(doc, 'easy'));
+
+    expect(seen).toEqual([]);
+  });
+
+  it('INV-1: observing a submit never presses or submits anything itself', () => {
+    const doc = page(FORM);
+    const seen: SubmitSignal[] = [];
+    watch(seen);
+
+    const clickSpy = vi.spyOn(HTMLElement.prototype, 'click');
+    const submitSpy = vi.fn();
+    const form = el(doc, 'app');
+    Object.defineProperty(form, 'submit', { value: submitSpy, configurable: true });
+
+    trustedClick(el(doc, 'send'));
+
+    // Non-vacuity: the watcher really did see the press it is being cleared of causing.
+    expect(seen).toHaveLength(1);
+    expect(clickSpy).not.toHaveBeenCalled();
+    expect(submitSpy).not.toHaveBeenCalled();
+  });
+});
+
+/* ------------------------------------------------------------------------------------------------
  * SEC 6.7 — the status flip
  * ---------------------------------------------------------------------------------------------- */
 
@@ -321,6 +715,53 @@ describe('the status flip only happens on an OBSERVED confirmation', () => {
 
   it('markApplied on a row that does not exist returns null rather than inventing one', async () => {
     expect(await markApplied('app_missing')).toBeNull();
+  });
+
+  it('a confirmation on an ALREADY-LOGGED posting promotes that row instead of losing the status', async () => {
+    // The fill created the row; the confirmation arrives afterwards as a second log for the same
+    // URL. If the merge path drops the requested status, the row is stranded in `draft` forever.
+    const { row } = await logFill(report, jobCtx, PROFILE);
+
+    const again = await logApplication({
+      company: jobCtx.company,
+      role: jobCtx.title,
+      url: FIXTURE_URLS.greenhouse,
+      ats: 'greenhouse',
+      profileId: PROFILE,
+      status: 'applied',
+    });
+
+    expect(again.created).toBe(false);
+    expect(again.row.id).toBe(row.id);
+    expect(again.row.status).toBe('applied');
+    expect(again.row.appliedAt).toEqual(expect.any(Number));
+    expect(again.row.history.map((h) => h.to)).toEqual(['draft', 'applied']);
+  });
+
+  it('the merge path never walks a row that already moved past draft backwards', async () => {
+    const { row } = await logFill(report, jobCtx, PROFILE);
+    await setStatus(row.id, 'interview');
+
+    const again = await logApplication({
+      company: jobCtx.company,
+      role: jobCtx.title,
+      url: FIXTURE_URLS.greenhouse,
+      ats: 'greenhouse',
+      profileId: PROFILE,
+      status: 'applied',
+    });
+
+    expect(again.row.status).toBe('interview');
+    expect(again.row.history.map((h) => h.to)).toEqual(['draft', 'interview']);
+  });
+
+  it('a plain re-fill leaves the status alone and writes no history entry', async () => {
+    const { row } = await logFill(report, jobCtx, PROFILE);
+    const again = await logFill(report, jobCtx, PROFILE);
+
+    expect(again.row.id).toBe(row.id);
+    expect(again.row.status).toBe('draft');
+    expect(again.row.history).toHaveLength(1);
   });
 
   it('a status change through update() is still recorded in history', async () => {

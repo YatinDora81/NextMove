@@ -27,7 +27,8 @@ import type {
 
 import { sendMessage } from '@/platform/bus';
 import { createLogger } from '@/platform/logger';
-import { getSettings, subscribeSlot } from '@/platform/storage';
+import { getSettings, patchSettings, subscribeSlot } from '@/platform/storage';
+
 
 import {
   FieldMatcher,
@@ -37,6 +38,8 @@ import {
   knownProfilePaths,
   nodeElement,
 } from '@/core';
+import { resolveProfileValue } from '@/core/matcher';
+
 import type { ScanResult } from '@/core/scanner';
 import {
   SUBMIT_TEXT_PATTERN,
@@ -47,6 +50,7 @@ import {
 } from '@/core/adapters';
 import { disposePageObserver, getPageObserver } from '@/core/observer';
 import {
+  REASON,
   emptyReport,
   fillText,
   readQuirks,
@@ -57,7 +61,9 @@ import {
   type ResumeAttachment,
 } from '@/core/fill';
 import { buildJobContext } from '@/tracker/capture';
-import { detectConfirmation } from '@/tracker/detectors';
+import { detectConfirmation, looksLikeJobPage } from '@/tracker/detectors';
+import { installSubmitWatch, type SubmitSignal, type SubmitWatchHandle } from '@/tracker/submit-watch';
+
 
 import {
   FieldMarkers,
@@ -68,11 +74,15 @@ import {
   destroyOverlay,
   getOverlay,
   infoToast,
+  installSuggest,
   isOpenTextQuestion,
   isPillDismissed,
   questionOf,
+  type SuggestController,
+
   type FrameContribution,
   type MarkerSpec,
+  type MarkerTone,
   type NextStepInfo,
   type OverlayHandle,
   type ReviewRow,
@@ -256,8 +266,30 @@ function attachmentFromBytes(resume: ResumeBytes): ResumeAttachment | null {
 function toneOf(event: FillFieldEvent): ReviewTone {
   if (event.action === 'fill' && event.ok) return 'filled';
   if (event.action === 'suggest') return 'suggested';
+  // A field we recognised and refused to overwrite is finished, not broken. Falling through to
+  // 'unmatched' painted the one case where NextMove behaved best as the one that needs the user.
+  if (event.reason === REASON.alreadyAnswered) return 'answered';
   return 'unmatched';
 }
+
+/**
+ * The marker layer has no outline of its own for `answered`, and inventing one would put a fourth
+ * colour on the page for a field that needs nothing. It borrows the `filled` outline — the field is
+ * complete either way — and the badge says who completed it.
+ */
+const MARKER_TONE: Readonly<Record<ReviewTone, MarkerTone>> = {
+  filled: 'filled',
+  answered: 'filled',
+  suggested: 'suggested',
+  unmatched: 'unmatched',
+};
+
+const MARKER_BADGE: Readonly<Record<ReviewTone, string>> = {
+  filled: 'Filled',
+  answered: 'You answered this',
+  suggested: 'Check this',
+  unmatched: 'Needs you',
+};
 
 function readFillPayload(raw: unknown): { profileId: string | null; trigger: FillTrigger } {
   const record = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
@@ -321,6 +353,19 @@ export default defineContentScript({
     let evaluateTimer: ReturnType<typeof setTimeout> | null = null;
     let unsubscribeSettings: (() => void) | null = null;
 
+    let suggest: SuggestController | null = null;
+    let submitWatch: SubmitWatchHandle | null = null;
+
+    /**
+     * The ghost-text layer knows a field only by its label text, so the profile side of a
+     * suggestion is precomputed here: label → the value the matcher would have filled. Rebuilt
+     * lazily, and thrown away whenever the page's field set changes underneath it.
+     */
+    let suggestIndex: Map<string, string> | null = null;
+    let suggestProfile: Profile | null = null;
+    let suggestProfileLoaded = false;
+
+
     function ui(): OverlayHandle {
       if (overlay === null) {
         overlay = getOverlay();
@@ -382,6 +427,81 @@ export default defineContentScript({
     function scanPage(): ScanResult {
       return new FormScanner({ frameId }).scan();
     }
+
+    /** The key both sides of the suggestion index agree on — v2.2's `normalize`. */
+    function labelKey(text: string): string {
+      return text
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim()
+        .slice(0, 60);
+    }
+
+    /** A profile value is only ghost-text material once it reads as something a human would type. */
+    function displayValue(value: unknown): string | null {
+      if (typeof value === 'string') return value.trim().length > 0 ? value.trim() : null;
+      if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+      if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+      return null;
+    }
+
+    async function ensureSuggestProfile(): Promise<Profile | null> {
+      if (suggestProfileLoaded) return suggestProfile;
+      suggestProfileLoaded = true;
+      const reply = await sendMessage('PROFILE_GET', { profileId: null });
+      suggestProfile = reply.ok ? reply.data.profile : null;
+      return suggestProfile;
+    }
+
+    async function ensureSuggestIndex(): Promise<Map<string, string>> {
+      if (suggestIndex !== null) return suggestIndex;
+
+      const index = new Map<string, string>();
+      suggestIndex = index;
+
+      const profile = await ensureSuggestProfile();
+      if (profile === null) return index;
+
+      const scan = lastScan ?? scanPage();
+      for (const match of matcherFor(profile, null).match(scan.fields)) {
+        if (match.path === null || match.action === 'skip') continue;
+        const value = displayValue(resolveProfileValue(profile, match.path));
+        if (value === null) continue;
+        const key = labelKey(match.node.sig.label);
+        if (key.length > 0 && !index.has(key)) index.set(key, value);
+      }
+      return index;
+    }
+
+    /**
+     * What to offer for a field, in v2.2's order: something the user explicitly taught us beats
+     * anything derived from the profile, because they taught it on a form like this one.
+     */
+    async function suggestLookup(labelText: string): Promise<string | null> {
+      const qRaw = labelText.trim();
+      if (qRaw.length === 0) return null;
+
+      const banked = await sendMessage('ANSWERS_LOOKUP', {
+        qRaw,
+        company: job?.company ?? null,
+        profileId: settings.activeProfileId,
+      });
+      if (banked.ok && banked.data.hit !== null) return banked.data.hit.answer;
+
+      return (await ensureSuggestIndex()).get(labelKey(qRaw)) ?? null;
+    }
+
+    async function suggestRemember(labelText: string, value: string): Promise<void> {
+      const reply = await sendMessage('ANSWERS_SAVE', {
+        qRaw: labelText,
+        answer: value,
+        source: 'user',
+        profileId: settings.activeProfileId,
+        company: job?.company ?? null,
+      });
+      if (!reply.ok) throw new Error(reply.error.message);
+    }
+
 
     function matcherFor(profile: Profile | null, mappings: Record<string, ProfilePath> | null): FieldMatcher {
       return new FieldMatcher({
@@ -447,7 +567,15 @@ export default defineContentScript({
     }
 
     async function writeAnswer(el: HTMLElement, text: string): Promise<boolean> {
-      const result = await fillText(el, text, contextOf({ quirks: readQuirks(config?.quirks ?? null) }));
+      const result = await fillText(
+        el,
+        text,
+        contextOf({ quirks: readQuirks(config?.quirks ?? null) }),
+        // The one gesture the overwrite escape hatch exists for: the user is looking at this field
+        // and pressed "insert this answer". A half-typed draft in the box is what they are asking us
+        // to replace, so refusing it the way a bulk fill does would break the ✨ flow outright.
+        { overwrite: true },
+      );
       return result.ok;
     }
 
@@ -679,19 +807,16 @@ export default defineContentScript({
           rows.push(row);
 
           if (!isTop) return;
-          if (tone === 'filled' && !settings.highlightFilled) return;
+          // An already-answered field is as "done" as a filled one, so it follows the same setting:
+          // someone who does not want their finished fields outlined does not want these either.
+          if ((tone === 'filled' || tone === 'answered') && !settings.highlightFilled) return;
           if (!(event.el instanceof HTMLElement)) return;
 
           const spec: MarkerSpec = {
             id,
             el: event.el,
-            tone,
-            badge:
-              tone === 'filled'
-                ? 'Filled'
-                : tone === 'suggested'
-                  ? 'Check this'
-                  : 'Needs you',
+            tone: MARKER_TONE[tone],
+            badge: MARKER_BADGE[tone],
             tooltip: event.sig.label,
           };
           specs.push(spec);
@@ -709,7 +834,15 @@ export default defineContentScript({
 
         lastReport = report;
         lastRows = rows;
-        if (report.filled > 0 || report.suggested > 0) {
+
+        // What arms the wizard chain is "this run belongs to an application we understand", not
+        // "this run wrote something". A first step whose fields are all already answered writes
+        // nothing and reports 0 filled / 0 suggested — the same numbers as a page we matched
+        // nothing on — and gating on those numbers alone left the chain disarmed, so the later,
+        // genuinely empty steps were never filled. A respected field is proof of recognition: the
+        // matcher found a profile path for it and the engine deliberately declined to overwrite.
+        const respected = rows.some((row) => row.tone === 'answered');
+        if (report.filled > 0 || report.suggested > 0 || respected) {
           chainActive = true;
           if (scan.fields.length > 0) filledStepKeys.add(scanKey(scan.fields));
         }
@@ -803,7 +936,20 @@ export default defineContentScript({
     async function evaluate(): Promise<void> {
       if (disposed) return;
 
+      // The power switch is checked here rather than at boot because it can flip while the page is
+      // open — Alt+Shift+N, the pill and the popup all write the settings slot, and the subscriber
+      // below re-enters this function on every write.
+      if (!settings.enabled) {
+        applicationLike = false;
+        sparkleTargets = [];
+        pill?.hide();
+        overlay?.clear('sparkles');
+        markers?.clear();
+        return;
+      }
+
       try {
+
         adapterId = detectAts(location.href, document).id;
       } catch (error) {
         log.debug('ATS detection failed; using the generic adapter', error);
@@ -818,10 +964,14 @@ export default defineContentScript({
         const hashes = new Set(scan.fields.map((field) => field.sig.hash));
         if (lastFieldHashes !== null && overlapRatio(hashes, lastFieldHashes) < 0.4) {
           resetStepState();
+          // A different field set answers different questions; the label → value index built for
+          // the previous step would suggest the wrong things on this one.
+          suggestIndex = null;
         }
         lastFieldHashes = hashes;
         stepKey = scanKey(scan.fields);
       }
+
 
       if (scan.fields.length === 0) {
         applicationLike = false;
@@ -856,6 +1006,16 @@ export default defineContentScript({
             overlay: ui(),
             domain,
             onFill: () => void runFillFlow('pill', null),
+            onTurnOff: () => {
+              void patchSettings({ enabled: false }).then(() =>
+                pushToast(
+                  infoToast(
+                    'NextMove is off',
+                    'Nothing is filled or suggested on any site until you turn it back on with Alt+Shift+N.',
+                  ),
+                ),
+              );
+            },
             onDismiss: () =>
               pushToast(
                 infoToast(
@@ -863,6 +1023,7 @@ export default defineContentScript({
                   'Alt+J and the toolbar button still work here.',
                 ),
               ),
+
           });
         }
         pill.show();
@@ -960,6 +1121,19 @@ export default defineContentScript({
       }
 
       log.info(`confirmation observed (${signal.source}: ${signal.evidence})`);
+      recordApplied(`${signal.source}: ${signal.evidence}`);
+    }
+
+    /**
+     * Mark this posting as applied, from whichever signal noticed first — a confirmation page in
+     * this frame, a confirmation relayed up from an iframe, or the submit press itself.
+     *
+     * A row we already own is patched rather than duplicated; only a page with no row yet logs a
+     * new one. Callers are responsible for their own gating (job-looking page, power switch); this
+     * function's only job is "same posting, one row".
+     */
+    function recordApplied(reason: string): void {
+      if (disposed || !isTop) return;
 
       if (applicationId !== null) {
         void sendMessage('TRACKER_UPDATE', {
@@ -974,6 +1148,7 @@ export default defineContentScript({
       if (captured === null) return;
       if (captured.company.length === 0 && captured.title.length === 0) return;
 
+      log.info(`logging an application (${reason})`);
       void sendMessage('TRACKER_LOG', {
         entry: {
           company: captured.company,
@@ -987,6 +1162,40 @@ export default defineContentScript({
         if (reply.ok) applicationId = reply.data.row.id;
       });
     }
+
+    /**
+     * The submit press itself, from `tracker/submit-watch`. This is the signal v2.2 had and this
+     * codebase did not: a posting that navigates straight to the employer's own "thanks" page —
+     * or to nothing at all — never produces a confirmation cue for the observer to find.
+     *
+     * Three gates before anything is written, because a false positive here invents an application
+     * the user never made: the power switch, a job-looking URL, and this page actually having had
+     * application-shaped fields on it.
+     */
+    function handleSubmitSignal(signal: SubmitSignal): void {
+      if (disposed || !settings.enabled || confirmationHandled) return;
+      if (!applicationLike) return;
+      if (!looksLikeJobPage(location.href, adapterId)) return;
+
+      confirmationHandled = true;
+      chainActive = false;
+
+      if (!isTop) {
+        const top = window.top;
+        if (top !== null && top !== window) {
+          const message: FrameConfirmedMessage = { __jobfillFrame: 'confirmed', v: 1 };
+          try {
+            top.postMessage(message, '*');
+          } catch (error) {
+            log.debug('could not report a submit up to the top frame', error);
+          }
+        }
+        return;
+      }
+
+      recordApplied(`submit (${signal.reason}${signal.label === '' ? '' : `: ${signal.label}`})`);
+    }
+
 
     type RuntimeListener = (
       message: unknown,
@@ -1020,16 +1229,18 @@ export default defineContentScript({
       if (event.source === window) return;
 
       if (isFrameConfirmation(event.data)) {
-        if (applicationId !== null && !confirmationHandled) {
+        // The form lived in an iframe, so the sub-frame is the only one that saw the submit or the
+        // thank-you page. Previously this was dropped unless the top frame already owned a row,
+        // which is exactly backwards for Greenhouse/Lever: the top frame is the job ad, and it has
+        // no row until something logs one.
+        if (!confirmationHandled) {
           confirmationHandled = true;
           chainActive = false;
-          void sendMessage('TRACKER_UPDATE', {
-            id: applicationId,
-            patch: { status: 'applied', appliedAt: Date.now() },
-          });
+          recordApplied('relayed from a sub-frame');
         }
         return;
       }
+
 
       const report = parseFrameReport(event.data);
       if (report === null) return;
@@ -1100,7 +1311,12 @@ export default defineContentScript({
       window.removeEventListener('message', onWindowMessage);
       document.removeEventListener('focusin', onFocusIn, true);
       unsubscribeSettings?.();
+      suggest?.destroy();
+      suggest = null;
+      submitWatch?.destroy();
+      submitWatch = null;
       disposePageObserver();
+
       markers?.dispose();
       markers = null;
       pill?.dispose();
@@ -1120,9 +1336,22 @@ export default defineContentScript({
     async function boot(): Promise<void> {
       await refreshSettings();
       unsubscribeSettings = subscribeSlot('settings', (next) => {
+        const wasEnabled = settings.enabled;
         settings = next;
-        if (!disposed) scheduleEvaluate();
+        if (disposed) return;
+        if (next.enabled !== wasEnabled) suggest?.setEnabled(next.enabled);
+        scheduleEvaluate();
       });
+
+      suggest = installSuggest({
+        lookup: suggestLookup,
+        remember: suggestRemember,
+        onToast: (message) => pushToast(infoToast(message)),
+      });
+      suggest.setEnabled(settings.enabled);
+
+      submitWatch = installSubmitWatch({ onSubmit: handleSubmitSignal });
+
 
       try {
         adapterId = detectAts(location.href, document).id;

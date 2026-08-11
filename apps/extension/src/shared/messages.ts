@@ -53,6 +53,9 @@ export const MESSAGE_TYPES = [
   'ANSWERS_SAVE',
   'ANSWERS_LIST',
   'ANSWERS_DELETE',
+  'ANSWERS_PIN',
+  'ANSWERS_CLEAR',
+
 
   'CONFIG_GET',
   'CONFIG_REFRESH',
@@ -287,6 +290,17 @@ export interface MessageContracts {
     payload: { id: string };
     reply: { deleted: true };
   };
+
+  ANSWERS_PIN: {
+    payload: { id: string; pinned: boolean };
+    reply: { record: AnswerRecord };
+  };
+
+  ANSWERS_CLEAR: {
+    payload: EmptyPayload;
+    reply: { cleared: number };
+  };
+
 
   CONFIG_GET: {
     payload: { atsId: AtsId };

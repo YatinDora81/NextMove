@@ -11,6 +11,53 @@ export const metadata: Metadata = {
     description: 'View all your job applications and track their status',
 };
 
+/** Shown when the outreach call fails without handing us an envelope message of its own. */
+const OUTREACH_FALLBACK_MESSAGE = "We couldn't load your outreach messages. Everything else on this page still works."
+
+type OutreachResult = {
+    messages: GeneratedMessage[]
+    /** Non-null when the outreach fetch failed; the outreach tab renders it inline. */
+    error: string | null
+}
+
+/**
+ * The Applied page has two independent sources: outreach (fetched here) and the
+ * extension-tracked applications (fetched from the client by ApplicationsDashboard).
+ * Outreach used to fail closed and replace the whole page, hiding applications that had
+ * loaded perfectly well — so every failure mode (transport error, 5xx, HTML error page
+ * instead of JSON, `success: false`) is folded into an inline message instead.
+ */
+async function loadOutreach(token: string): Promise<OutreachResult> {
+    try {
+        const res = await fetch(GET_GENERATED_MESSAGES, {
+            method: "GET",
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        })
+
+        // Gateways answer 5xx with HTML, so json() is a throwing call on the sad path.
+        const payload: unknown = await res.json().catch(() => null)
+        const envelope = typeof payload === "object" && payload !== null
+            ? (payload as Record<string, unknown>)
+            : null
+        const message = typeof envelope?.message === "string" && envelope.message.trim() !== ""
+            ? envelope.message
+            : null
+
+        if (!res.ok || envelope === null || envelope.success !== true) {
+            return { messages: [], error: message ?? OUTREACH_FALLBACK_MESSAGE }
+        }
+
+        return {
+            messages: Array.isArray(envelope.data) ? (envelope.data as GeneratedMessage[]) : [],
+            error: null,
+        }
+    } catch {
+        return { messages: [], error: OUTREACH_FALLBACK_MESSAGE }
+    }
+}
+
 export default async function Applied() {
     const token = await getServerToken()
 
@@ -18,27 +65,11 @@ export default async function Applied() {
         redirect("/?popup=login&redirect_url=/applied")
     }
 
-    const res = await fetch(GET_GENERATED_MESSAGES, {
-        method: "GET",
-        headers: {
-            "Authorization": `Bearer ${token}`
-        }
-    })
-    const data = await res.json()
-
-    if (!data.success) {
-        return (
-            <div className="mx-auto w-full max-w-[980px] px-6 py-6">
-                <div className="rounded-xl border border-dan/40 bg-danbg px-4 py-3 text-[13.5px] text-dan">
-                    {data.message}
-                </div>
-            </div>
-        )
-    }
+    const outreach = await loadOutreach(token)
 
     return (
         <Suspense fallback={null}>
-            <AppliedTabs messages={data.data as GeneratedMessage[]} />
+            <AppliedTabs messages={outreach.messages} outreachError={outreach.error} />
         </Suspense>
     )
 }

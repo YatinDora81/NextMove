@@ -25,6 +25,10 @@
 
 import { db } from '@/platform/db';
 import { applicationRowSchema } from '@/shared/schema';
+import {
+  forgetAllApplicationSyncRecords,
+  forgetApplicationSyncRecords,
+} from '@/sync/client';
 import type {
   AppStatus,
   ApplicationLogInput,
@@ -251,7 +255,7 @@ export async function logApplication(input: ApplicationLogInput): Promise<Tracke
   const existing = await findExisting(input.url, input.profileId);
 
   if (existing !== null) {
-    const merged: ApplicationRow = {
+    let merged: ApplicationRow = {
       ...existing,
       // Auto-capture may improve on a re-fill (a lazily rendered header, a better JSON-LD block),
       // but a value the user edited by hand is never overwritten.
@@ -263,6 +267,21 @@ export async function logApplication(input: ApplicationLogInput): Promise<Tracke
       notes: input.notes !== undefined && input.notes.length > 0 ? input.notes : existing.notes,
       updatedAt: at,
     };
+
+    // The requested status has to survive the merge, or an observed confirmation on a posting that
+    // was already logged during the fill could never promote it — the row would sit in `draft`
+    // forever. The promotion rule is `markApplied()`'s, to the letter: only a row still in `draft`
+    // moves, so a row the user (or the employer) already advanced is never walked backwards.
+    const requested = input.status;
+    if (requested !== undefined && requested !== 'draft' && existing.status === 'draft') {
+      merged = {
+        ...merged,
+        status: requested,
+        appliedAt: merged.appliedAt ?? at,
+        history: [...merged.history, { at, to: requested }],
+      };
+    }
+
     await db.applications.put(merged);
     return { row: merged, created: false };
   }
@@ -398,6 +417,10 @@ export async function remove(id: string): Promise<boolean> {
   const row = await db.applications.get(id);
   if (row === undefined) return false;
   await db.applications.delete(id);
+  // A row's server identity is held beside the row (`sync/client.ts`), and nothing else ever
+  // revisits that map — a deleted row would leak its entry into storage.local forever, and a later
+  // row reusing the id would inherit a stale one. Local-only work: this is a no-op when unpaired.
+  await forgetApplicationSyncRecords([id]);
   return true;
 }
 
@@ -405,6 +428,7 @@ export async function remove(id: string): Promise<boolean> {
 export async function clear(): Promise<number> {
   const rows = await db.applications.toArray();
   await db.applications.clear();
+  await forgetAllApplicationSyncRecords();
   return rows.length;
 }
 

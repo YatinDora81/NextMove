@@ -18,6 +18,8 @@
  * `innerHTML`, is length-capped, and is used solely to decide a boolean.
  */
 
+import type { AtsId } from '@/shared/types';
+
 /* ------------------------------------------------------------------------------------------------
  * Types
  * ---------------------------------------------------------------------------------------------- */
@@ -93,6 +95,26 @@ const LANDMARK_SELECTORS: readonly string[] = [
   'h2',
 ];
 
+/**
+ * Hosts that serve job postings and applications and essentially nothing else — the ATS themselves,
+ * plus the `careers.` / `jobs.` subdomain every company careers site is published under.
+ */
+const JOB_HOST_PATTERNS: readonly RegExp[] = [
+  /(^|\.)greenhouse\.io$/i,
+  /(^|\.)lever\.co$/i,
+  /(^|\.)myworkdayjobs\.com$/i,
+  /(^|\.)workday(?:jobs)?\.com$/i,
+  /(^|\.)ashbyhq\.com$/i,
+  /(^|\.)naukri\.com$/i,
+  /(^|\.)smartrecruiters\.com$/i,
+  /(^|\.)icims\.com$/i,
+  /(^|\.)taleo\.net$/i,
+  /(^|\.)(?:careers?|jobs?)\./i,
+];
+
+/** Path shapes a self-hosted careers section uses ("acme.com/careers/1234/apply"). */
+const JOB_PATH_PATTERNS: readonly RegExp[] = [/\/careers?(?:\/|$)/i, /\/jobs?(?:\/|$)/i];
+
 /** Below this the tracker leaves the row as `draft` and lets the user flip it by hand. */
 export const CONFIRMATION_MIN_CONFIDENCE = 0.7;
 
@@ -164,6 +186,39 @@ function firstCue(text: string): string {
 /* ------------------------------------------------------------------------------------------------
  * Public detection surface — all read-only
  * ---------------------------------------------------------------------------------------------- */
+
+/**
+ * The gate every auto-log runs through first (v2.2 Phase 3): is this page part of a job application
+ * at all?
+ *
+ * The confirmation vocabulary above is deliberately generic, and generic phrases live outside job
+ * boards too — a bank's "Your application has been submitted", a support form's `/thank-you`. Without
+ * this predicate a submit anywhere on the web can mint an `applied` row for a job the user never
+ * applied to, which is worse than missing the row: the tracker is only useful if the user trusts it.
+ *
+ * `atsId` is the adapter that matched (SEC 6.5). Anything other than `generic` IS the answer —
+ * adapter detection already proved the page belongs to an ATS, and no host or path heuristic can be
+ * more certain than that.
+ */
+export function looksLikeJobPage(url: string, atsId?: AtsId | null): boolean {
+  if (atsId !== undefined && atsId !== null && atsId !== 'generic') return true;
+
+  const value = (url ?? '').trim();
+  if (value.length === 0) return false;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return false;
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  if (JOB_HOST_PATTERNS.some((pattern) => pattern.test(host))) return true;
+
+  const path = parsed.pathname.toLowerCase();
+  return JOB_PATH_PATTERNS.some((pattern) => pattern.test(path));
+}
 
 /** Does this URL look like a post-submission destination? */
 export function matchesConfirmationUrl(

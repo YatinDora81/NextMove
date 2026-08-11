@@ -50,6 +50,13 @@ const BLANK_EDITOR: EditorState = {
   scope: 'profile',
 };
 
+/**
+ * How long "Clear all" stays armed. Clearing the bank is irreversible and the second click is the
+ * whole confirmation, so it must not survive the user's attention wandering — an accidental
+ * double-click a minute later would empty the bank with no dialog in the way.
+ */
+const CONFIRM_WINDOW_MS = 6_000;
+
 export function AnswersPanel(): ReactElement {
   const records = useAnswersStore((state) => state.records);
   const total = useAnswersStore((state) => state.total);
@@ -64,12 +71,15 @@ export function AnswersPanel(): ReactElement {
   const save = useAnswersStore((state) => state.save);
   const remove = useAnswersStore((state) => state.remove);
   const togglePin = useAnswersStore((state) => state.togglePin);
+  const clear = useAnswersStore((state) => state.clear);
 
   const profiles = useProfilesStore((state) => state.profiles);
   const activeProfileId = useProfilesStore((state) => state.activeProfileId);
 
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [pendingDelete, setPendingDelete] = useState<AnswerRecord | null>(null);
+  const [armed, setArmed] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   const [searchInput, setSearchInput] = useState(search);
   const debouncedSearch = useDebouncedValue(searchInput);
@@ -87,7 +97,18 @@ export function AnswersPanel(): ReactElement {
     setSearchInput(search);
   }, [search]);
 
+  useEffect(() => {
+    if (!armed) return;
+    const timer = window.setTimeout(() => setArmed(false), CONFIRM_WINDOW_MS);
+    return () => window.clearTimeout(timer);
+  }, [armed]);
+
   const ordered = orderAnswers(records, pinned);
+
+  // A filter can hide every row while the bank is still full, and ANSWERS_CLEAR ignores filters —
+  // so offer the control whenever the bank might hold something, not just when rows are on screen.
+  const filtered = search.trim() !== '' || profileFilter !== null;
+  const canClear = total > 0 || filtered;
 
   const openNew = (): void => setEditor({ ...BLANK_EDITOR });
 
@@ -118,15 +139,44 @@ export function AnswersPanel(): ReactElement {
     else toast.ok('Answer banked.');
   };
 
+  const clearAll = async (): Promise<void> => {
+    setArmed(false);
+    setClearing(true);
+    const cleared = await clear();
+    setClearing(false);
+    if (cleared === null) toast.error('The bank could not be cleared.');
+    else toast.ok(`Cleared ${String(cleared)} ${plural(cleared, 'answer')}.`);
+  };
+
   return (
     <div className="flex flex-col gap-5">
       <PanelHeader
         title="Answer Bank"
         description="Screening questions repeat brutally across applications. Every answer you accept is saved here, and the next time the same — or a similar — question appears, NextMove offers it before spending a single API call."
         actions={
-          <Button variant="primary" onClick={openNew}>
-            Add an answer
-          </Button>
+          <>
+            {!canClear ? null : armed ? (
+              <>
+                <Button onClick={() => setArmed(false)}>Keep them</Button>
+                <Button
+                  variant="danger"
+                  busy={clearing}
+                  onClick={() => {
+                    void clearAll();
+                  }}
+                >
+                  Delete every answer — sure?
+                </Button>
+              </>
+            ) : (
+              <Button variant="danger" busy={clearing} onClick={() => setArmed(true)}>
+                Clear all
+              </Button>
+            )}
+            <Button variant="primary" onClick={openNew}>
+              Add an answer
+            </Button>
+          </>
         }
       />
 
@@ -227,7 +277,12 @@ export function AnswersPanel(): ReactElement {
                     {record.timesUsed > 0 ? ` · last ${formatRelative(record.lastUsedAt)}` : ''}
                   </span>
                   <div className="ml-auto flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => togglePin(record.id)}>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        void togglePin(record.id);
+                      }}
+                    >
                       {isPinned ? 'Unpin' : 'Pin'}
                     </Button>
                     <Button size="sm" onClick={() => openEdit(record)}>

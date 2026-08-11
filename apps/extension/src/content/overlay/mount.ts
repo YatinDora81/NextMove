@@ -220,6 +220,20 @@ button {
   line-height: 1;
 }
 .jf-pill__close:hover { background: var(--jf-surface-subtle); color: var(--jf-fg); }
+.jf-pill__power {
+  border: 0;
+  background: transparent;
+  color: var(--jf-fg-subtle);
+  padding: 4px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+.jf-pill__power:hover { background: var(--jf-danger-soft); color: var(--jf-danger); }
+
+
 
 .jf-panel {
   position: fixed;
@@ -268,6 +282,10 @@ button {
 .jf-chip__swatch { width: 8px; height: 8px; border-radius: 2px; flex: none; }
 .jf-chip--filled { color: var(--jf-accent); }
 .jf-chip--filled .jf-chip__swatch { background: var(--jf-accent); }
+/* "Already answered" is a settled state, not a warning — it borrows the same green as the
+   next-step callout so it never competes with the amber/red rows that do want attention. */
+.jf-chip--answered { color: var(--jf-ok); }
+.jf-chip--answered .jf-chip__swatch { background: var(--jf-ok); }
 .jf-chip--suggested { color: var(--jf-warn); }
 .jf-chip--suggested .jf-chip__swatch { background: var(--jf-warn); }
 .jf-chip--unmatched { color: var(--jf-danger); }
@@ -283,6 +301,7 @@ button {
 .jf-row:last-child { border-bottom: 0; }
 .jf-row__bar { width: 3px; align-self: stretch; border-radius: 2px; flex: none; }
 .jf-row--filled .jf-row__bar { background: var(--jf-accent); }
+.jf-row--answered .jf-row__bar { background: var(--jf-ok); }
 .jf-row--suggested .jf-row__bar { background: var(--jf-warn); }
 .jf-row--unmatched .jf-row__bar { background: var(--jf-danger); }
 .jf-row--focused { background: color-mix(in srgb, var(--jf-accent) 9%, transparent); border-radius: 8px; }

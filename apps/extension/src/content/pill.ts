@@ -96,9 +96,15 @@ export interface FillPillOptions {
   overlay: OverlayHandle;
   onFill: () => void;
   onDismiss?: () => void;
+  /**
+   * The global power switch, distinct from `onDismiss`: ✕ hides the pill on this one site and
+   * leaves Alt+J working, while this turns NextMove off everywhere until it is switched back on.
+   */
+  onTurnOff?: () => void;
   domain?: string;
   label?: string;
 }
+
 
 const DEFAULT_LABEL = 'Fill this application';
 const EDGE_MARGIN = 16;
@@ -213,9 +219,23 @@ export class FillPill {
       this.options.onFill();
     });
 
+    const power = document.createElement('button');
+    power.type = 'button';
+    power.className = 'jf-pill__power';
+    power.textContent = 'Off';
+    power.title = 'Turn NextMove off on every site (Alt+Shift+N)';
+    power.setAttribute('aria-label', 'Turn NextMove off on every site');
+    power.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.hide();
+      this.options.onTurnOff?.();
+    });
+
     const close = document.createElement('button');
     close.type = 'button';
     close.className = 'jf-pill__close';
+
     close.textContent = '✕';
     close.title = `Hide NextMove on ${this.domain || 'this site'}`;
     close.setAttribute('aria-label', 'Hide NextMove on this site');
@@ -229,7 +249,8 @@ export class FillPill {
 
     grip.addEventListener('pointerdown', this.onPointerDown);
 
-    root.append(grip, fill, close);
+    root.append(grip, fill, power, close);
+
     layer.appendChild(root);
 
     this.root = root;

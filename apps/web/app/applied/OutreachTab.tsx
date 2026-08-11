@@ -16,7 +16,24 @@ function joinParts(parts: (string | null | undefined)[]): string {
     return parts.map((part) => (part ?? "").trim()).filter((part) => part !== "").join(" · ")
 }
 
-export function OutreachTab({ messages }: { messages: GeneratedMessage[] }) {
+export function OutreachTab({
+    messages,
+    error,
+}: {
+    messages: GeneratedMessage[]
+    /** Set when the outreach fetch failed. Scoped to this pane so the page still renders. */
+    error: string | null
+}) {
+    // An outreach failure says nothing about the applications tab, so it stays in this pane
+    // rather than standing in for the whole page.
+    if (error !== null) {
+        return (
+            <div className="rounded-xl border border-dan/40 bg-danbg px-4 py-3 text-[13.5px] text-dan">
+                {error}
+            </div>
+        )
+    }
+
     if (!messages || messages.length === 0) {
         return (
             <Card className="px-4 py-12 text-center text-[13.5px] text-fg2">No messages found</Card>

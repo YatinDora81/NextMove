@@ -1,13 +1,31 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { installBrowserMock, makeProfile, resetBrowserMock } from '../setup';
+import { ensureWebCrypto, installBrowserMock, makeProfile, resetBrowserMock } from '../setup';
 
 installBrowserMock();
 
 import { generateVaultKey, isVaultKey } from '@repo/vault';
+import { jobApplicationRowSchema } from '@repo/types/ExtensionTypes';
 
-import { HANDOFF_NONCE_KEY, HANDOFF_ALLOWED_ORIGINS, WEB_APP_URL } from '@/shared/constants';
+import {
+  DEFAULT_SYNC_STATE,
+  HANDOFF_NONCE_KEY,
+  HANDOFF_ALLOWED_ORIGINS,
+  STORAGE_KEY_SYNC,
+  WEB_APP_URL,
+} from '@/shared/constants';
+import type { MessageContext } from '@/shared/messages';
+import type { ApplicationRow } from '@/shared/types';
 import { mergeProfiles } from '@/sync/profile';
+import {
+  APPLICATION_PUSH_MAX_ATTEMPTS,
+  listBlockedApplications,
+  noteApplicationPushed,
+  patchApplication,
+  pushApplications,
+  readApplicationSyncMap,
+} from '@/sync/client';
+import { sealDeviceToken } from '@/sync/e2e';
 import {
   HANDOFF_CONNECT,
   HANDOFF_HELLO,
@@ -231,5 +249,455 @@ describe('connectUrl', () => {
 describe('vault keys are what the handshake carries', () => {
   it('generates keys the extension will accept', () => {
     expect(isVaultKey(generateVaultKey())).toBe(true);
+  });
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * Applications push — SEC 8.3
+ *
+ * The server's upsert resolves a push by `clientId` first and by the posting's url second, and the
+ * url branch deliberately answers with the matched row's ORIGINAL `clientId` (see
+ * `jobApplicationRepo.runUpsert`: rewriting it would strand every other install's PATCHes). So the
+ * id that comes back is NOT reliably the id we sent, and the push path may not assume it is.
+ * ---------------------------------------------------------------------------------------------- */
+
+const PUSH_CTX: MessageContext = {
+  type: 'SYNC_PUSH',
+  reqId: 'test-req',
+  gesture: null,
+  tabId: null,
+  frameId: null,
+  url: null,
+  origin: 'background',
+};
+
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+interface FakeServerOptions {
+  /** Postings this account already tracks: url → the `clientId` the server keeps for it. */
+  existing?: Readonly<Record<string, string>>;
+  /** clientIds the server refuses with 409 DUPLICATE_URL, as `@@unique([userId, urlKey])` would. */
+  refuse?: readonly string[];
+}
+
+interface ServerRow {
+  clientId: string;
+  url: string | null;
+}
+
+interface FakeServer {
+  /** Every clientId POSTed to /api/job-applications, in order, across all ticks. */
+  posts: string[];
+  /** The rows the account holds, as the Applied page would list them. */
+  rows: () => ServerRow[];
+  fetch: (input: unknown, init?: RequestInit) => Promise<Response>;
+}
+
+/**
+ * A stand-in for `POST /api/job-applications` that resolves an upsert the way
+ * `jobApplicationRepo.runUpsert` does: `clientId` first, the posting's url second, create third.
+ *
+ * Modelling the clientId branch is what makes this a fixture and not a mirror of the extension's
+ * assumptions — it is the branch a row can only reach once the extension addresses the server by
+ * the id the SERVER assigned, and the branch whose absence silently doubles the Applied page.
+ */
+function fakeApiServer(options: FakeServerOptions = {}): FakeServer {
+  const held = new Map<string, string | null>();
+  for (const [url, clientId] of Object.entries(options.existing ?? {})) held.set(clientId, url);
+  const refused = new Set<string>(options.refuse ?? []);
+  const posts: string[] = [];
+
+  const ownerOfUrl = (url: string | null): string | null => {
+    if (url === null) return null;
+    for (const [clientId, heldUrl] of held) {
+      if (heldUrl === url) return clientId;
+    }
+    return null;
+  };
+
+  return {
+    posts,
+    rows: () => [...held.entries()].map(([clientId, url]) => ({ clientId, url })),
+    fetch: async (_input: unknown, init?: RequestInit): Promise<Response> => {
+      const row = jobApplicationRowSchema.parse(JSON.parse(String(init?.body ?? '{}')));
+      posts.push(row.clientId);
+
+      if (refused.has(row.clientId)) {
+        return jsonResponse(409, {
+          success: false,
+          data: { code: 'DUPLICATE_URL' },
+          message: 'You are already tracking an application for that job posting.',
+        });
+      }
+
+      // `clientId` hit: the row is updated in place, url included. Nothing new is created.
+      // Otherwise the url decides, and the matched row keeps its ORIGINAL clientId.
+      const url = row.url ?? null;
+      const owner = held.has(row.clientId) ? row.clientId : (ownerOfUrl(url) ?? row.clientId);
+      held.set(owner, url);
+      return jsonResponse(200, {
+        success: true,
+        data: { ...row, clientId: owner },
+        message: 'Job application updated successfully',
+      });
+    },
+  };
+}
+
+async function pairThisDevice(seal: typeof sealDeviceToken = sealDeviceToken): Promise<void> {
+  const sealed = await seal('device-token-for-tests');
+  await ext().storage.local.set({
+    [STORAGE_KEY_SYNC]: {
+      ...DEFAULT_SYNC_STATE,
+      paired: true,
+      deviceId: 'dev_test',
+      tokenCt: sealed.ciphertext,
+      tokenIv: sealed.nonce,
+    },
+  });
+}
+
+function wireRow(clientId: string, url: string): ReturnType<typeof jobApplicationRowSchema.parse> {
+  return jobApplicationRowSchema.parse({
+    clientId,
+    company: 'Northwind Labs',
+    role: 'Data Engineer',
+    url,
+    ats: 'greenhouse',
+    status: 'APPLIED',
+    appliedAt: null,
+    notes: null,
+    fillStats: { filled: 3, total: 4 },
+    history: [],
+  });
+}
+
+function localRow(id: string, url: string): ApplicationRow {
+  return {
+    id,
+    company: 'Northwind Labs',
+    role: 'Data Engineer',
+    url,
+    ats: 'greenhouse',
+    profileId: 'prof_test_0001',
+    status: 'applied',
+    appliedAt: 1_000,
+    fillStats: { filled: 3, total: 4 },
+    notes: '',
+    history: [],
+    updatedAt: 1_000,
+    syncedAt: null,
+  };
+}
+
+describe('pushApplications · a row the server refuses must not wedge the batch', () => {
+  beforeEach(async () => {
+    ensureWebCrypto();
+    await pairThisDevice();
+  });
+
+  it('skips a DUPLICATE_URL 409 and keeps pushing the rows behind it', async () => {
+    const server = fakeApiServer({ refuse: ['app_dup'] });
+    vi.stubGlobal('fetch', vi.fn(server.fetch));
+
+    const result = await pushApplications([
+      wireRow('app_a', 'https://jobs.example/a'),
+      wireRow('app_dup', 'https://jobs.example/dup'),
+      wireRow('app_b', 'https://jobs.example/b'),
+    ]);
+
+    if (!result.ok) throw new Error(`expected the batch to survive, got ${result.error.code}`);
+    expect(server.posts).toEqual(['app_a', 'app_dup', 'app_b']);
+    expect(result.data.saved.map((entry) => entry.requestedClientId)).toEqual(['app_a', 'app_b']);
+    expect(result.data.pushed).toBe(2);
+    expect(result.data.duplicateUrls).toEqual(['app_dup']);
+  });
+
+  it('reports the id the server kept alongside the id we sent', async () => {
+    const server = fakeApiServer({ existing: { 'https://jobs.example/a': 'srv_a' } });
+    vi.stubGlobal('fetch', vi.fn(server.fetch));
+
+    const result = await pushApplications([wireRow('app_a', 'https://jobs.example/a')]);
+    if (!result.ok) throw new Error(`expected the push to succeed, got ${result.error.code}`);
+
+    expect(result.data.saved[0]?.requestedClientId).toBe('app_a');
+    expect(result.data.saved[0]?.row.clientId).toBe('srv_a');
+  });
+
+  it('addresses a later PATCH by the id the server assigned, not by the local one', async () => {
+    await noteApplicationPushed('app_a', 'srv_a');
+
+    const seen: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: unknown, init?: RequestInit): Promise<Response> => {
+        seen.push(String(input));
+        const patch = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+        return jsonResponse(200, {
+          success: true,
+          data: { ...wireRow('srv_a', 'https://jobs.example/a'), ...patch },
+          message: 'Job application updated successfully',
+        });
+      }),
+    );
+
+    // `app_a` is the tracker's own id. The server only ever knew this row as `srv_a`, so a request
+    // that spelled the local id would 404 — and used to.
+    const result = await patchApplication('app_a', { status: 'INTERVIEW' });
+    if (!result.ok) throw new Error(`expected the patch to succeed, got ${result.error.code}`);
+    expect(seen[0] ?? '').toContain('/api/job-applications/srv_a');
+  });
+});
+
+describe('SYNC_PUSH · applications settle after one tick', () => {
+  afterEach(() => {
+    vi.doUnmock('@/platform/db');
+    vi.resetModules();
+  });
+
+  /**
+   * Dexie cannot run under happy-dom, so `@/platform/db` is backed by the in-memory table from
+   * `tests/setup.ts`. Everything else on the path — the handler, `sync/client.ts`, the guard, the
+   * device-token round trip — is the real thing, which is the point: the bug lived in the seam
+   * between the handler and the client.
+   */
+  async function loadPushPath(server: FakeServer, rows: readonly ApplicationRow[]): Promise<{
+    push: (typeof import('@/background/handlers/sync'))['syncHandlers']['SYNC_PUSH'];
+    stored: () => ApplicationRow[];
+    /** Edit a tracker row the way the dashboard would: new field, new `updatedAt`. */
+    edit: (id: string, patch: Partial<ApplicationRow>) => Promise<void>;
+  }> {
+    vi.resetModules();
+    vi.doMock('@/platform/db', async () => {
+      const { memoryDb } = await import('../setup');
+      return {
+        db: memoryDb,
+        putApplication: async (row: ApplicationRow): Promise<string> =>
+          memoryDb.applications.put(row as ApplicationRow & Record<string, unknown>),
+        // Mirrors the real predicate: never stamped, or edited since the stamp.
+        listUnsyncedApplications: async (): Promise<ApplicationRow[]> => {
+          const all = await memoryDb.applications.toArray();
+          return all.filter((row) => {
+            const syncedAt = row.syncedAt ?? null;
+            return syncedAt === null || (row.updatedAt ?? 0) > syncedAt;
+          });
+        },
+      };
+    });
+
+    const { memoryDb, resetMemoryDb } = await import('../setup');
+    await resetMemoryDb();
+    memoryDb.applications.__seed(rows.map((row) => row as ApplicationRow & Record<string, unknown>));
+
+    // Seal the device token with the SAME module instance the handler will decrypt it with.
+    const e2e = await import('@/sync/e2e');
+    await pairThisDevice(e2e.sealDeviceToken);
+    const storage = await import('@/platform/storage');
+    await storage.patchSettings({ syncEnabled: true });
+
+    vi.stubGlobal('fetch', vi.fn(server.fetch));
+    const { syncHandlers } = await import('@/background/handlers/sync');
+    return {
+      push: syncHandlers.SYNC_PUSH,
+      stored: () => memoryDb.applications.__rows(),
+      edit: async (id: string, patch: Partial<ApplicationRow>): Promise<void> => {
+        const row = await memoryDb.applications.get(id);
+        if (row === undefined) throw new Error(`no local row ${id}`);
+        await memoryDb.applications.put({ ...row, ...patch });
+      },
+    };
+  }
+
+  beforeEach(() => {
+    ensureWebCrypto();
+  });
+
+  it('pushes zero rows on the second tick, even when the server answers with its own clientIds', async () => {
+    // A reinstall: every local row carries a fresh clientId, every posting is already on the
+    // server under the id the previous install minted.
+    const server = fakeApiServer({
+      existing: {
+        'https://jobs.example/1': 'srv_1',
+        'https://jobs.example/2': 'srv_2',
+        'https://jobs.example/3': 'srv_3',
+      },
+    });
+    const { push, stored } = await loadPushPath(server, [
+      localRow('app_1', 'https://jobs.example/1'),
+      localRow('app_2', 'https://jobs.example/2'),
+      localRow('app_3', 'https://jobs.example/3'),
+    ]);
+
+    const first = await push({ scopes: ['applications'] }, PUSH_CTX);
+    if (!first.ok) throw new Error(`first tick failed: ${first.error.code} ${first.error.message}`);
+    expect(first.data.pushed.applications).toBe(3);
+    expect(server.posts).toEqual(['app_1', 'app_2', 'app_3']);
+    expect(stored().every((row) => (row.syncedAt ?? 0) > 0)).toBe(true);
+
+    const second = await push({ scopes: ['applications'] }, PUSH_CTX);
+    if (!second.ok) throw new Error(`second tick failed: ${second.error.code}`);
+    expect(second.data.pushed.applications).toBe(0);
+    // The whole point: nothing was re-pushed.
+    expect(server.posts).toEqual(['app_1', 'app_2', 'app_3']);
+  });
+
+  it('still stamps the rows around a duplicate-url refusal', async () => {
+    const server = fakeApiServer({ refuse: ['app_2'] });
+    const { push, stored } = await loadPushPath(server, [
+      localRow('app_1', 'https://jobs.example/1'),
+      localRow('app_2', 'https://jobs.example/2'),
+      localRow('app_3', 'https://jobs.example/3'),
+    ]);
+
+    const first = await push({ scopes: ['applications'] }, PUSH_CTX);
+    if (!first.ok) throw new Error(`first tick failed: ${first.error.code} ${first.error.message}`);
+    expect(first.data.pushed.applications).toBe(2);
+
+    const unsynced = stored().filter((row) => (row.syncedAt ?? null) === null);
+    expect(unsynced.map((row) => row.id)).toEqual(['app_2']);
+
+    // The refused row is retried — the user can resolve the duplicate on the web and it lands —
+    // but it is the ONLY row that goes back on the wire.
+    const second = await push({ scopes: ['applications'] }, PUSH_CTX);
+    if (!second.ok) throw new Error(`second tick failed: ${second.error.code}`);
+    expect(server.posts).toEqual(['app_1', 'app_2', 'app_3', 'app_2']);
+  });
+
+  /* ----------------------------------------------------------------------------------------------
+   * (1) The local row has to converge on the identity the server assigned.
+   *
+   * A row the server matched BY URL comes back under the server's own clientId. If the extension
+   * keeps addressing it by the local id, the next local url edit misses both server lookups — the
+   * clientId is unknown there and the new urlKey matches nothing — and the server CREATES a second
+   * row. The original is then orphaned on the Applied page: the exact duplicate
+   * `@@unique([userId, urlKey])` exists to prevent.
+   * -------------------------------------------------------------------------------------------- */
+  it('edits the row the server already had instead of creating a second one', async () => {
+    const server = fakeApiServer({ existing: { 'https://jobs.example/1': 'srv_1' } });
+    const { push, edit } = await loadPushPath(server, [localRow('app_1', 'https://jobs.example/1')]);
+
+    const first = await push({ scopes: ['applications'] }, PUSH_CTX);
+    if (!first.ok) throw new Error(`first tick failed: ${first.error.code} ${first.error.message}`);
+    expect(server.posts).toEqual(['app_1']);
+    expect(server.rows()).toEqual([{ clientId: 'srv_1', url: 'https://jobs.example/1' }]);
+
+    // The user fixes the link on the card (or the posting moved): same application, new urlKey.
+    // `updatedAt` past the stamp is what puts the row back in `listUnsyncedApplications()`.
+    await edit('app_1', {
+      url: 'https://jobs.example/1-canonical',
+      updatedAt: Date.now() + 1_000,
+    });
+
+    const second = await push({ scopes: ['applications'] }, PUSH_CTX);
+    if (!second.ok) throw new Error(`second tick failed: ${second.error.code}`);
+    expect(second.data.pushed.applications).toBe(1);
+
+    // Addressed by the id the SERVER assigned, so the clientId lookup hits and the row moves
+    // rather than a second one appearing beside it.
+    expect(server.rows()).toEqual([{ clientId: 'srv_1', url: 'https://jobs.example/1-canonical' }]);
+    expect(server.posts).toEqual(['app_1', 'srv_1']);
+  });
+
+  /**
+   * The cost of adopting the server's id: it is many-to-one. `findExisting` is profile-scoped, so
+   * applying to one posting under two profiles keeps two LOCAL rows, and the server — which holds
+   * one row per (user, url) — answers both with the same clientId. Both then adopt it.
+   *
+   * From the SECOND push on, both rows go to the batch builder under the same wire id. Indexing the
+   * acknowledgements by that id with a plain `Map<string, ApplicationRow>` drops all but the last
+   * of them, and the dropped one is never stamped — `listUnsyncedApplications` keeps returning it
+   * and the alarm re-pushes it every tick, forever. That is the re-push loop coming back through
+   * the side door, and it is why the map holds a list.
+   */
+  it('settles BOTH local rows when two of them adopt one server application', async () => {
+    const server = fakeApiServer({ existing: { 'https://jobs.example/1': 'srv_1' } });
+    const { push, stored } = await loadPushPath(server, [
+      localRow('app_a', 'https://jobs.example/1'),
+      localRow('app_b', 'https://jobs.example/1'),
+    ]);
+
+    // Both rows have already met the server once and adopted the id it answered with. Stating that
+    // directly beats pushing twice: the two stamps would land in the same millisecond and the
+    // assertion below could not tell them apart.
+    await noteApplicationPushed('app_a', 'srv_1');
+    await noteApplicationPushed('app_b', 'srv_1');
+
+    const tick = await push({ scopes: ['applications'] }, PUSH_CTX);
+    if (!tick.ok) throw new Error(`push failed: ${tick.error.code} ${tick.error.message}`);
+
+    // One request for the one server row — sending the same clientId twice in a batch is two
+    // upserts of it where the second silently wins.
+    expect(server.posts).toEqual(['srv_1']);
+
+    // The property that used to fail: BOTH rows are settled by that one acknowledgement. With a
+    // plain `Map<string, ApplicationRow>`, `app_a` was evicted by `app_b`, never stamped, and went
+    // back on the wire on this tick and every tick after it.
+    expect(stored().filter((row) => (row.syncedAt ?? null) === null)).toEqual([]);
+  });
+
+
+
+  it('keeps the local primary key, so live handles into the tracker still resolve', async () => {
+    const server = fakeApiServer({ existing: { 'https://jobs.example/1': 'srv_1' } });
+    const { push, stored } = await loadPushPath(server, [
+      localRow('app_1', 'https://jobs.example/1'),
+    ]);
+
+    const first = await push({ scopes: ['applications'] }, PUSH_CTX);
+    if (!first.ok) throw new Error(`first tick failed: ${first.error.code}`);
+
+    // The content script is holding `app_1` for the rest of the page's life and will post
+    // TRACKER_MARK_APPLIED with it. Re-keying the Dexie row to `srv_1` would strand that handle
+    // and silently lose an OBSERVED status flip (INV-1), so adoption happens beside the row.
+    expect(stored().map((row) => row.id)).toEqual(['app_1']);
+    expect((await readApplicationSyncMap())['app_1']?.remoteClientId).toBe('srv_1');
+  });
+
+  /* ----------------------------------------------------------------------------------------------
+   * (2) A row the server permanently refuses needs somewhere to rest.
+   * -------------------------------------------------------------------------------------------- */
+  it('stops re-POSTing a permanently refused row and reports it as blocked', async () => {
+    const server = fakeApiServer({ refuse: ['app_2'] });
+    const { push } = await loadPushPath(server, [localRow('app_2', 'https://jobs.example/2')]);
+
+    let last = await push({ scopes: ['applications'] }, PUSH_CTX);
+    for (let tick = 1; tick < 6; tick += 1) {
+      last = await push({ scopes: ['applications'] }, PUSH_CTX);
+      if (!last.ok) throw new Error(`tick ${String(tick)} failed: ${last.error.code}`);
+    }
+    if (!last.ok) throw new Error(`final tick failed: ${last.error.code}`);
+
+    expect(server.posts).toHaveLength(APPLICATION_PUSH_MAX_ATTEMPTS);
+    expect(new Set(server.posts)).toEqual(new Set(['app_2']));
+
+    const blocked = await listBlockedApplications();
+    expect(blocked.map((entry) => entry.localId)).toEqual(['app_2']);
+    expect(blocked[0]?.refusals).toBe(APPLICATION_PUSH_MAX_ATTEMPTS);
+
+    // …and the popup is not the only thing that could learn about it: the reply carries a sentence.
+    expect(last.data.state.lastError ?? '').toMatch(/already tracks/i);
+  });
+
+  it('gives a blocked row a fresh run of attempts once the user edits it', async () => {
+    const server = fakeApiServer({ refuse: ['app_2'] });
+    const { push, edit } = await loadPushPath(server, [localRow('app_2', 'https://jobs.example/2')]);
+
+    for (let tick = 0; tick < 5; tick += 1) await push({ scopes: ['applications'] }, PUSH_CTX);
+    expect(server.posts).toHaveLength(APPLICATION_PUSH_MAX_ATTEMPTS);
+
+    // Editing the row is the user telling us they did something about the duplicate.
+    await edit('app_2', { notes: 'merged the duplicate on the web', updatedAt: Date.now() + 1_000 });
+
+    const reply = await push({ scopes: ['applications'] }, PUSH_CTX);
+    if (!reply.ok) throw new Error(`retry tick failed: ${reply.error.code}`);
+    expect(server.posts).toHaveLength(APPLICATION_PUSH_MAX_ATTEMPTS + 1);
+    // The streak restarts rather than resuming, so the row is out of the terminal state again.
+    expect(await listBlockedApplications()).toEqual([]);
+    expect((await readApplicationSyncMap())['app_2']?.refusals).toBe(1);
   });
 });

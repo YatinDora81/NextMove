@@ -23,12 +23,23 @@ function isTabValue(value: string | null): value is TabValue {
     return value !== null && (TAB_VALUES as readonly string[]).includes(value)
 }
 
-export function AppliedTabs({ messages }: { messages: GeneratedMessage[] }) {
+export function AppliedTabs({
+    messages,
+    outreachError,
+}: {
+    messages: GeneratedMessage[]
+    /** Set when the server could not load outreach; applications are unaffected either way. */
+    outreachError: string | null
+}) {
     const router = useRouter()
     const searchParams = useSearchParams()
     const requested = searchParams.get("tab")
 
-    const [tab, setTab] = useState<TabValue>(isTabValue(requested) ? requested : "outreach")
+    // With outreach broken, opening on it would show the user nothing but an error, so land
+    // on applications instead — unless the URL asked for a specific tab.
+    const [tab, setTab] = useState<TabValue>(
+        isTabValue(requested) ? requested : outreachError !== null ? "applications" : "outreach",
+    )
 
     useEffect(() => {
         if (isTabValue(requested) && requested !== tab) setTab(requested)
@@ -54,7 +65,9 @@ export function AppliedTabs({ messages }: { messages: GeneratedMessage[] }) {
                         <TabsList className="h-auto w-fit gap-0.5 rounded-[9px] bg-well p-[3px]">
                             <TabsTrigger value="outreach" className={TAB_TRIGGER}>
                                 Outreach
-                                <span className="tnum text-fg3">{messages.length}</span>
+                                {outreachError === null && (
+                                    <span className="tnum text-fg3">{messages.length}</span>
+                                )}
                             </TabsTrigger>
                             <TabsTrigger value="applications" className={TAB_TRIGGER}>
                                 Applications
@@ -67,7 +80,7 @@ export function AppliedTabs({ messages }: { messages: GeneratedMessage[] }) {
                 </div>
 
                 <TabsContent value="outreach" className="w-full">
-                    <OutreachTab messages={messages} />
+                    <OutreachTab messages={messages} error={outreachError} />
                 </TabsContent>
 
                 <TabsContent value="applications" className="w-full">

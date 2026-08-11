@@ -24,11 +24,13 @@ import {
   ExternalLink,
   Key,
   Plus,
+  Power,
   Settings,
   ShieldCheck,
   User,
   Zap,
 } from '@/ui/icons';
+
 import type { IconComponent } from '@/ui/icons';
 import {
   STATUS_LABEL,
@@ -42,8 +44,10 @@ import {
   poolRetryAt,
   useKeysStore,
   useProfilesStore,
+  useSettingsStore,
   useSyncStore,
 } from '@/ui/store';
+
 import { useNow } from '@/ui/useNow';
 
 interface FillState {
@@ -81,6 +85,11 @@ export function App(): ReactElement {
   const syncState = useSyncStore((state) => state.state);
   const loadSync = useSyncStore((state) => state.load);
 
+  const settings = useSettingsStore((state) => state.settings);
+  const loadSettings = useSettingsStore((state) => state.load);
+  const patchSettings = useSettingsStore((state) => state.patch);
+
+
   const [fill, setFill] = useState<FillState>(IDLE);
   const [tracker, setTracker] = useState<TrackerSlice>({ rows: [], stats: null });
   const [ready, setReady] = useState(false);
@@ -92,10 +101,30 @@ export function App(): ReactElement {
       .then((data) => setTracker({ rows: data.rows, stats: data.stats }))
       .catch(() => setTracker({ rows: [], stats: null }));
 
-    void Promise.allSettled([loadProfiles(), loadKeys(), loadSync(), trackerLoad]).then(() => {
+    void Promise.allSettled([
+      loadProfiles(),
+      loadKeys(),
+      loadSync(),
+      loadSettings(),
+      trackerLoad,
+    ]).then(() => {
       setReady(true);
     });
-  }, [loadProfiles, loadKeys, loadSync]);
+  }, [loadProfiles, loadKeys, loadSync, loadSettings]);
+
+  // Alt+Shift+N and the in-page pill write the same settings slot, so the popup has to follow the
+  // storage rather than only its own click.
+  useEffect(() => {
+    const onChanged = (_changes: unknown, area: string): void => {
+      if (area !== 'local') return;
+      void loadSettings();
+    };
+    browser.storage.onChanged.addListener(onChanged);
+    return () => {
+      browser.storage.onChanged.removeListener(onChanged);
+    };
+  }, [loadSettings]);
+
 
   useEffect(() => {
     void browser.storage.local
@@ -129,6 +158,14 @@ export function App(): ReactElement {
   const condition = poolCondition(keys);
   const now = useNow(1_000, condition === 'cooling' || condition === 'exhausted');
   const hasProfile = profiles.length > 0;
+  // Absent settings means "still loading"; the switch reads as on so the popup never flashes an
+  // "off" state it is about to contradict.
+  const enabled = settings?.enabled !== false;
+
+  const onToggleEnabled = useCallback(() => {
+    void patchSettings({ enabled: !enabled });
+  }, [enabled, patchSettings]);
+
 
   const onFill = useCallback(async () => {
     setFill({ ...IDLE, busy: true });
@@ -177,11 +214,22 @@ export function App(): ReactElement {
         <Button
           variant="ghost"
           size="icon"
+          onClick={onToggleEnabled}
+          aria-pressed={enabled}
+          aria-label={enabled ? 'Turn NextMove off' : 'Turn NextMove on'}
+          title={`${enabled ? 'Turn off' : 'Turn on'} — Alt+Shift+N`}
+          className={enabled ? 'text-[var(--jf-ok)]' : 'text-[var(--jf-fg-subtle)]'}
+          icon={<Power size={18} />}
+        />
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={openOptions}
           aria-label="Open settings"
           icon={<Settings size={18} />}
         />
       </header>
+
 
       {ready ? (
         <>
@@ -219,6 +267,7 @@ export function App(): ReactElement {
                 size="lg"
                 block
                 busy={fill.busy}
+                disabled={!enabled}
                 icon={<Zap size={18} />}
                 onClick={() => {
                   void onFill();
@@ -226,6 +275,7 @@ export function App(): ReactElement {
               >
                 Fill this application
               </Button>
+
             ) : (
               <Button
                 variant="primary"
@@ -239,7 +289,12 @@ export function App(): ReactElement {
             )}
 
             <div role="status" aria-live="polite">
-              {fill.report !== null ? (
+              {!enabled ? (
+                <p className="text-center text-[12px] text-[var(--jf-fg-subtle)]">
+                  NextMove is off — no suggestions, no filling, on any page. Your saved data is
+                  untouched. <Kbd>Alt</Kbd> + <Kbd>Shift</Kbd> + <Kbd>N</Kbd> turns it back on.
+                </p>
+              ) : fill.report !== null ? (
                 <FillSummary report={fill.report} />
               ) : fill.error !== null ? (
                 <FillFailure message={fill.error} unreachable={fill.unreachable} />
@@ -249,6 +304,7 @@ export function App(): ReactElement {
                 </p>
               ) : null}
             </div>
+
           </div>
 
           <div className="min-h-0 flex-1 divide-y divide-[var(--jf-border)] overflow-x-hidden overflow-y-auto [scrollbar-gutter:stable]">

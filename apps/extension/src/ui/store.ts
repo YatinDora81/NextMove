@@ -480,26 +480,21 @@ export const STATUS_LABEL: Record<AppStatus, string> = {
   ghosted: 'Ghosted',
 };
 
-const PIN_STORAGE_KEY = 'jf.ui.pinnedAnswers';
-
-function readPins(): Set<string> {
-  try {
-    const raw = localStorage.getItem(PIN_STORAGE_KEY);
-    if (raw === null) return new Set();
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return new Set();
-    return new Set(parsed.filter((value): value is string => typeof value === 'string'));
-  } catch {
-    return new Set();
-  }
+/**
+ * A pin lives on the bank row, not in this page's storage — `answerBank.list()` sorts pinned rows
+ * first, so a pin the UI kept to itself would change nothing about the order the bus hands back and
+ * would be invisible to the popup. It rides the wire on every record (a `BankedAnswer` IS an
+ * `AnswerRecord`) but is deliberately absent from the shared type, so read it structurally rather
+ * than widen the bus contract for one boolean.
+ */
+function isPinned(record: AnswerRecord): boolean {
+  return (record as { pinned?: unknown }).pinned === true;
 }
 
-function writePins(pins: ReadonlySet<string>): void {
-  try {
-    localStorage.setItem(PIN_STORAGE_KEY, JSON.stringify([...pins]));
-  } catch {
-    // A full or disabled localStorage costs the user their pin order, nothing more.
-  }
+function pinsOf(records: readonly AnswerRecord[]): Set<string> {
+  const pins = new Set<string>();
+  for (const record of records) if (isPinned(record)) pins.add(record.id);
+  return pins;
 }
 
 interface AnswersState {
@@ -522,7 +517,9 @@ interface AnswersState {
     scope?: AnswerScope;
   }) => Promise<AnswerRecord | null>;
   remove: (id: string) => Promise<void>;
-  togglePin: (id: string) => void;
+  togglePin: (id: string) => Promise<void>;
+  /** Empties the bank. Returns how many answers went, or `null` if the bus refused. */
+  clear: () => Promise<number | null>;
 }
 
 export const useAnswersStore = create<AnswersState>((set, get) => ({
@@ -530,7 +527,7 @@ export const useAnswersStore = create<AnswersState>((set, get) => ({
   total: 0,
   search: '',
   profileId: null,
-  pinned: readPins(),
+  pinned: new Set(),
   loading: false,
   error: null,
 
@@ -542,7 +539,12 @@ export const useAnswersStore = create<AnswersState>((set, get) => ({
       if (search.trim() !== '') payload.search = search.trim();
       if (profileId !== null) payload.profileId = profileId;
       const data = await call('ANSWERS_LIST', payload);
-      set({ records: data.records, total: data.total, loading: false });
+      set({
+        records: data.records,
+        total: data.total,
+        pinned: pinsOf(data.records),
+        loading: false,
+      });
     } catch (error) {
       set({ loading: false, error: describeError(error) });
     }
@@ -583,22 +585,50 @@ export const useAnswersStore = create<AnswersState>((set, get) => ({
       set((state) => {
         const pinned = new Set(state.pinned);
         pinned.delete(id);
-        writePins(pinned);
-        return { records: state.records.filter((record) => record.id !== id), pinned };
+        return {
+          records: state.records.filter((record) => record.id !== id),
+          total: Math.max(0, state.total - 1),
+          pinned,
+        };
       });
     } catch (error) {
       set({ error: describeError(error) });
     }
   },
 
-  togglePin: (id) => {
-    set((state) => {
-      const pinned = new Set(state.pinned);
-      if (pinned.has(id)) pinned.delete(id);
-      else pinned.add(id);
-      writePins(pinned);
-      return { pinned };
-    });
+  togglePin: async (id) => {
+    const next = !get().pinned.has(id);
+    try {
+      const data = await call('ANSWERS_PIN', { id, pinned: next });
+      set((state) => {
+        const pinned = new Set(state.pinned);
+        if (isPinned(data.record)) pinned.add(data.record.id);
+        else pinned.delete(data.record.id);
+        return {
+          records: state.records.map((record) =>
+            record.id === data.record.id ? data.record : record,
+          ),
+          pinned,
+          error: null,
+        };
+      });
+      // The bank, not this page, owns the order pinned rows come back in — reload so the row moves
+      // to where the popup and the next visit will show it.
+      await get().load();
+    } catch (error) {
+      set({ error: describeError(error) });
+    }
+  },
+
+  clear: async () => {
+    try {
+      const data = await call('ANSWERS_CLEAR', {});
+      set({ records: [], total: 0, pinned: new Set(), error: null });
+      return data.cleared;
+    } catch (error) {
+      set({ error: describeError(error) });
+      return null;
+    }
   },
 }));
 

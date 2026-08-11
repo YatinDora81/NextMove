@@ -28,6 +28,7 @@ import {
   failed,
   filled,
   unverified,
+  type FillRequest,
   type FillValue,
   type StrategyContext,
   type StrategyResult,
@@ -248,6 +249,89 @@ function optionTexts(option: SelectOptionInfo): string[] {
   return texts.filter((t) => t.trim().length > 0);
 }
 
+/**
+ * Option captions that mean "nothing has been chosen yet".
+ *
+ * Deliberately anchored at the start of the text: "Select your country" is a placeholder, while
+ * "Selected Board Member" is a real answer that happens to begin with the same letters.
+ */
+const PLACEHOLDER_OPTION_TEXT = /^\s*(select|choose|please|pick|--|—)/i;
+
+/**
+ * Does the dropdown already carry a real answer?
+ *
+ * The `<select>` clause of the engine's one "already answered" policy (`isAlreadyAnswered`).
+ *
+ * The page's own default, a value restored from a draft, and a choice the user made by hand are
+ * indistinguishable from here — and all three are answers JobFill has no business replacing. Only
+ * an empty `value` or a placeholder caption ("Select…", "-- Choose --") counts as unanswered.
+ *
+ * Distinct from `matching.isPlaceholderOption`, which ranks CANDIDATE options and therefore treats
+ * any option carrying a value as selectable. This asks the opposite question — what does the
+ * control currently say — where a placeholder that ships with a value ("--", value="0") still
+ * means the field is blank.
+ */
+export function selectHasRealValue(el: HTMLSelectElement): boolean {
+  // A `<select multiple>` answers this question by a different rule; see below.
+  if (el.multiple) return multiSelectHasRealValue(el);
+
+  const option: HTMLOptionElement | undefined = el.options[el.selectedIndex];
+  if (!option) return false;
+  if ((option.value ?? '').length === 0) return false;
+  return !PLACEHOLDER_OPTION_TEXT.test(option.textContent ?? '');
+}
+
+/**
+ * Does a `<select multiple>` already carry a real answer?
+ *
+ * Same policy, different convention — which is why this is not `selectHasRealValue`:
+ *
+ *   - a single select is ALWAYS showing something (the user agent selects the first option when
+ *     the markup selected none), so a page that wants a blank-looking dropdown has to ship a
+ *     placeholder row — "Select…", "-- Choose --" — and the single-case rule has to read that
+ *     caption to tell an unanswered control from an answered one;
+ *   - a multi-select renders its options as a list with no collapsed display, so nothing is
+ *     selected until something selects it, and the placeholder convention does not apply: a row
+ *     captioned "Select all that apply" is an instruction, not a stand-in for the answer. Every
+ *     selected option is there because the user, a restored draft or the page's own markup put it
+ *     there — and all three are answers a bulk fill has no business replacing.
+ *
+ * So "answered" here is "at least one selected option carries a value". A selected row with no
+ * value submits nothing and is the one selection that means nothing.
+ *
+ * Relaxing the caption rule inside `selectHasRealValue` would not have been enough: it reads
+ * `el.selectedIndex`, which on a multi-select is only the FIRST selected option, so a control whose
+ * valueless instruction row sits selected above three real choices would still read as unanswered.
+ */
+function multiSelectHasRealValue(el: HTMLSelectElement): boolean {
+  for (let i = 0; i < el.options.length; i++) {
+    const option: HTMLOptionElement | undefined = el.options[i];
+    if (option?.selected !== true) continue;
+    if ((option.value ?? '').length > 0) return true;
+  }
+  return false;
+}
+
+/** Every option index the control currently shows as selected. */
+function selectedIndices(el: HTMLSelectElement): Set<number> {
+  const out = new Set<number>();
+  for (let i = 0; i < el.options.length; i++) {
+    const option: HTMLOptionElement | undefined = el.options[i];
+    if (option?.selected === true) out.add(i);
+  }
+  return out;
+}
+
+/** Is the control showing exactly `wanted` — no option missing, none left over? */
+function selectionIs(el: HTMLSelectElement, wanted: ReadonlySet<number>): boolean {
+  const current = selectedIndices(el);
+  if (current.size !== wanted.size) return false;
+  for (const index of wanted) {
+    if (!current.has(index)) return false;
+  }
+  return true;
+}
+
 /** Rank the rendered options against a set of desired spellings. */
 export function pickOption(
   options: readonly SelectOptionInfo[],
@@ -277,6 +361,7 @@ export async function fillSelect(
   el: Element,
   value: FillValue,
   ctx: StrategyContext,
+  request: FillRequest = {},
 ): Promise<StrategyResult> {
   try {
     // INV-1: never auto-submit. A <select> is not a submit control, but the guard is unconditional.
@@ -297,7 +382,9 @@ export async function fillSelect(
   const label = `${ctx.sig?.label ?? ''} ${ctx.sig?.name ?? ''} ${ctx.sig?.id ?? ''} ${ctx.sig?.autocomplete ?? ''}`;
 
   if (el.multiple && Array.isArray(value)) {
-    return fillMultiSelect(el, value, label, ctx);
+    // The overwrite policy applies here too — `fillMultiSelect` enforces its own clause of it,
+    // because "already answered" means something different for a list than for a dropdown.
+    return fillMultiSelect(el, value, label, ctx, request);
   }
 
   const primary = wanted[0] ?? '';
@@ -307,6 +394,16 @@ export async function fillSelect(
   const choice = pickOption(options, variants);
   // INV-4: no confident option ⇒ leave the field alone rather than guess a neighbour.
   if (!choice) return failed(REASON.noOptionMatch);
+
+  // An already-answered dropdown is left exactly as it is (see `selectHasRealValue`). When the
+  // standing answer is the one we would have written, that is a `filled` — the field is correct and
+  // the report should say so, the same way `fillRadio` treats an option that is already checked.
+  // Otherwise nothing is written and the field is reported as skipped under `already-answered`, not
+  // as an error and not as `not-fillable`: declining to clobber an answer is the strategy working,
+  // and the overlay has to be able to tell the user which of the two happened.
+  if (request.overwrite !== true && selectHasRealValue(el)) {
+    return el.selectedIndex === choice.item.index ? filled() : failed(REASON.alreadyAnswered);
+  }
 
   const callOptions = ctx.preferLocal === true ? { preferLocal: true } : undefined;
   // Some ATS build value-less option lists; then the visible text is the only address there is.
@@ -337,6 +434,7 @@ async function fillMultiSelect(
   values: readonly string[],
   label: string,
   ctx: StrategyContext,
+  request: FillRequest,
 ): Promise<StrategyResult> {
   const options = collectOptions(el);
   const chosen = new Set<number>();
@@ -345,7 +443,19 @@ async function fillMultiSelect(
     const choice = pickOption(options, valueVariants(value, label));
     if (choice) chosen.add(choice.item.index);
   }
+  // INV-4: nothing matched confidently ⇒ leave the list alone rather than tick a neighbour.
   if (chosen.size === 0) return failed(REASON.noOptionMatch);
+
+  // The multi-select clause of the same policy the single path applies above: a list the user has
+  // already ticked is left exactly as it is (see `multiSelectHasRealValue`). Writing here is not a
+  // per-option merge but a replacement — the loop below clears every option we did not choose — so
+  // a partial standing selection is precisely the case that must not be touched: the user dropping
+  // one of five skills is an edit, and re-adding it is the clobber this policy exists to stop.
+  // A list that already reads exactly what we would have written is reported as `filled`, matching
+  // the single path, so the panel does not invent a gap for the user to go and check.
+  if (request.overwrite !== true && multiSelectHasRealValue(el)) {
+    return selectionIs(el, chosen) ? filled() : failed(REASON.alreadyAnswered);
+  }
 
   for (let i = 0; i < el.options.length; i++) {
     const option: HTMLOptionElement | undefined = el.options[i];
@@ -355,11 +465,9 @@ async function fillMultiSelect(
   el.dispatchEvent(new Event('change', { bubbles: true }));
 
   await sleep(ctx.quirks.verifyDelayMs, ctx.signal);
+  if (isAborted(ctx.signal)) return failed(REASON.aborted);
 
-  let selected = 0;
-  for (let i = 0; i < el.options.length; i++) {
-    const option: HTMLOptionElement | undefined = el.options[i];
-    if (option?.selected === true) selected++;
-  }
-  return selected === chosen.size ? filled() : unverified(REASON.notCommitted);
+  // A count would pass while the page re-selected a different set; compare the actual indices.
+  // INV-4: written but not provably committed ⇒ downgrade to a suggestion.
+  return selectionIs(el, chosen) ? filled() : unverified(REASON.notCommitted);
 }

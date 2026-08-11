@@ -134,6 +134,8 @@ export const PAIR_CODE_LENGTH = 8;
 export const PAIR_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
 export const COMMAND_FILL_PAGE = 'fill-page';
+export const COMMAND_TOGGLE_ENABLED = 'toggle-enabled';
+
 
 export const ALARM_CONFIG_POLL = 'jf.alarm.configPoll';
 export const ALARM_QUOTA_RESET = 'jf.alarm.quotaReset';
@@ -144,6 +146,8 @@ export const MENU_FILL_PAGE = 'jf.menu.fillPage';
 export const MENU_GENERATE_ANSWER = 'jf.menu.generateAnswer';
 
 export const BADGE_KEY_DEAD = '!';
+export const BADGE_DISABLED = 'off';
+
 
 export const OVERLAY_HOST_ID = 'nextmove-autofill-root';
 
@@ -152,7 +156,10 @@ export const QUOTA_RESET_TIMEZONE = 'America/Los_Angeles';
 export const DEFAULT_SETTINGS: Settings = {
   activeProfileId: null,
 
+  enabled: true,
+
   fillThreshold: FILL_THRESHOLD,
+
   suggestThreshold: SUGGEST_THRESHOLD,
 
   autoFillOnLoad: false,

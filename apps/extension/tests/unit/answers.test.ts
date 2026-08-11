@@ -54,6 +54,9 @@ import {
   rehydrate,
   templatize,
 } from '@/answers/normalize';
+import { answerHandlers } from '@/background/handlers/answers';
+import { requiresGesture } from '@/shared/messages';
+import type { MessageContext, MessageType } from '@/shared/messages';
 import { COMPANY_TOKEN, SAME_Q, SIMILAR_Q } from '@/shared/constants';
 
 import { memoryDb, resetMemoryDb } from '../setup';
@@ -392,6 +395,107 @@ describe('save / markUsed / list / remove', () => {
     const result = await importAnswerBank({ answers: [{ nonsense: true }, null, 'string'] });
     expect(result.imported).toBe(0);
     expect(result.skipped).toBe(3);
+  });
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * SEC 5.2 — the Options management surface
+ *
+ * Pin and clear are asserted through the BUS handlers rather than through `bank.ts`, because the
+ * thing that was broken before was the contract, not the storage: the Options panel used to keep
+ * pins in its own localStorage, where they reordered nothing and the popup could not see them.
+ * ---------------------------------------------------------------------------------------------- */
+
+function busCtx(type: MessageType): MessageContext {
+  return {
+    type,
+    reqId: 'req_test_0001',
+    gesture: null,
+    tabId: null,
+    frameId: null,
+    url: null,
+    origin: 'options',
+  };
+}
+
+/** `pinned` rides on the record but is not part of the shared `AnswerRecord` type. */
+function pinnedFlag(record: object): boolean {
+  return (record as { pinned?: unknown }).pinned === true;
+}
+
+describe('ANSWERS_PIN / ANSWERS_CLEAR — managing what the bank remembers', () => {
+  beforeEach(async () => {
+    await save({ qRaw: 'Q one?', answer: 'A1', source: 'user', profileId: PROFILE });
+    await save({ qRaw: 'Q two?', answer: 'A2', source: 'user', profileId: PROFILE });
+    await save({ qRaw: 'Q three?', answer: 'A3', source: 'ai', profileId: PROFILE });
+  });
+
+  const listIds = async (): Promise<string[]> => {
+    const reply = await answerHandlers.ANSWERS_LIST({ profileId: PROFILE }, busCtx('ANSWERS_LIST'));
+    if (!reply.ok) throw new Error(reply.error.message);
+    return reply.data.records.map((record) => record.id);
+  };
+
+  it('a pinned answer is listed first, and unpinning restores the natural order', async () => {
+    const before = await listIds();
+    // Pin whatever the default order buried last — that is the only move the order can prove.
+    const buried = before[before.length - 1] ?? '';
+
+    const pinned = await answerHandlers.ANSWERS_PIN(
+      { id: buried, pinned: true },
+      busCtx('ANSWERS_PIN'),
+    );
+    expect(pinned.ok).toBe(true);
+    expect(await listIds()).toEqual([buried, ...before.slice(0, -1)]);
+
+    await answerHandlers.ANSWERS_PIN({ id: buried, pinned: false }, busCtx('ANSWERS_PIN'));
+    expect(await listIds()).toEqual(before);
+  });
+
+  it('the reply carries the pin flag, so the UI never has to guess or refetch', async () => {
+    const [first = ''] = await listIds();
+    const reply = await answerHandlers.ANSWERS_PIN({ id: first, pinned: true }, busCtx('ANSWERS_PIN'));
+    expect(reply.ok).toBe(true);
+    if (!reply.ok) return;
+    expect(reply.data.record.id).toBe(first);
+    expect(pinnedFlag(reply.data.record)).toBe(true);
+  });
+
+  it('pinning an answer that is already gone is NOT_FOUND, not a crash', async () => {
+    const reply = await answerHandlers.ANSWERS_PIN(
+      { id: 'ans_missing', pinned: true },
+      busCtx('ANSWERS_PIN'),
+    );
+    expect(reply.ok).toBe(false);
+    if (reply.ok) return;
+    expect(reply.error.code).toBe('NOT_FOUND');
+  });
+
+  it('ANSWERS_CLEAR empties the bank and reports how many answers it destroyed', async () => {
+    const reply = await answerHandlers.ANSWERS_CLEAR({}, busCtx('ANSWERS_CLEAR'));
+    expect(reply.ok).toBe(true);
+    if (!reply.ok) return;
+    expect(reply.data.cleared).toBe(3);
+    expect(await memoryDb.answerBank.count()).toBe(0);
+    expect(await listIds()).toEqual([]);
+
+    // Idempotent: a double-tap on an already empty bank reports the truth rather than failing.
+    const again = await answerHandlers.ANSWERS_CLEAR({}, busCtx('ANSWERS_CLEAR'));
+    expect(again.ok && again.data.cleared).toBe(0);
+  });
+
+  it('managing the bank stays offline: no gesture is demanded and no socket is opened', async () => {
+    expect(requiresGesture('ANSWERS_PIN')).toBe(false);
+    expect(requiresGesture('ANSWERS_CLEAR')).toBe(false);
+
+    const fetchSpy = vi.fn(() => Promise.reject(new Error('managing the bank must not open a socket')));
+    vi.stubGlobal('fetch', fetchSpy);
+
+    const [first = ''] = await listIds();
+    await answerHandlers.ANSWERS_PIN({ id: first, pinned: true }, busCtx('ANSWERS_PIN'));
+    await answerHandlers.ANSWERS_CLEAR({}, busCtx('ANSWERS_CLEAR'));
+
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
 

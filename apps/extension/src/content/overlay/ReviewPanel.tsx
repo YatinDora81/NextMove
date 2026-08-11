@@ -9,7 +9,19 @@ import {
   type ReactNode,
 } from 'react';
 
-export type ReviewTone = 'filled' | 'suggested' | 'unmatched';
+/**
+ * How a row reads to the user, not what the engine did to it.
+ *
+ *   filled     NextMove wrote the value and the page kept it.
+ *   answered   NextMove recognised the field and wrote nothing, because it already had an answer.
+ *   suggested  something is proposed but unproven — the user has to look.
+ *   unmatched  nothing NextMove can do here; the field is the user's to complete.
+ *
+ * `answered` is its own tone because it is the only one of the four that is finished *and* not our
+ * doing: counting it as `filled` inflates a number the header takes from the report, and counting
+ * it as `unmatched` turns a deliberate, correct refusal into a red "Needs you" row.
+ */
+export type ReviewTone = 'filled' | 'answered' | 'suggested' | 'unmatched';
 
 export interface ReviewRow {
   id: string;
@@ -72,6 +84,7 @@ export interface ReviewPanelProps {
 
 const TONE_LABEL: Readonly<Record<ReviewTone, string>> = {
   filled: 'Filled',
+  answered: 'Already answered',
   suggested: 'Check these',
   unmatched: 'Needs you',
 };
@@ -86,6 +99,10 @@ function reasonCopy(reason: string | undefined): string | null {
       return 'Your profile has nothing for this field yet.';
     case 'no-option-match':
       return 'None of the options matched your saved answer.';
+    case 'already-answered':
+      // The engine's `REASON.alreadyAnswered`: a field that already carried an answer, so nothing
+      // was written. Without this sentence the row looked like a failure the user had to fix.
+      return 'You have already answered this — NextMove left it alone.';
     case 'value-not-committed':
     case 'commit-unverified':
       return 'Written, but the site did not confirm it — please check.';
@@ -333,7 +350,7 @@ export function ReviewPanel(props: ReviewPanelProps): ReactElement {
   const [active, setActive] = useState<ReviewTone | null>(null);
 
   const counts = useMemo(() => {
-    const out: Record<ReviewTone, number> = { filled: 0, suggested: 0, unmatched: 0 };
+    const out: Record<ReviewTone, number> = { filled: 0, answered: 0, suggested: 0, unmatched: 0 };
     for (const row of rows) out[row.tone] += 1;
     return out;
   }, [rows]);
@@ -345,7 +362,7 @@ export function ReviewPanel(props: ReviewPanelProps): ReactElement {
 
   const frameFilled = frameContributions.reduce((sum, frame) => sum + frame.filled, 0);
 
-  const legend = (['filled', 'suggested', 'unmatched'] as const).map((tone) =>
+  const legend = (['filled', 'answered', 'suggested', 'unmatched'] as const).map((tone) =>
     h(
       'button',
       {

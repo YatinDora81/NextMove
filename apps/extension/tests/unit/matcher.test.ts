@@ -29,9 +29,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { getAdapter } from '@/core/adapters';
+import { fillSelect, selectHasRealValue } from '@/core/fill/strategies/select';
+import { contextOf, REASON } from '@/core/fill/types';
 import { FieldMatcher } from '@/core/matcher';
 import { detectAtsId } from '@/core/adapters/registry';
-import { scanForms } from '@/core/scanner';
+import { deriveGroupQuestion, scanForms } from '@/core/scanner';
 import { FILL_THRESHOLD, SCORE, SCORE_MODIFIER, SUGGEST_THRESHOLD } from '@/shared/constants';
 import type { AtsId, FieldNode, MatchResult, ProfilePath } from '@/shared/types';
 
@@ -660,5 +662,267 @@ describe('SEC 6.3 order of authority — the first confident tier wins', () => {
       },
     }).matchOne(node);
     expect(result.path).toBe('resume');
+  });
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * The question a radio group asks (SEC 6.2 — signatures)
+ *
+ * A radio group is ONE question, and its signature has to carry that question rather than the
+ * caption of whichever member the scanner reached first. `signature.resolveGroupLabel` reads the
+ * authored answer — <legend>, an ARIA radiogroup name, a nearby heading — and `scanner`'s
+ * `deriveGroupQuestion` is the tier below it, for the pages that ship none of the three. Without it
+ * every group on a hand-rolled form is signed as "Yes": one label, one hash shape, nothing the
+ * matcher can score, and two different questions colliding on one saved user mapping (F-13).
+ * ---------------------------------------------------------------------------------------------- */
+
+describe('radio-group questions derived from unstructured markup', () => {
+  /** Scan the current document and return the node whose control carries this `name`. */
+  function groupNode(name: string): FieldNode {
+    const node = scanForms(document).fields.find((candidate) => candidate.sig.name === name);
+    if (node === undefined) throw new Error(`no scanned field named "${name}"`);
+    return node;
+  }
+
+  it('reads the prompt out of the div soup around the group', () => {
+    unloadFixture();
+    document.body.innerHTML = `
+      <div class="field">
+        <p class="prompt">Will you now or in the future require sponsorship for employment?</p>
+        <label><input type="radio" name="sponsorship" value="Yes" /> Yes</label>
+        <label><input type="radio" name="sponsorship" value="No" /> No</label>
+      </div>
+    `;
+
+    const node = groupNode('sponsorship');
+    expect(node.sig.label).toBe(
+      'Will you now or in the future require sponsorship for employment?',
+    );
+    // …and the question, unlike the caption "Yes", is something the matcher can actually score.
+    expect(new FieldMatcher({ requireValue: false }).matchOne(node).path).toBe(
+      'authorization.needsSponsorship',
+    );
+  });
+
+  it('never mistakes an option caption for the question', () => {
+    unloadFixture();
+    // The captions come FIRST in document order and are long enough to pass the length test, so
+    // only the "is this one of the options" rule can keep them out of the signature.
+    document.body.innerHTML = `
+      <div class="auth">
+        <label for="a1">I am legally authorized to work in the United States</label>
+        <input id="a1" type="radio" name="work_auth" value="authorized" />
+        <label for="a2">I am not authorized and will require sponsorship</label>
+        <input id="a2" type="radio" name="work_auth" value="sponsorship" />
+        <p>Are you legally authorized to work in the United States?</p>
+      </div>
+    `;
+
+    expect(groupNode('work_auth').sig.label).toBe(
+      'Are you legally authorized to work in the United States?',
+    );
+  });
+
+  it('an authored <legend> outranks the derivation — it is a statement, not a guess', () => {
+    unloadFixture();
+    document.body.innerHTML = `
+      <fieldset>
+        <legend>Do you require visa sponsorship?</legend>
+        <p>Answer for the country this role is based in.</p>
+        <label><input type="radio" name="visa" value="Yes" /> Yes</label>
+        <label><input type="radio" name="visa" value="No" /> No</label>
+      </fieldset>
+    `;
+
+    expect(groupNode('visa').sig.label).toBe('Do you require visa sponsorship?');
+  });
+
+  it('two questions on one page get two different signatures', () => {
+    unloadFixture();
+    document.body.innerHTML = `
+      <div class="field">
+        <p>Are you legally authorized to work in the United States?</p>
+        <label><input type="radio" name="q1" value="Yes" /> Yes</label>
+        <label><input type="radio" name="q1" value="No" /> No</label>
+      </div>
+      <div class="field">
+        <p>Will you now or in the future require sponsorship for employment?</p>
+        <label><input type="radio" name="q2" value="Yes" /> Yes</label>
+        <label><input type="radio" name="q2" value="No" /> No</label>
+      </div>
+    `;
+
+    const first = groupNode('q1');
+    const second = groupNode('q2');
+    expect(first.sig.label).not.toBe(second.sig.label);
+    expect(first.sig.hash).not.toBe(second.sig.hash);
+  });
+
+  it('says nothing rather than guess when the container holds no prompt (INV-4)', () => {
+    unloadFixture();
+    document.body.innerHTML = `
+      <div class="options">
+        <label><input type="radio" name="bare" value="Yes" /> Yes</label>
+        <label><input type="radio" name="bare" value="No" /> No</label>
+      </div>
+    `;
+
+    const radio = document.querySelector('input[name="bare"]');
+    expect(radio).not.toBeNull();
+    if (radio === null) return;
+    expect(deriveGroupQuestion(radio)).toBe('');
+  });
+
+  it('a lone radio has no group, so nothing is derived for it', () => {
+    unloadFixture();
+    document.body.innerHTML = `
+      <div class="field">
+        <p>Please confirm you have read the privacy notice.</p>
+        <label><input type="radio" name="solo" value="Yes" /> Yes</label>
+      </div>
+    `;
+
+    const radio = document.querySelector('input[name="solo"]');
+    expect(radio).not.toBeNull();
+    if (radio === null) return;
+    expect(deriveGroupQuestion(radio)).toBe('');
+  });
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * Choice controls hidden behind their own <label> (SEC 6.2 — the scanner's visibility rule)
+ * ---------------------------------------------------------------------------------------------- */
+
+describe('scanner · a styled-away radio/checkbox is reachable through its label', () => {
+  it('keeps an opacity:0 checkbox whose label is on screen', () => {
+    unloadFixture();
+    document.body.innerHTML = `
+      <div class="consent">
+        <input id="bg" type="checkbox" name="background_check" style="opacity:0" />
+        <label for="bg">I consent to a background check</label>
+      </div>
+    `;
+
+    const names = scanForms(document).fields.map((node) => node.sig.name);
+    expect(names).toContain('background_check');
+  });
+
+  it('keeps a visibility:hidden radio wrapped in a visible label', () => {
+    unloadFixture();
+    document.body.innerHTML = `
+      <div class="field">
+        <p>Are you legally authorized to work in the United States?</p>
+        <label><input type="radio" name="work_auth" value="Yes" style="visibility:hidden" /> Yes</label>
+        <label><input type="radio" name="work_auth" value="No" style="visibility:hidden" /> No</label>
+      </div>
+    `;
+
+    const node = scanForms(document).fields.find((field) => field.sig.name === 'work_auth');
+    expect(node).toBeDefined();
+    expect(node?.visible).toBe(true);
+  });
+
+  it('drops the control when the label is hidden too — the exemption proves reachability', () => {
+    unloadFixture();
+    document.body.innerHTML = `
+      <div class="consent">
+        <input id="bg2" type="checkbox" name="hidden_step" style="opacity:0" />
+        <label for="bg2" style="display:none">I consent to a background check</label>
+      </div>
+    `;
+
+    const names = scanForms(document).fields.map((node) => node.sig.name);
+    expect(names).not.toContain('hidden_step');
+  });
+
+  it('the exemption does not leak to other control types', () => {
+    unloadFixture();
+    document.body.innerHTML = `
+      <div class="field">
+        <input id="t1" type="text" name="middle_name" style="opacity:0" />
+        <label for="t1">Middle name</label>
+      </div>
+    `;
+
+    const names = scanForms(document).fields.map((node) => node.sig.name);
+    expect(names).not.toContain('middle_name');
+  });
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * A dropdown that already carries an answer (SEC 6.4)
+ * ---------------------------------------------------------------------------------------------- */
+
+describe('select · an existing selection is an answer, not an empty field', () => {
+  function selectFixture(): HTMLSelectElement {
+    unloadFixture();
+    document.body.innerHTML = `
+      <label for="country">Country</label>
+      <select id="country" name="country">
+        <option value="">Select…</option>
+        <option value="US">United States</option>
+        <option value="CA">Canada</option>
+      </select>
+    `;
+    const el = document.querySelector('#country');
+    if (!(el instanceof HTMLSelectElement)) throw new Error('the select fixture did not build');
+    return el;
+  }
+
+  it('a placeholder row is not a real value, so the field still fills', async () => {
+    const select = selectFixture();
+    expect(selectHasRealValue(select)).toBe(false);
+
+    const result = await fillSelect(select, 'Canada', contextOf({ preferLocal: true }));
+    expect(result.ok).toBe(true);
+    expect(select.value).toBe('CA');
+  });
+
+  it('a placeholder that ships with a value is still a placeholder', () => {
+    unloadFixture();
+    document.body.innerHTML = `
+      <select id="period" name="period">
+        <option value="0">-- Choose one --</option>
+        <option value="year">Per year</option>
+      </select>
+    `;
+    const select = document.querySelector('#period');
+    expect(select).toBeInstanceOf(HTMLSelectElement);
+    if (!(select instanceof HTMLSelectElement)) return;
+    expect(selectHasRealValue(select)).toBe(false);
+  });
+
+  it('a fill run leaves a dropdown that already reads "Canada" alone', async () => {
+    const select = selectFixture();
+    select.value = 'CA';
+    expect(selectHasRealValue(select)).toBe(true);
+
+    const result = await fillSelect(select, 'United States', contextOf({ preferLocal: true }));
+    expect(select.value).toBe('CA');
+    // Declining to clobber an answer is the strategy working — a skip, never an error. It reports
+    // `already-answered` and not `not-fillable`: the overlay has to tell the user which happened.
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe(REASON.alreadyAnswered);
+  });
+
+  it('a standing answer that is already the one we wanted counts as filled', async () => {
+    const select = selectFixture();
+    select.value = 'US';
+
+    const result = await fillSelect(select, 'United States', contextOf({ preferLocal: true }));
+    expect(result.ok).toBe(true);
+    expect(result.verified).toBe(true);
+    expect(select.value).toBe('US');
+  });
+
+  it('an explicit re-fill of this one field still overwrites it', async () => {
+    const select = selectFixture();
+    select.value = 'CA';
+
+    const result = await fillSelect(select, 'United States', contextOf({ preferLocal: true }), {
+      overwrite: true,
+    });
+    expect(result.ok).toBe(true);
+    expect(select.value).toBe('US');
   });
 });

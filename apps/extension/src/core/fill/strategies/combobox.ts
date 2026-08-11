@@ -29,11 +29,13 @@ import {
 } from '../dom';
 import { MIN_OPTION_SCORE, bestOption, normalize } from '../matching';
 import { valueVariants } from './select';
+import { textHasRealValue } from './text';
 import {
   REASON,
   failed,
   filled,
   unverified,
+  type FillRequest,
   type FillValue,
   type StrategyContext,
   type StrategyResult,
@@ -257,6 +259,7 @@ export async function fillCombobox(
   el: Element,
   value: FillValue,
   ctx: StrategyContext,
+  request: FillRequest = {},
 ): Promise<StrategyResult> {
   try {
     assertNotSubmitControl(el, 'fill'); // INV-1
@@ -276,6 +279,15 @@ export async function fillCombobox(
   const label = `${ctx.sig?.label ?? ''} ${ctx.sig?.name ?? ''} ${ctx.sig?.id ?? ''}`;
   const variants = valueVariants(text, label);
   const query = queryFor(variants[0] ?? text);
+
+  // An already-answered typeahead is left exactly as it is (see `comboboxHasRealValue`). Step 2
+  // below CLEARS the field before typing, which is exactly how a selection the user made by hand
+  // was being destroyed. A standing selection that is already the one we would have picked counts
+  // as `filled` — the field is correct and the report should say so; anything else is a skip, not
+  // an error, because declining to clobber an answer is the strategy working.
+  if (request.overwrite !== true && comboboxHasRealValue(el)) {
+    return alreadyShows(selectionText(el), variants) ? filled() : failed(REASON.alreadyAnswered);
+  }
 
   // 1. focus — a typeahead that never receives focus never opens its popup.
   el.focus();
@@ -345,36 +357,103 @@ export async function fillCombobox(
   return unverified(REASON.commitUnverified);
 }
 
+/** The wrapper a typeahead renders its popup and its committed selection into. */
+function widgetContainer(el: Element): Element | null {
+  return (
+    el.closest('[data-automation-id], [class*="select" i], [class*="combobox" i]') ??
+    el.parentElement
+  );
+}
+
+function nodesMatching(container: Element, selectors: readonly string[]): HTMLElement[] {
+  const out: HTMLElement[] = [];
+  for (const selector of selectors) {
+    try {
+      out.push(...Array.from(container.querySelectorAll<HTMLElement>(selector)));
+    } catch {
+      continue; // a malformed remote-config selector must never break a fill run
+    }
+  }
+  return out;
+}
+
+/**
+ * Nodes that mean "this typeahead is holding a selection", for the widgets that render the
+ * committed value beside the input instead of inside it (react-select, Workday).
+ *
+ * Deliberately narrower than the set `selectionChipMatches` searches. That one only accepts a node
+ * whose TEXT is the option we just clicked, so a loose `[class*="tag" i]` — which also matches
+ * "advantage", "vintage", "stage" — costs nothing. Asking the opposite question, "is there any
+ * selection at all", has no text to check against, and a false positive there leaves a genuinely
+ * empty field blank because the engine believed the user had already answered it.
+ */
+const SELECTION_NODE_SELECTORS = [
+  '[data-automation-id="selectedItem"]',
+  '[class*="singleValue" i]',
+  '[class*="single-value" i]',
+  '[class*="multiValue" i]',
+  '[class*="multi-value" i]',
+];
+
+/** What the widget currently shows as its answer: its own text, else its selection chip. */
+function selectionText(el: Element): string {
+  if (textHasRealValue(el)) return readLocalValue(el) ?? '';
+
+  const container = widgetContainer(el);
+  if (container === null) return '';
+  for (const node of nodesMatching(container, SELECTION_NODE_SELECTORS)) {
+    const text = (node.textContent ?? '').trim();
+    if (text.length > 0) return text;
+  }
+  return '';
+}
+
+/**
+ * Does this typeahead already carry a real selection?
+ *
+ * The combobox clause of the engine's one "already answered" policy (`isAlreadyAnswered`). Two
+ * shapes count, because both are answers to the human reading the page: text sitting in the input,
+ * and a committed selection rendered as a chip next to an input the widget keeps empty.
+ */
+export function comboboxHasRealValue(el: Element): boolean {
+  return selectionText(el).length > 0;
+}
+
+/**
+ * Is the selection the widget is already showing the one we were about to pick?
+ *
+ * The standing text has to CONTAIN the whole variant, which is how a typeahead legitimately renders
+ * a choice ("Bengaluru, Karnataka, India" for "Bengaluru"). The reverse — a variant containing the
+ * standing text — is not accepted: a lone "B" the user was in the middle of typing is not an answer
+ * of "Bengaluru", and reporting it as one would claim a fill that never happened.
+ */
+function alreadyShows(standing: string, variants: readonly string[]): boolean {
+  const a = normalize(standing);
+  if (a.length === 0) return false;
+  return variants.some((variant) => {
+    const v = normalize(variant);
+    return v.length > 0 && a.includes(v);
+  });
+}
+
 /** react-select and Workday render the committed value beside the input, not inside it. */
 function selectionChipMatches(el: Element, chosenText: string): boolean {
   const wanted = normalize(chosenText);
   if (wanted.length === 0) return false;
 
-  const container =
-    el.closest('[data-automation-id], [class*="select" i], [class*="combobox" i]') ??
-    el.parentElement;
-  if (!container) return false;
+  const container = widgetContainer(el);
+  if (container === null) return false;
 
   const chipSelectors = [
-    '[data-automation-id="selectedItem"]',
-    '[class*="singleValue" i]',
-    '[class*="multiValue" i]',
+    ...SELECTION_NODE_SELECTORS,
     '[class*="chip" i]',
     '[class*="pill" i]',
     '[class*="tag" i]',
     '[aria-selected="true"]',
   ];
 
-  for (const selector of chipSelectors) {
-    let nodes: HTMLElement[];
-    try {
-      nodes = Array.from(container.querySelectorAll<HTMLElement>(selector));
-    } catch {
-      continue;
-    }
-    for (const node of nodes) {
-      if (normalize(node.textContent ?? '').includes(wanted)) return true;
-    }
+  for (const node of nodesMatching(container, chipSelectors)) {
+    if (normalize(node.textContent ?? '').includes(wanted)) return true;
   }
   return false;
 }
