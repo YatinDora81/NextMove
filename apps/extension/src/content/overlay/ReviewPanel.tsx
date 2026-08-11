@@ -302,9 +302,14 @@ function Row({
       row.tone === 'unmatched' || focused
         ? h(FieldMapper, { row, paths, domain, onMapField })
         : null,
-      (row.tone === 'unmatched' || focused) && onSaveAnswer !== undefined
+      // An already-answered field is the BEST candidate for this: the value sitting in it is one
+      // the user typed themselves, so offering to bank it is worth more here than on a field
+      // nothing could be matched to. Remapping stays hidden for those rows — the matcher already
+      // resolved them — but banking the answer must not be gated behind focusing the page field.
+      (row.tone === 'unmatched' || row.tone === 'answered' || focused) && onSaveAnswer !== undefined
         ? h(SaveAnswerButton, { row, onSaveAnswer })
         : null,
+
     ),
     h(
       'div',
@@ -493,9 +498,17 @@ export function ReviewPanel(props: ReviewPanelProps): ReactElement {
         h(
           'div',
           { className: 'jf-panel__sub' },
-          `${atsLabel} · ${stats.suggested} to check · ${stats.skipped} left for you${
+          // `stats.skipped` counts every field the engine did not write, which since the
+          // already-answered policy includes the ones it deliberately respected. Calling those
+          // "left for you" contradicts the legend directly below, which counts them as answered —
+          // so they are named here instead of being blamed on the user.
+          `${atsLabel} · ${stats.suggested} to check · ${Math.max(
+            0,
+            stats.skipped - counts.answered,
+          )} left for you${counts.answered > 0 ? ` · ${counts.answered} already answered` : ''}${
             stats.errors > 0 ? ` · ${stats.errors} failed` : ''
           }`,
+
         ),
       ),
       h(

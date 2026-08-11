@@ -109,10 +109,22 @@ const PROMPT_OPTION_RE = /select|choose|please|--|—/i;
  * and hide the accept button here, which is exactly backwards.
  */
 export function selectHasRealValue(select: HTMLSelectElement): boolean {
+  // A multi-select has no collapsed display, so nothing is selected until something selects it and
+  // the placeholder convention does not apply — "Select all that apply" is an instruction, not a
+  // stand-in. It also cannot be read through `selectedIndex`, which names only the FIRST selection:
+  // a valueless hint row sitting above three real choices would read as unanswered.
+  if (select.multiple) {
+    for (const option of select.selectedOptions) {
+      if (option.value !== '') return true;
+    }
+    return false;
+  }
+
   const option = select.options.item(select.selectedIndex);
   if (option === null || option.value === '') return false;
   return !PLACEHOLDER_OPTION_RE.test(option.textContent ?? '');
 }
+
 
 /** The option that best answers `value`, or `null` when nothing clears `OPTION_MATCH_FLOOR`. */
 export function bestOptionMatch(select: HTMLSelectElement, value: string): HTMLOptionElement | null {
