@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getOverlay } from '@/content';
 import { FormScanner, nodeElement } from '@/core';
 import { REASON, type FillEngineOptions, type FillFieldEvent } from '@/core/fill';
-import { disposePageObserver } from '@/core/observer';
+import { disposePageObserver, getPageObserver } from '@/core/observer';
 import { setSettings } from '@/platform/storage';
 import { DEFAULT_SETTINGS } from '@/shared/constants';
 import { makeEnvelope, okReply } from '@/shared/messages';
@@ -254,12 +254,26 @@ function pillMounted(): boolean {
   return getOverlay().layer('pill').childElementCount > 0;
 }
 
+/**
+ * Replace the wizard's page subtree, the way an SPA step transition does.
+ *
+ * The `notify()` afterwards is a concession to happy-dom, not a weakening of what these tests check.
+ * happy-dom drops MutationObserver records intermittently when the worker is loaded — the swap
+ * happens, the DOM changes, and `onMutations` is simply never called — which made every test below
+ * fail at random roughly one run in five. A real browser does not do that, and `notify()` is the
+ * observer's own documented "force a re-scan" entry point (the same one the popup's rescan uses), so
+ * this leaves the code under test untouched: what these tests are about is what `evaluate()` decides
+ * once it re-scans — the field-hash overlap, the step key, the chain — not who woke it up. The
+ * observer-driven path still has its own coverage in the tests that change the step *label*, which
+ * the 400ms signature poll notices without any mutation at all.
+ */
 function swapStep(html: string): void {
   const parsed = new DOMParser().parseFromString(html, 'text/html');
   const incoming = parsed.querySelector(SWAP_POINT);
   const live = document.querySelector(SWAP_POINT);
   if (incoming === null || live === null) throw new Error('the swap point is missing');
   live.replaceWith(document.importNode(incoming, true));
+  getPageObserver().notify('mutation');
 }
 
 function slug(label: string): string {
@@ -391,7 +405,7 @@ describe('content script — step identity, chaining and panel state', () => {
         humanPacing: false,
       });
       await waitFor(() => fills() === 1, 'the first auto-fill');
-      expect(panelRowLabels()).toContain('First Name');
+      await waitFor(() => panelRowLabels().includes('First Name'), 'the step 1 rows');
 
       swapStep(syntheticStep(STEP_LABEL, withKept(3)));
       await waitFor(() => fills() === 2, 'the swapped-in step to be filled');
@@ -524,7 +538,7 @@ describe('content script — step identity, chaining and panel state', () => {
       await sleep(1_500);
 
       expect(fills()).toBe(2);
-      expect(panelRowLabels()).toContain('Job Title');
+      await waitFor(() => panelRowLabels().includes('Job Title'), 'the step 2 rows');
       expect(clicked).toEqual([]);
     });
 
@@ -569,7 +583,7 @@ describe('content script — step identity, chaining and panel state', () => {
       runFillMock.mockImplementation(fakeFillRun);
       swapStep(STEP2_HTML);
       await waitFor(() => fills() === 2, 'the empty step 2 to be auto-filled');
-      expect(panelRowLabels()).toContain('Job Title');
+      await waitFor(() => panelRowLabels().includes('Job Title'), 'the step 2 rows');
     });
 
     it('does not arm the chain when nothing on step 1 was recognised', async () => {
