@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ReactElement } from 'react';
 
+import { setEnabled, subscribeSlot } from '@/platform/storage';
 import { DEFAULT_MODEL_CHAIN, FILL_THRESHOLD, SUGGEST_THRESHOLD } from '@/shared/constants';
 import type { AnswerLength, AnswerTone, ModelId } from '@/shared/types';
 
@@ -33,6 +34,13 @@ export function PreferencesPanel(): ReactElement {
 
   useEffect(() => {
     void load();
+    // This panel now carries the power switch, which is the same stored flag as Alt+Shift+N, the
+    // popup's toggle and the in-page bubble. No surface may keep a private copy of it: without this
+    // subscription, pressing the shortcut with Options open would leave a switch on screen claiming
+    // the opposite of what is true.
+    return subscribeSlot('settings', () => {
+      void load();
+    });
   }, [load]);
 
   if (settings === null) {
@@ -66,6 +74,16 @@ export function PreferencesPanel(): ReactElement {
 
       <FieldSet legend="Filling">
         <div className="flex flex-col gap-1">
+          <Switch
+            checked={settings.enabled}
+            onChange={(enabled) => {
+              // Through the shared writer, not this panel's generic `patch`: the power switch has one
+              // implementation so that four surfaces cannot disagree about it (SEC 5.1).
+              void setEnabled(enabled);
+            }}
+            label="NextMove is on"
+            hint="Off means the in-page layer draws nothing, suggests nothing and fills nothing on any site — and the toolbar button, the shortcut and the context menu all refuse. Nothing you have saved is touched."
+          />
           <Switch
             checked={settings.showFloatingPill}
             onChange={(showFloatingPill) => {

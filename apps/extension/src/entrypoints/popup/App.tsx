@@ -11,6 +11,7 @@ import type { AppStatus, ApplicationRow, FillReport, TrackerStats } from '@/shar
 
 import { Badge, Button, EmptyState, Select, StatusDot, cx } from '@/ui/components';
 import type { BadgeTone } from '@/ui/components';
+import { toggleEnabled } from '@/platform/storage';
 import { formatCountdown, formatRelative, plural } from '@/ui/format';
 import {
   AlertCircle,
@@ -87,7 +88,6 @@ export function App(): ReactElement {
 
   const settings = useSettingsStore((state) => state.settings);
   const loadSettings = useSettingsStore((state) => state.load);
-  const patchSettings = useSettingsStore((state) => state.patch);
 
 
   const [fill, setFill] = useState<FillState>(IDLE);
@@ -112,8 +112,8 @@ export function App(): ReactElement {
     });
   }, [loadProfiles, loadKeys, loadSync, loadSettings]);
 
-  // Alt+Shift+N and the in-page pill write the same settings slot, so the popup has to follow the
-  // storage rather than only its own click.
+  // Alt+Shift+N, the in-page panel header and the bubble's power dot all write the same settings
+  // slot, so the popup has to follow the storage rather than only its own click.
   useEffect(() => {
     const onChanged = (_changes: unknown, area: string): void => {
       if (area !== 'local') return;
@@ -162,9 +162,12 @@ export function App(): ReactElement {
   // "off" state it is about to contradict.
   const enabled = settings?.enabled !== false;
 
+  // One writer for the power switch, shared with the panel header, the bubble's dot and the
+  // shortcut: it reads the stored value under the slot's own lock rather than flipping this
+  // component's snapshot, which the shortcut may already have moved (SEC 5.1).
   const onToggleEnabled = useCallback(() => {
-    void patchSettings({ enabled: !enabled });
-  }, [enabled, patchSettings]);
+    void toggleEnabled();
+  }, []);
 
 
   const onFill = useCallback(async () => {

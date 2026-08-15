@@ -1,5 +1,5 @@
 import { createLogger } from '@/platform/logger';
-import { runMigrations, updateSlot } from '@/platform/storage';
+import { runMigrations, subscribeSlot, toggleEnabled } from '@/platform/storage';
 import { COMMAND_FILL_PAGE, COMMAND_TOGGLE_ENABLED, MENU_FILL_PAGE } from '@/shared/constants';
 
 
@@ -10,7 +10,6 @@ import { handleExternalMessage } from '@/background/handoff';
 import { dispatchLocal, installRouter } from '@/background/router';
 import { getSlot } from '@/platform/storage';
 import { ONBOARDED_KEY, ONBOARDING_PAGE, WEB_UNINSTALL_URL } from '@/shared/constants';
-import type { Settings } from '@/shared/types';
 
 
 const log = createLogger('bg');
@@ -71,18 +70,16 @@ async function maybeOpenOnboarding(reason: string): Promise<void> {
 }
 
 /**
- * Flip the global power switch and repaint the badge.
+ * Alt+Shift+N. The flip itself belongs to `platform/storage`, which every other surface writes
+ * through too, so this is only the shortcut's half: ask for the flip and say what happened.
  *
- * Nothing else has to be told: the in-page layer, the popup and the options page all watch the
- * settings slot through `storage.onChanged`, so one write reaches every surface in every tab.
+ * Nothing else has to be told. The in-page layer in every tab, the popup, the options page and the
+ * badge below all watch the settings slot through `storage.onChanged`, so one write is the whole
+ * fan-out — including the badge, which used to be repainted here and only here, and therefore went
+ * stale the moment the user flipped the switch from the popup instead.
  */
-async function toggleEnabled(): Promise<boolean> {
-  const next = await updateSlot('settings', (current: Settings) => ({
-    ...current,
-    enabled: !current.enabled,
-    updatedAt: Date.now(),
-  }));
-  await refreshKeyBadge();
+async function flipPowerSwitch(): Promise<boolean> {
+  const next = await toggleEnabled();
   log.info(`power switch → ${next.enabled ? 'on' : 'off'}`);
   return next.enabled;
 }
@@ -114,9 +111,15 @@ export default defineBackground(() => {
 
   installAlarmListener();
 
+  // The badge is a surface like any other: it reads `enabled` and it must not lag behind whichever
+  // surface flipped it. One subscription here replaces the repaint each writer used to remember.
+  subscribeSlot('settings', () => {
+    void refreshKeyBadge();
+  });
+
   browser.commands.onCommand.addListener((command, tab) => {
     if (command === COMMAND_TOGGLE_ENABLED) {
-      void toggleEnabled();
+      void flipPowerSwitch();
       return;
     }
     if (command !== COMMAND_FILL_PAGE) return;

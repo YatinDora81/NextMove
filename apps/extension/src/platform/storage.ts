@@ -428,31 +428,54 @@ type AnyListener = (value: unknown) => void;
 const listeners = new Map<StorageSlot, Set<AnyListener>>();
 let changeHookInstalled = false;
 
-function installChangeHook(): void {
-  if (changeHookInstalled) return;
-  const api = ext();
-  api.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName !== 'local') return;
-    for (const key of Object.keys(changes)) {
-      const slot = SLOT_BY_STORAGE_KEY.get(key);
-      if (!slot) continue;
-      const slotListeners = listeners.get(slot);
-      if (!slotListeners || slotListeners.size === 0) continue;
-      // Re-read through the decoder rather than trusting `change.newValue`: sealed slots need
-      // decryption, and every slot needs its Zod pass before a subscriber sees it.
-      void getSlot(slot)
-        .then((value) => {
-          for (const listener of slotListeners) {
-            try {
-              listener(value);
-            } catch (error) {
-              log.error(`subscriber for ${key} threw`, error);
-            }
+/**
+ * The change feed's listener, hoisted so its registration can be *verified* rather than assumed.
+ *
+ * One `addListener` guarded by a boolean is not the same thing as "we are subscribed": a context that
+ * loses the listener — because something detached it, or because the extension API object it was
+ * attached to is not the one we are asked about now — goes permanently deaf, and the symptom is a
+ * settings change that silently reaches no surface at all. Every `subscribeSlot` re-checks.
+ */
+/** The change feed's one listener, hoisted so its registration can be verified (see below). */
+const onStorageChanged = (changes: Record<string, unknown>, areaName: string): void => {
+  if (areaName !== 'local') return;
+  for (const key of Object.keys(changes)) {
+    const slot = SLOT_BY_STORAGE_KEY.get(key);
+    if (!slot) continue;
+    const slotListeners = listeners.get(slot);
+    if (!slotListeners || slotListeners.size === 0) continue;
+    // Re-read through the decoder rather than trusting `change.newValue`: sealed slots need
+    // decryption, and every slot needs its Zod pass before a subscriber sees it.
+    void getSlot(slot)
+      .then((value) => {
+        for (const listener of slotListeners) {
+          try {
+            listener(value);
+          } catch (error) {
+            log.error(`subscriber for ${key} threw`, error);
           }
-        })
-        .catch((error: unknown) => log.error(`change feed re-read of ${key} failed`, error));
-    }
-  });
+        }
+      })
+      .catch((error: unknown) => log.error(`change feed re-read of ${key} failed`, error));
+  }
+};
+
+/**
+ * Attach the change feed, and *verify* the attachment rather than assuming it.
+ *
+ * One `addListener` behind a boolean is not the same thing as "this context is subscribed": if the
+ * listener is ever detached — or if the extension-API object it was attached to is not the one we are
+ * handed now — the boolean stays true and every subscriber goes permanently deaf, with a settings
+ * change silently reaching no surface at all. `hasListener` is part of every Chrome event object, and
+ * it is optional here only so a shim without it still gets the old behaviour.
+ */
+function installChangeHook(): void {
+  const feed = ext().storage.onChanged as unknown as {
+    addListener(fn: typeof onStorageChanged): void;
+    hasListener?(fn: typeof onStorageChanged): boolean;
+  };
+  if (changeHookInstalled && feed.hasListener?.(onStorageChanged) !== false) return;
+  feed.addListener(onStorageChanged);
   changeHookInstalled = true;
 }
 
@@ -513,6 +536,39 @@ export async function setSettings(settings: Settings, now: number = Date.now()):
 
 export async function patchSettings(patch: Partial<Settings>, now: number = Date.now()): Promise<Settings> {
   return updateSlot('settings', (current) => ({ ...current, ...patch, updatedAt: now }));
+}
+
+/**
+ * The one writer of the global power switch (`Settings.enabled`).
+ *
+ * Four surfaces flip this bit — the popup header, the in-page panel header, the bubble's power dot
+ * and Alt+Shift+N in the service worker — and before this helper existed they did it three
+ * different ways, one of which forgot to stamp `updatedAt` and one of which repainted the toolbar
+ * badge while the others did not. Everything about "off" is a promise to the user, so the promise
+ * gets exactly one implementation.
+ *
+ * Nothing needs telling afterwards: every surface (including the badge and the in-page layer in
+ * every open tab) watches the settings slot through `storage.onChanged`, so one write is the whole
+ * fan-out. There is deliberately no `SETTINGS_*` message type — the service worker is not on the
+ * path of a preference.
+ */
+export async function setEnabled(enabled: boolean, now: number = Date.now()): Promise<Settings> {
+  return patchSettings({ enabled }, now);
+}
+
+/**
+ * Flip it, whatever it currently is, and report where it landed.
+ *
+ * A read-then-`setEnabled(!value)` from a keyboard shortcut can lose to a click on the popup toggle
+ * arriving in between; this runs inside `updateSlot`'s per-slot lock, so the two orderings are the
+ * only two outcomes and "on" and "off" can never end up both true.
+ */
+export async function toggleEnabled(now: number = Date.now()): Promise<Settings> {
+  return updateSlot('settings', (current) => ({
+    ...current,
+    enabled: !current.enabled,
+    updatedAt: now,
+  }));
 }
 
 export async function setSyncState(state: SyncState): Promise<SyncState> {
