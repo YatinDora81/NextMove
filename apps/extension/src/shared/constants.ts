@@ -19,6 +19,30 @@ export const STORAGE_KEYS = {
 export type StorageKeyName = keyof typeof STORAGE_KEYS;
 export type StorageKey = (typeof STORAGE_KEYS)[StorageKeyName];
 
+/**
+ * Purely-local UI keys, deliberately OUTSIDE `STORAGE_KEYS`.
+ *
+ * `STORAGE_KEYS` is the closed six-slot map that `platform/storage.ts` builds `StorageShape`,
+ * `SLOTS` and its migration/wipe helpers from; every member there must have a schema, a default
+ * and a place in the sync contract. These two hold throwaway per-device chrome (is the panel
+ * collapsed, which suggestions did you wave off on this domain) — they are never synced, never
+ * migrated, and losing them costs the user nothing. Adding them to the slot map would force a
+ * seventh `StorageShape` member on a module that has no business knowing about panel geometry.
+ *
+ * So they follow the precedent already set by `jf.pill` (`PILL_STORAGE_KEY` in `content/pill.ts`):
+ * a standalone `jf.*` key written with raw `browser.storage.local` and defensively re-parsed on
+ * every read, because nothing else guarantees their shape.
+ */
+export const STORAGE_KEY_UI = 'jf.ui';
+export const STORAGE_KEY_FIELD_DISMISSALS = 'jf.fieldDismissals';
+
+/**
+ * How long a per-field "✗ don't suggest this" survives. A dismissal is a reaction to one bad
+ * guess, not a permanent verdict — profiles change, and the matcher improves — so entries older
+ * than this are pruned on every read of `jf.fieldDismissals` and the suggestion comes back.
+ */
+export const FIELD_DISMISSAL_TTL_MS = 30 * 24 * 60 * 60 * 1_000;
+
 export const SCHEMA_VERSION = 1;
 
 export const DB_NAME = 'jobfill';

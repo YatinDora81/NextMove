@@ -234,6 +234,168 @@ button {
 .jf-pill__power:hover { background: var(--jf-danger-soft); color: var(--jf-danger); }
 
 
+/* ------------------------------------------------------------------------------------------------
+ * The bottom-right shell — collapsed bubble, panel chrome, power switch
+ * ---------------------------------------------------------------------------------------------- */
+
+/*
+ * The bubble is a wrapper rather than one big button because it holds three targets: the body that
+ * expands the panel, the power dot, and the count badge. A button inside a button is invalid, and
+ * the dot has to be its own control — flipping the power switch must not also open the panel.
+ */
+.jf-bubble {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: 48px;
+  height: 48px;
+  pointer-events: auto;
+}
+/* Expanded: the panel is the widget now, so the bubble steps aside without being torn down. */
+.jf-bubble--hidden { visibility: hidden; pointer-events: none; }
+
+.jf-bubble__open {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--jf-border);
+  background: var(--jf-surface);
+  box-shadow: var(--jf-shadow);
+  color: var(--jf-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.jf-bubble__open:hover { border-color: var(--jf-accent); }
+.jf-bubble__open:focus-visible { outline: 2px solid var(--jf-accent); outline-offset: 2px; }
+/* Off is a state, not a failure: the mark goes quiet rather than red. */
+.jf-bubble--off .jf-bubble__open { color: var(--jf-fg-faint); }
+.jf-bubble--busy .jf-bubble__mark { animation: jf-blink 900ms ease-in-out infinite; }
+.jf-bubble__mark { display: block; flex: none; }
+
+.jf-bubble__count {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--jf-accent);
+  color: var(--jf-accent-contrast);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * The power dot is its own button inside the bubble, so it needs a hit area a finger can find
+ * without swallowing the click that expands the panel. 18px of target around an 8px dot.
+ */
+.jf-bubble__power {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.jf-bubble__power:focus-visible { outline: 2px solid var(--jf-accent); outline-offset: 1px; }
+.jf-bubble__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid var(--jf-surface);
+  background: var(--jf-ok);
+  box-sizing: content-box;
+}
+.jf-bubble--off .jf-bubble__dot { background: var(--jf-fg-faint); }
+
+/*
+ * Collapsed hides the dock with visibility rather than display: none on purpose: the panel is
+ * meant to come back exactly as it was left, and a display-none container drops its scroll offset
+ * along with its layout box. Visibility keeps the box (and the scroll position), takes it out of
+ * hit-testing, and takes its buttons out of the tab order.
+ */
+.jf-shell--collapsed { visibility: hidden; pointer-events: none; }
+
+.jf-panel__chrome {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px 7px 12px;
+  border-bottom: 1px solid var(--jf-border);
+  background: var(--jf-surface-subtle);
+}
+.jf-panel__brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--jf-fg);
+}
+.jf-panel__brand svg { color: var(--jf-accent); flex: none; }
+
+.jf-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--jf-fg-muted);
+  flex: none;
+}
+.jf-switch:focus-visible { outline: 2px solid var(--jf-accent); outline-offset: 2px; border-radius: 999px; }
+.jf-switch__track {
+  width: 26px;
+  height: 15px;
+  border-radius: 999px;
+  background: var(--jf-surface-sunken-strong);
+  border: 1px solid var(--jf-hairline-strong);
+  position: relative;
+  transition: background 120ms ease-out;
+  flex: none;
+}
+.jf-switch__knob {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--jf-surface);
+  box-shadow: var(--jf-shadow-1);
+  transition: transform 120ms ease-out;
+}
+.jf-switch[aria-checked='true'] { color: var(--jf-fg); }
+.jf-switch[aria-checked='true'] .jf-switch__track {
+  background: var(--jf-ok);
+  border-color: var(--jf-ok);
+}
+.jf-switch[aria-checked='true'] .jf-switch__knob { transform: translateX(11px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .jf-switch__track, .jf-switch__knob { transition: none; }
+  .jf-bubble--busy .jf-bubble__mark { animation: none; }
+}
+
+
 
 .jf-panel {
   position: fixed;
@@ -448,10 +610,17 @@ button {
 @keyframes jf-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .jf-spinner { animation-duration: 2s; } }
 
+/*
+ * Clear of the bubble, not on top of it.
+ *
+ * The toast stack and the collapsed bubble both wanted the bottom-right 48px, and the stack is the
+ * higher layer — so the "NextMove is off" toast landed exactly over the one control that could turn
+ * it back on, and swallowed the click. 76px is the bubble's 48 plus its 16 of margin plus 12 of gap.
+ */
 .jf-toasts {
   position: fixed;
   right: 16px;
-  bottom: 16px;
+  bottom: 76px;
   display: flex;
   flex-direction: column-reverse;
   gap: 8px;

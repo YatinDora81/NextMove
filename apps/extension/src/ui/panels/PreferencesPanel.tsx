@@ -121,8 +121,8 @@ export function PreferencesPanel(): ReactElement {
             onChange={(showFloatingPill) => {
               void patch({ showFloatingPill });
             }}
-            label="Show the floating fill button on application pages"
-            hint="Appears only when a scan actually finds application-shaped fields."
+            label="Show NextMove's button in the corner of a page"
+            hint="The bubble that expands into the review panel, and the only place the on/off switch is reachable from inside a page."
           />
           <Switch
             checked={settings.autoFillOnLoad}
