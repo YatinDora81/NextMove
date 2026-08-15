@@ -51,6 +51,17 @@ export interface SuggestDeps {
   remember(labelText: string, value: string): Promise<void>;
   /** Optional surface for the one-line confirmations; the caller owns the real toast stack. */
   onToast?(message: string): void;
+  /**
+   * "Something else already speaks for this control." Wired to the proactive layer
+   * (`FieldControls`), which paints a ghost and a ✓/✗/💾 cluster on every field the matcher
+   * recognised, before anything is focused.
+   *
+   * Without this the two layers would both offer the same field the moment it was focused: two
+   * ghosts on the same text origin, and two bars fighting over the same 22px of its right edge.
+   * This layer keeps what it is uniquely able to do — an Answer Bank hit on a field the matcher
+   * could not place, and 🔖 on radios and checkboxes, neither of which the proactive layer offers.
+   */
+  owns?(el: Element): boolean;
 }
 
 /** The four things a session can be attached to; they differ only in what the bar offers. */
@@ -603,6 +614,7 @@ class SuggestOverlay implements SuggestController {
   private readonly onFocusIn = (event: Event): void => {
     if (!this.enabled) return;
     const target = event.target;
+    if (target instanceof Element && this.deps.owns?.(target) === true) return;
     if (isEligibleSelect(target)) this.beginSelect(target);
     else if (isEligibleText(target)) this.beginText(target);
   };
@@ -902,6 +914,7 @@ class SuggestOverlay implements SuggestController {
     if (!(target instanceof HTMLInputElement)) return;
     const type = target.type.toLowerCase();
     if (type !== 'radio' && type !== 'checkbox') return;
+    if (this.deps.owns?.(target) === true) return;
     this.beginChoice(target, type);
   };
 

@@ -77,7 +77,18 @@ export interface ReviewPanelProps {
   onRevealNextStep: () => void;
   onMapField: (row: ReviewRow, path: string) => Promise<boolean>;
   onSaveAnswer?: (row: ReviewRow) => Promise<boolean>;
+  /**
+   * Undo a ✗. Present only when the caller keeps a per-field dismissal ledger; rows carrying
+   * `reason: 'dismissed'` grow a "suggest this again" button from it, because ✗ sits one 18px
+   * button away from ✓ on the page and a mis-click must not be a one-way door.
+   */
+  onRestoreRow?: (row: ReviewRow) => Promise<boolean>;
   focusedHash?: string | null;
+  /**
+   * The window around the review — name, power switch, minimise. Rendered as the card's first child
+   * rather than composed outside it so the whole thing reads as one panel; `PanelShell` supplies it.
+   */
+  chrome?: ReactNode;
   onRefill: () => void;
   onClose: () => void;
 }
@@ -97,6 +108,12 @@ function reasonCopy(reason: string | undefined): string | null {
       return 'You’re on this field now — map it once and NextMove fills it here from then on.';
     case 'no-value':
       return 'Your profile has nothing for this field yet.';
+    case 'dismissed':
+      // The ✗ on the page field. Said in the past tense on purpose: this is a record of the user's
+      // own decision, not a failure of the matcher's.
+      return 'You told NextMove not to suggest anything here.';
+    case 'accepted':
+      return 'You accepted NextMove’s suggestion for this field.';
     case 'no-option-match':
       return 'None of the options matched your saved answer.';
     case 'already-answered':
@@ -254,6 +271,49 @@ function SaveAnswerButton({ row, onSaveAnswer }: SaveAnswerButtonProps): ReactEl
   );
 }
 
+interface RestoreButtonProps {
+  row: ReviewRow;
+  onRestoreRow: (row: ReviewRow) => Promise<boolean>;
+}
+
+/**
+ * There is no success state here on purpose. A restored suggestion is no longer dismissed, so the
+ * row it lives in stops existing on the same tick — the confirmation the user gets is the ghost
+ * reappearing on the field behind this panel, which is the thing they actually asked for.
+ */
+function RestoreButton({ row, onRestoreRow }: RestoreButtonProps): ReactElement {
+  const [state, setState] = useState<'idle' | 'saving' | 'failed'>('idle');
+
+  const restore = useCallback(() => {
+    if (state === 'saving') return;
+    setState('saving');
+    void onRestoreRow(row).then(
+      (ok) => {
+        if (!ok) setState('failed');
+      },
+      () => setState('failed'),
+    );
+  }, [onRestoreRow, row, state]);
+
+  return h(
+    'div',
+    { className: 'jf-map' },
+    h(
+      'button',
+      {
+        type: 'button',
+        className: 'jf-btn jf-btn--tiny',
+        disabled: state === 'saving',
+        onClick: restore,
+      },
+      state === 'saving' ? 'Restoring…' : 'Suggest this again',
+    ),
+    state === 'failed'
+      ? h('span', { className: 'jf-row__meta' }, 'Could not restore it — try again.')
+      : null,
+  );
+}
+
 interface RowProps {
   row: ReviewRow;
   paths: readonly string[];
@@ -262,6 +322,7 @@ interface RowProps {
   onRevealRow: (id: string) => void;
   onMapField: (row: ReviewRow, path: string) => Promise<boolean>;
   onSaveAnswer?: (row: ReviewRow) => Promise<boolean>;
+  onRestoreRow?: (row: ReviewRow) => Promise<boolean>;
 }
 
 function Row({
@@ -272,6 +333,7 @@ function Row({
   onRevealRow,
   onMapField,
   onSaveAnswer,
+  onRestoreRow,
 }: RowProps): ReactElement {
   const rowRef = useRef<HTMLDivElement | null>(null);
   const reason = reasonCopy(row.reason);
@@ -308,6 +370,9 @@ function Row({
       // resolved them — but banking the answer must not be gated behind focusing the page field.
       (row.tone === 'unmatched' || row.tone === 'answered' || focused) && onSaveAnswer !== undefined
         ? h(SaveAnswerButton, { row, onSaveAnswer })
+        : null,
+      row.reason === 'dismissed' && onRestoreRow !== undefined
+        ? h(RestoreButton, { row, onRestoreRow })
         : null,
 
     ),
@@ -347,7 +412,9 @@ export function ReviewPanel(props: ReviewPanelProps): ReactElement {
     onRevealNextStep,
     onMapField,
     onSaveAnswer,
+    onRestoreRow,
     focusedHash,
+    chrome,
     onRefill,
     onClose,
   } = props;
@@ -482,6 +549,7 @@ export function ReviewPanel(props: ReviewPanelProps): ReactElement {
   return h(
     'div',
     { className: 'jf-card jf-panel', role: 'dialog', 'aria-label': 'NextMove review' },
+    chrome ?? null,
     h(
       'div',
       { className: 'jf-panel__head' },
@@ -548,6 +616,7 @@ export function ReviewPanel(props: ReviewPanelProps): ReactElement {
               onRevealRow,
               onMapField,
               onSaveAnswer,
+              onRestoreRow,
             }),
           ),
     ),

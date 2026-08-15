@@ -234,6 +234,21 @@ function panelSubtitle(): string {
   return panel().querySelector('.jf-panel__sub')?.textContent ?? '';
 }
 
+function shell(): HTMLElement | null {
+  return panel().querySelector<HTMLElement>('.jf-shell');
+}
+
+function panelExpanded(): boolean {
+  const el = shell();
+  return el !== null && !el.classList.contains('jf-shell--collapsed');
+}
+
+function clickInPanel(selector: string): void {
+  const button = panel().querySelector<HTMLElement>(selector);
+  if (button === null) throw new Error(`the panel has no ${selector}`);
+  button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+}
+
 function panelRowLabels(): string[] {
   return [...panel().querySelectorAll('.jf-row__label')].map((el) =>
     (el.textContent ?? '').replace(/\s*\*$/, '').trim(),
@@ -624,6 +639,64 @@ describe('content script — step identity, chaining and panel state', () => {
       await sleep(1_500);
 
       expect(fills()).toBe(2);
+    });
+  });
+
+  describe('the collapsible corner', () => {
+    it('opens itself once when a run finishes, and never again on its own', async () => {
+      await bootContentScript(STEP1_HTML, STEP1_URL, {
+        autoFillOnLoad: false,
+        autoFillNextSteps: false,
+        reviewOverlay: true,
+      });
+      await waitFor(pillMounted, 'the content script to finish its first evaluate');
+
+      // Collapsed on arrival: NextMove has to earn 392px of someone's screen.
+      await waitFor(() => shell() !== null, 'the shell to mount');
+      expect(panelExpanded()).toBe(false);
+
+      mock.__emitMessage(makeEnvelope('FILL_REQUEST', { profileId: null, trigger: 'popup' }));
+      await waitFor(() => fills() === 1, 'the requested fill');
+      await waitFor(panelExpanded, 'the panel to open on the results');
+
+      // …and the one-shot expand is not a preference. Persisting it would open a 392px panel over
+      // every page in every tab for the rest of the session.
+      expect(mock.__store['jf.ui']).toBeUndefined();
+
+      clickInPanel('.jf-panel__chrome button[aria-label="Minimise NextMove"]');
+      await waitFor(() => !panelExpanded(), 'the panel to fold away');
+      // Minimising IS a choice, so that one is remembered.
+      await waitFor(() => mock.__store['jf.ui'] !== undefined, 'the collapse to be persisted');
+      expect(mock.__store['jf.ui']).toEqual({ panelCollapsed: true });
+
+      mock.__emitMessage(makeEnvelope('FILL_REQUEST', { profileId: null, trigger: 'popup' }));
+      await waitFor(() => fills() === 2, 'the second fill');
+      await sleep(400);
+      expect(panelExpanded()).toBe(false);
+    });
+
+    it('turns the page loose when the power switch goes off, and keeps the way back', async () => {
+      await bootContentScript(STEP1_HTML, STEP1_URL, { autoFillOnLoad: false });
+      await waitFor(pillMounted, 'the content script to finish its first evaluate');
+      await waitFor(() => shell() !== null, 'the shell to mount');
+
+      await setSettings({ ...DEFAULT_SETTINGS, autoFillOnLoad: false, enabled: false });
+
+      // `enabled === false` is documented as "the in-page layer draws nothing" — including on a page
+      // that was already open when the switch moved.
+      await waitFor(() => shell() === null, 'the panel to be torn out of the page');
+      expect(getOverlay().layer('fields').querySelectorAll('.jf-cluster--show')).toHaveLength(0);
+      expect(getOverlay().layer('markers').childElementCount).toBe(0);
+
+      // The bubble is the one survivor, and it says which state it is in.
+      const bubble = getOverlay().layer('pill').querySelector('.jf-bubble');
+      expect(bubble?.className).toContain('jf-bubble--off');
+
+      await setSettings({ ...DEFAULT_SETTINGS, autoFillOnLoad: false, enabled: true });
+      await waitFor(() => shell() !== null, 'the panel to come back');
+      expect(
+        getOverlay().layer('pill').querySelector('.jf-bubble')?.className,
+      ).not.toContain('jf-bubble--off');
     });
   });
 

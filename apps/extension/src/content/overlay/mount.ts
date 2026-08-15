@@ -6,7 +6,13 @@ import { createLogger } from '@/platform/logger';
 
 const log = createLogger('overlay');
 
-export const OVERLAY_LAYERS = ['markers', 'sparkles', 'pill', 'panel', 'toasts'] as const;
+/**
+ * Paint order, back to front. `fields` sits directly above `markers` because both are anchored to
+ * the same page controls and the per-field ghost/cluster has to read as *on* the input while the
+ * F-06 outline stays behind it; everything from `sparkles` up is chrome that must be able to cover
+ * a suggestion, never the other way round.
+ */
+export const OVERLAY_LAYERS = ['markers', 'fields', 'sparkles', 'pill', 'panel', 'toasts'] as const;
 
 export type OverlayLayer = (typeof OVERLAY_LAYERS)[number];
 
@@ -49,10 +55,11 @@ ${overlayTokens}
 }
 
 .jf-layer--markers { z-index: 1; }
-.jf-layer--sparkles { z-index: 2; }
-.jf-layer--pill { z-index: 3; }
-.jf-layer--panel { z-index: 4; }
-.jf-layer--toasts { z-index: 5; }
+.jf-layer--fields { z-index: 2; }
+.jf-layer--sparkles { z-index: 3; }
+.jf-layer--pill { z-index: 4; }
+.jf-layer--panel { z-index: 5; }
+.jf-layer--toasts { z-index: 6; }
 
 .jf-layer * {
   box-sizing: border-box;
@@ -233,6 +240,70 @@ button {
 }
 .jf-pill__power:hover { background: var(--jf-danger-soft); color: var(--jf-danger); }
 
+
+/* ------------------------------------------------------------------------------------------------
+ * F-06 proactive suggestions — the per-field ghost preview and its ✓ / ✗ / 💾 cluster
+ * ---------------------------------------------------------------------------------------------- */
+
+/*
+ * The ghost is painted over the *page's* control, whose background follows the page's theme and not
+ * the operating system's — so its colour is a fixed mid-grey rather than a --jf-* token. That is
+ * the same decision, and the same value, as the focused-field ghost in Suggest.ts: a themed token
+ * reads as a real, already-typed value on half the sites in the world.
+ *
+ * No element-level opacity, deliberately: a control carrying a placeholder gets an opaque backdrop
+ * painted from its own computed background (FieldControls.resolveBackdrop) so the page's placeholder
+ * does not print through the suggestion, and opacity would make that backdrop translucent again.
+ * The grey is chosen to read as "not typed yet" at full strength.
+ */
+.jf-ghost {
+  position: fixed;
+  display: none;
+  align-items: center;
+  pointer-events: none;
+  overflow: hidden;
+  white-space: nowrap;
+  color: #8a8a93;
+}
+.jf-ghost--show { display: flex; }
+
+.jf-cluster {
+  position: fixed;
+  display: none;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid var(--jf-hairline-strong);
+  background: var(--jf-surface);
+  box-shadow: var(--jf-shadow-2);
+  pointer-events: auto;
+  user-select: none;
+}
+.jf-cluster--show { display: inline-flex; }
+/* Nothing left to accept or refuse here — 💾 is the whole offer. */
+.jf-cluster--save-only .jf-cluster__btn--accept,
+.jf-cluster--save-only .jf-cluster__btn--dismiss { display: none; }
+
+.jf-cluster__btn {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+}
+.jf-cluster__btn:hover { background: var(--jf-surface-subtle); }
+.jf-cluster__btn:focus-visible { outline: 2px solid var(--jf-accent); outline-offset: 1px; }
+.jf-cluster__btn[aria-disabled='true'] { opacity: 0.4; cursor: default; }
+.jf-cluster__btn--accept { color: var(--jf-ok); }
+.jf-cluster__btn--dismiss { color: var(--jf-danger); }
+.jf-cluster__btn--save { color: var(--jf-accent); }
 
 /* ------------------------------------------------------------------------------------------------
  * The bottom-right shell — collapsed bubble, panel chrome, power switch
