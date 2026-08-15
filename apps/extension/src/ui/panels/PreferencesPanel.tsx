@@ -18,6 +18,7 @@ import {
   toast,
 } from '@/ui/components';
 import { formatRelative } from '@/ui/format';
+import { SHORTCUTS, openShortcutsPage, shortcutKeys, shortcutText } from '@/ui/shortcuts';
 import { call, describeError, useSettingsStore } from '@/ui/store';
 
 const TONES: readonly AnswerTone[] = ['concise', 'enthusiastic', 'formal'];
@@ -71,6 +72,37 @@ export function PreferencesPanel(): ReactElement {
       />
 
       {error === null ? null : <Notice tone="danger">{error}</Notice>}
+
+      <FieldSet
+        legend="Keyboard"
+        description="The shipped defaults. Your browser owns the bindings, so it is also where you change them."
+        actions={
+          <Button variant="secondary" size="sm" onClick={openShortcutsPage}>
+            Change shortcuts
+          </Button>
+        }
+      >
+        <dl className="flex flex-col gap-1.5">
+          {SHORTCUTS.map((shortcut) => (
+            <div key={shortcut.id} className="flex items-baseline justify-between gap-3">
+              <dt className="text-sm text-[var(--jf-fg-muted)]">{shortcut.label}</dt>
+              <dd
+                className="flex shrink-0 items-center gap-1"
+                aria-label={shortcutText(shortcut)}
+              >
+                {shortcutKeys(shortcut).map((key) => (
+                  <kbd
+                    key={key}
+                    className="rounded-[var(--jf-radius-sm)] border border-[var(--jf-kbd-border)] bg-[var(--jf-kbd-bg)] px-1.5 py-px font-[var(--jf-font-mono)] text-[12px] text-[var(--jf-fg-muted)]"
+                  >
+                    {key}
+                  </kbd>
+                ))}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </FieldSet>
 
       <FieldSet legend="Filling">
         <div className="flex flex-col gap-1">

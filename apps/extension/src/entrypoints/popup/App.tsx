@@ -14,6 +14,14 @@ import type { BadgeTone } from '@/ui/components';
 import { toggleEnabled } from '@/platform/storage';
 import { formatCountdown, formatRelative, plural } from '@/ui/format';
 import {
+  FILL_SHORTCUT,
+  TOGGLE_SHORTCUT,
+  openShortcutsPage,
+  shortcutKeys,
+  shortcutText,
+  type ShortcutSpec,
+} from '@/ui/shortcuts';
+import {
   AlertCircle,
   AlertTriangle,
   Briefcase,
@@ -220,7 +228,7 @@ export function App(): ReactElement {
           onClick={onToggleEnabled}
           aria-pressed={enabled}
           aria-label={enabled ? 'Turn NextMove off' : 'Turn NextMove on'}
-          title={`${enabled ? 'Turn off' : 'Turn on'} — Alt+Shift+N`}
+          title={`${enabled ? 'Turn off' : 'Turn on'} — ${shortcutText(TOGGLE_SHORTCUT)}`}
           className={enabled ? 'text-[var(--jf-ok)]' : 'text-[var(--jf-fg-subtle)]'}
           icon={<Power size={18} />}
         />
@@ -295,7 +303,7 @@ export function App(): ReactElement {
               {!enabled ? (
                 <p className="text-center text-[12px] text-[var(--jf-fg-subtle)]">
                   NextMove is off — no suggestions, no filling, on any page. Your saved data is
-                  untouched. <Kbd>Alt</Kbd> + <Kbd>Shift</Kbd> + <Kbd>N</Kbd> turns it back on.
+                  untouched. <ShortcutKeys shortcut={TOGGLE_SHORTCUT} /> turns it back on.
                 </p>
               ) : fill.report !== null ? (
                 <FillSummary report={fill.report} />
@@ -303,7 +311,7 @@ export function App(): ReactElement {
                 <FillFailure message={fill.error} unreachable={fill.unreachable} />
               ) : hasProfile ? (
                 <p className="text-center text-[12px] text-[var(--jf-fg-subtle)]">
-                  Shortcut: <Kbd>Alt</Kbd> + <Kbd>J</Kbd> on any application page.
+                  Shortcut: <ShortcutKeys shortcut={FILL_SHORTCUT} /> on any application page.
                 </p>
               ) : null}
             </div>
@@ -468,7 +476,23 @@ export function App(): ReactElement {
         <BootPlaceholder />
       )}
 
-      <footer className="flex shrink-0 flex-col items-center border-t border-[var(--jf-border)] bg-[var(--jf-surface)] px-4 py-2 text-center">
+      <footer className="flex shrink-0 flex-col items-center gap-1.5 border-t border-[var(--jf-border)] bg-[var(--jf-surface)] px-4 py-2 text-center">
+        <p className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-[11.5px] leading-snug text-[var(--jf-fg-subtle)]">
+          <span className="flex items-center gap-1">
+            <ShortcutKeys shortcut={FILL_SHORTCUT} /> fill
+          </span>
+          <span aria-hidden>·</span>
+          <span className="flex items-center gap-1">
+            <ShortcutKeys shortcut={TOGGLE_SHORTCUT} /> on / off
+          </span>
+          <button
+            type="button"
+            onClick={openShortcutsPage}
+            className="underline decoration-dotted underline-offset-2 hover:text-[var(--jf-fg)]"
+          >
+            Change
+          </button>
+        </p>
         <p className="flex items-center gap-1.5 text-[13px] leading-snug text-[var(--jf-fg-muted)]">
           <ShieldCheck size={14} className="shrink-0 text-[var(--jf-ok)]" />
           NextMove fills the form.
@@ -521,6 +545,29 @@ function SectionLink({
       <ChevronRight size={14} />
     </Button>
   );
+}
+
+/**
+ * The keys of one shortcut, drawn as they appear on this user's keyboard — `⌥ ⇧ N` on a Mac, joined
+ * by `+` everywhere else, because the symbols already read as a chord and "⌥+⇧+N" does not.
+ */
+function ShortcutKeys({ shortcut }: { shortcut: ShortcutSpec }): ReactElement {
+  const keys = shortcutKeys(shortcut);
+  return (
+    <span className="inline-flex items-center gap-0.5 whitespace-nowrap" aria-label={shortcutText(shortcut)}>
+      {keys.map((key, index) => (
+        <span key={key} className="inline-flex items-center gap-0.5">
+          {index > 0 && !isMacKey(keys[0] ?? '') ? <span aria-hidden>+</span> : null}
+          <Kbd>{key}</Kbd>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** A Mac chord is drawn as adjacent symbols; a Windows one needs its plus signs. */
+function isMacKey(first: string): boolean {
+  return first === '⌥' || first === '⇧' || first === '⌃';
 }
 
 function Kbd({ children }: { children: ReactNode }): ReactElement {
