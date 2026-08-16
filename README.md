@@ -8,6 +8,12 @@ synced application tracker — with your data encrypted client-side.
 
 **Live app:** https://nextmove-yatin.vercel.app/
 
+## Quick Links
+- [Getting started](#getting-started)
+- [Architecture](#architecture-at-a-glance)
+- [API reference](#api-surface)
+- [Contributing](#contributing)
+
 ## Monorepo (pnpm + Turborepo)
 
 | Path                       | What |
@@ -194,6 +200,17 @@ Quiet Precision — see `docs/DESIGN_SYSTEM.md`. Grayscale first, one cobalt acc
 (`#4353e8` light / `#8492ff` dark) at most four times per screen, hierarchy from
 weight rather than colour, 40 px grid heroes, the black-N logo chip. No gradients,
 glassmorphism, glow shadows or 800-weight display type.
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| `pnpm install` fails with Prisma errors | Ensure `onlyBuiltDependencies` lists packages needing postinstall in `pnpm-workspace.yaml` |
+| Extension doesn't load in Chrome | Verify `extension id` in `wxt.config.ts` matches `NEXT_PUBLIC_EXTENSION_ID` in web `.env` |
+| Redis connection timeout | Redis is optional; cache layer degrades to DB reads — check `REDIS_URL` if intentionally using Redis |
+| Type errors in `@repo/types` | Run `pnpm --filter db generate` to regenerate Prisma client after schema changes |
+| `GEMINI_API_KEY` errors in extension | Check that key is stored via `/api/ai-keys` vault; keys never leave the device |
+| Migrations failing on dev | Ensure PostgreSQL is running and `DATABASE_URL` is correct; never edit existing migrations |
 
 ## Contributing
 
