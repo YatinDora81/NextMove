@@ -34,7 +34,7 @@ synced application tracker — with your data encrypted client-side.
 2. AI runs only on an explicit user gesture.
 3. Local-first: guest mode is fully offline.
 4. Fill >=70 confidence · suggest 50–69 · skip <50.
-5. **Gemini keys never leave the device** (`GEMINI_KEY_PATTERN` + `assertSyncSafe`).
+5. **Extension Gemini keys never leave the device** (`GEMINI_KEY_PATTERN` + `assertSyncSafe`). Web BYOK keys are stored in the server vault and are never synced to the extension.
 
 ## Getting started
 
@@ -48,7 +48,7 @@ synced application tracker — with your data encrypted client-side.
 ### Install and run
     pnpm install
     pnpm dev            # turbo run dev
-    pnpm check-types && pnpm lint && pnpm test && pnpm build
+    pnpm check-types && pnpm lint && pnpm turbo run test && pnpm build
 
 ### Database
     cd packages/db
@@ -77,7 +77,7 @@ Every app ships a committed `.env.example`. Copy it to `.env` and fill it in;
 | App | Template | Needs |
 |-----|----------|-------|
 | `apps/web` | `apps/web/.env.example` | `NEXT_PUBLIC_BASE_URL`, `NEXT_PUBLIC_EXTENSION_ID`, `NEXT_PUBLIC_CHROME_STORE_URL`, `INTERNAL_API_SECRET`, `MAIL_USER`, `MAIL_PASS` |
-| `apps/http-server` | `apps/http-server/.env.example` | `PORT`, `DATABASE_URL`, `REDIS_*`, `JWT_SECRET`, `INTERNAL_API_SECRET`, `KEY_VAULT_MASTER_KEY`, `GEMINI_API_KEY`, `ORIGINS`, `ADMIN_EMAILS` |
+| `apps/http-server` | `apps/http-server/.env.example` | `PORT`, `TRUST_PROXY`, `DATABASE_URL`, `REDIS_*`, `JWT_SECRET`, `INTERNAL_API_SECRET`, `ADMIN_SECRET`, `KEY_VAULT_MASTER_KEY`, `GEMINI_API_KEY`, `WEB_BYOK_REQUIRED`, `WEB_MODEL_BUDGETS`, `ORIGINS`, `ADMIN_EMAILS`, `CLERK_*`, `MAIL_*`, `NEXTJS_URL` |
 | `packages/db` | — | `DATABASE_URL` |
 
 Anything prefixed `NEXT_PUBLIC_` is inlined into the browser bundle at build
@@ -121,8 +121,9 @@ a new variable must be added there or Turborepo will not include it in the cache
 
 ## API surface
 
-Base URL = `NEXT_PUBLIC_BASE_URL`. Everything except `/api/auth/*` and
-`/api/webhooks/*` requires `Authorization: Bearer <jwt>`. Mount points are in
+Base URL = `NEXT_PUBLIC_BASE_URL`. Everything except `/api/auth/*`,
+`/api/webhooks/*`, and the one-time device pairing endpoint requires
+`Authorization: Bearer <jwt>`. Mount points are in
 `apps/http-server/src/index.ts`; each router in `src/routes/` is the source of
 truth for its own paths.
 
@@ -136,10 +137,10 @@ truth for its own paths.
 | `/api/chat` | Persistent AI chat rooms (premium) |
 | `/api/cache` | Redis flush (admin only) |
 | `/api/ai-keys` | Bring-your-own Gemini keys, stored via `packages/vault` |
-| `/api/devices` | Device pairing codes, listing, revocation |
+| `/api/devices` | Device pairing codes, code-authenticated pairing, listing, revocation |
 | `/api/sync` | Encrypted profile + field-mapping sync (2 MB JSON limit) |
 | `/api/job-applications` | Application tracker records |
-| `/api/webhooks` | Svix-verified Clerk webhooks (legacy provisioning) |
+| `/api/webhooks` | Svix-verified Clerk webhooks (legacy provisioning; raw body required) |
 | `/api/internal/send-email` | Next.js route, gated by `x-internal-secret`, sends OTP/SMTP mail |
 
 ## Auth model
@@ -196,7 +197,7 @@ that flag.
 
 ## Design system
 
-Quiet Precision — see `docs/DESIGN_SYSTEM.md`. Grayscale first, one cobalt accent
+Quiet Precision — the web app's design brief is in `apps/web/README.md`. Grayscale first, one cobalt accent
 (`#4353e8` light / `#8492ff` dark) at most four times per screen, hierarchy from
 weight rather than colour, 40 px grid heroes, the black-N logo chip. No gradients,
 glassmorphism, glow shadows or 800-weight display type.
